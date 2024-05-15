@@ -1,9 +1,18 @@
 require('dotenv').config();
 
+const cors = require('cors');
+const { CLIENT_URL } = require('./config');
 const express = require('express');
 const { cachePool } = require('./db');
 const app = express();
-const PORT = process.env.PORT || 3000;
+const PORT = process.env.PORT || 3001;
+
+const corsOptions = {
+  origin: CLIENT_URL,
+  optionsSuccessStatus: 200
+};
+
+app.use(cors(corsOptions));
 
 app.get('', async (req, res) => {
   return res.send('synthetix cache api');
