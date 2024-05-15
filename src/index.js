@@ -33,7 +33,7 @@ app.get('/tvl', async (req, res) => {
     // query cache db for updated value
     const tvl = await cachePool.query('SELECT * FROM tvl LIMIT 1');
 
-    return res.json(tvl.rows);  
+    return res.json(tvl.rows[0]);  
   } catch (error) {
     console.error(error);
     res.status(500).send('Server error');
