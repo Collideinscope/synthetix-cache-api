@@ -6,11 +6,13 @@ const app = express();
 
 const PORT = process.env.PORT || 3000;
 
+app.get('', async (req, res) => {
+  return res.send('synthetix cache api');
+});
+
 app.get('/api/apy', async (req, res) => {
   try {
-    const result = await pool.query('SELECT * FROM your_apy_view;');
 
-    return res.json(result.rows);
   } catch (error) {
     console.error(error);
 
@@ -18,17 +20,22 @@ app.get('/api/apy', async (req, res) => {
   }
 });
 
-app.get('/api/tvl', async (req, res) => {
+app.get('/tvl', async (req, res) => {
   try {
-    const result = await pool.query('SELECT * FROM your_tvl_view;');
+    const result = await pool.query(`
+      SELECT ts, pool_id, collateral_type, amount, collateral_value
+      FROM base_mainnet.core_vault_collateral
+      ORDER BY ts DESC
+      LIMIT 1;
+    `);
 
-    res.json(result.rows);
+    return res.json(result.rows);
   } catch (error) {
     console.error(error);
-    
     res.status(500).send('Server error');
   }
 });
+
 
 app.listen(PORT, () => {
   console.log(`Server is running on port ${PORT}`);
