@@ -4,6 +4,8 @@ const cors = require('cors');
 const { CLIENT_URL } = require('./config');
 const express = require('express');
 const { cachePool } = require('./db');
+const { updateAPYData } = require('./apyService');
+
 const app = express();
 const PORT = process.env.PORT || 3001;
 
@@ -20,7 +22,10 @@ app.get('', async (req, res) => {
 
 app.get('/apy', async (req, res) => {
   try {
-    return res.send('apy');
+    // query cache db for updated value
+    const apy = await cachePool.query('SELECT * FROM apy LIMIT 1');
+
+    return res.json(apy.rows[0]);
   } catch (error) {
     console.error(error);
 

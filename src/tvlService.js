@@ -12,7 +12,7 @@ const updateTVLData = async () => {
 
     const row = result.rows[0];
 
-    // Insert to cache db
+    // update cache db
     await cachePool.query(`
       INSERT INTO tvl (ts, pool_id, collateral_type, amount, collateral_value)
       VALUES ($1, $2, $3, $4, $5)
