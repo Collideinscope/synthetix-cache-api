@@ -16,11 +16,10 @@ const updateTVLData = async () => {
     await cachePool.query(`
       INSERT INTO tvl (ts, pool_id, collateral_type, amount, collateral_value)
       VALUES ($1, $2, $3, $4, $5)
-      ON CONFLICT (ts) DO UPDATE
-      SET amount = EXCLUDED.amount, collateral_value = EXCLUDED.collateral_value;    
-    `, [row.ts, row.pool_id, row.collateral_type, row.amount, row.collateral_value])
-    ;
-
+      ON CONFLICT (pool_id, collateral_type) DO UPDATE
+      SET ts = EXCLUDED.ts, amount = EXCLUDED.amount, collateral_value = EXCLUDED.collateral_value;
+    `, [row.ts, row.pool_id, row.collateral_type, row.amount, row.collateral_value]);
+    
     console.log('TVL data fetched and inserted/updated successfully.');
   } catch (error) {
     console.error('Error updating TVL data:', error);
