@@ -31,10 +31,18 @@ app.get('/apy', async (req, res) => {
       return res.status(404).send('APY data not found');
     }
 
-    const apy_7d = parseFloat(apyData.apy_7d);
+    const apyPeriods = {
+      apy_24h: parseFloat(apyData.apy_24h),
+      apy_7d: parseFloat(apyData.apy_7d),
+      apy_28d: parseFloat(apyData.apy_28d),
+    }
 
-    const apyValues = TIMEFRAMES.reduce((acc, timeframe) => {
-      acc[timeframe] = calculateAPY(apy_7d, timeframe);
+    const apyValues = Object.entries(apyPeriods).reduce((acc, [period, apy]) => {
+      acc[period] = TIMEFRAMES.reduce((result, timeframe) => {
+        result[timeframe] = calculateAPY(apy, timeframe);
+  
+        return result;
+      }, {});
 
       return acc;
     }, {})
