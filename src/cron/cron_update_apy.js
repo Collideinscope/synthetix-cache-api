@@ -1,4 +1,4 @@
-const { updateAPYData } = require('./apyService');
+const { updateAPYData } = require('../services/apyService');
 
 const cronUpdateAPY = async () => {
   try {

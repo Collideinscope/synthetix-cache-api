@@ -1,4 +1,4 @@
-const { updateTVLData } = require('./tvlService');
+const { updateTVLData } = require('../services/tvlService');
 
 const cronUpdateTVL = async () => {
   try {
