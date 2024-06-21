@@ -1,14 +1,14 @@
-const { updateAPYData } = require('../services/apyService');
+const { fetchAndUpdateLatestAPYData } = require('../services/apyService');
 
 const cronUpdateAPY = async () => {
   try {
     console.log('Running cron job to update APY data...');
 
-    await updateAPYData();
+    await fetchAndUpdateLatestAPYData();
 
-    console.log('Cron job completed successfully');
+    console.log('Cron job APY Update completed successfully');
   } catch (error) {
-    console.error('Error running update APY cron job:', error);
+    console.error('Error running APY Update cron job:', error);
   }
 }
 
