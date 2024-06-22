@@ -11,3 +11,29 @@ CREATE TABLE apy (
     apy_7d NUMERIC,
     apy_28d NUMERIC
 );
+
+CREATE TABLE tvl (
+    id SERIAL PRIMARY KEY,
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+    ts TIMESTAMP WITH TIME ZONE NOT NULL,
+    chain TEXT NOT NULL,
+    pool_id INTEGER NOT NULL,
+    collateral_type TEXT NOT NULL,
+    amount NUMERIC(30, 10) NOT NULL,
+    collateral_value NUMERIC(30, 10) NOT NULL,
+    block_ts TIMESTAMP WITH TIME ZONE NOT NULL,
+    block_number INTEGER NOT NULL,
+    contract_address TEXT NOT NULL
+);
+
+CREATE TABLE core_delegations (
+    id SERIAL PRIMARY KEY,
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+    ts TIMESTAMP WITH TIME ZONE NOT NULL,
+    chain TEXT NOT NULL,
+    pool_id INTEGER NOT NULL,
+    collateral_type TEXT NOT NULL,
+    amount_delegated NUMERIC NOT NULL
+);

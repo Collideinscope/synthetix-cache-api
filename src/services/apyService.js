@@ -33,7 +33,12 @@ const getAllAPYData = async (chain) => {
   }
 };
 
+// initial seed
 const fetchAndInsertAllAPYData = async (chain) => {
+  if (!chain) {
+    console.error(`Chain must be provided for data updates.`);
+  };
+
   try {
     const tableName = `${chain}_mainnet.fct_core_apr`;
 
@@ -58,6 +63,10 @@ const fetchAndInsertAllAPYData = async (chain) => {
 };
 
 const fetchAndUpdateLatestAPYData = async (chain) => {
+  if (!chain) {
+    console.error(`Chain must be provided for data updates.`);
+  };
+
   try {
     const tableName = `${chain}_mainnet.fct_core_apr`;
 
@@ -74,7 +83,7 @@ const fetchAndUpdateLatestAPYData = async (chain) => {
     `, [lastTimestamp]);
 
     if (newRows.rows.length === 0) {
-      console.log(`No new data to update for ${chain}.`);
+      console.log(`No new APY data to update for ${chain}.`);
       return;
     }
 

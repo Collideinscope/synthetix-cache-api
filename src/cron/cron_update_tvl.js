@@ -1,15 +1,12 @@
-const { updateTVLData } = require('../services/tvlService');
+const { fetchAndUpdateLatestTVLData } = require('../services/tvlService');
 
 const cronUpdateTVL = async () => {
-  try {
-    console.log('Running cron job to update TVL data...');
+  console.log('Running cron job to update TVL data...');
 
-    await updateTVLData();
+  await fetchAndUpdateLatestTVLData('base');
+  await fetchAndUpdateLatestTVLData('arbitrum');
 
-    console.log('Cron job completed successfully');
-  } catch (error) {
-    console.error('Error running update TVL cron job:', error);
-  }
+  console.log('Cron job TVL Update completed successfully');
 }
 
 cronUpdateTVL();
