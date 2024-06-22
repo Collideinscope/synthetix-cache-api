@@ -1,13 +1,13 @@
 const { fetchAndInsertAllAPYData } = require('../services/apyService');
 
 const seedAPYData = async () => {
-  try {
-    await fetchAndInsertAllAPYData();
+  console.log('Seeding APY data...');
 
-    console.log('Seeding APY data completed.');
-  } catch (error) {
-    console.error('Seeding APY failed:', error);
-  }
+  await fetchAndInsertAllAPYData('base');
+
+  await fetchAndInsertAllAPYData('arbitrum');
+
+  console.log('Seeding APY data completed.');
 };
 
 module.exports = { seedAPYData };
