@@ -13,9 +13,10 @@ app.get('/', async (req, res) => {
   }
 });
 
-app.get('/apy/latest', async (req, res) => {
+app.get('/apy/latest/:chain?', async (req, res) => {
   try {
-    const result = await getLatestAPYData();
+    const { chain } = req.params;
+    const result = await getLatestAPYData(chain);
 
     if (!result.length) {
       return res.status(404).send('APY data not found');
@@ -23,7 +24,7 @@ app.get('/apy/latest', async (req, res) => {
 
     const transformedData = modifyAPYDataWithTimeframes(result);
 
-    // return the only value in the arrray (latest)
+    // return the only value in the array (latest)
     return res.json(transformedData[0]); 
   } catch (error) {
     console.error(error);
@@ -31,9 +32,10 @@ app.get('/apy/latest', async (req, res) => {
   }
 });
 
-app.get('/apy/all', async (req, res) => {
+app.get('/apy/all/:chain?', async (req, res) => {
   try {
-    const result = await getAllAPYData();
+    const { chain } = req.params;
+    const result = await getAllAPYData(chain);
 
     if (!result.length) {
       return res.status(404).send('APY data not found');

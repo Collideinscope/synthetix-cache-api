@@ -9,12 +9,9 @@ exports.seed = async function(knex) {
   // Deletes ALL existing entries
   await knex('apy').del();
 
-  // Insert seed data
-  try {
-    await fetchAndInsertAllAPYData();
+  // Seed APY data for base chain
+  await fetchAndInsertAllAPYData('base');
 
-    console.log('Data seeded successfully.');
-  } catch (error) {
-    console.error('Error seeding APY data:', error);
-  }
+  // Seed APY data for arbitrum chain
+  await fetchAndInsertAllAPYData('arbitrum');
 };

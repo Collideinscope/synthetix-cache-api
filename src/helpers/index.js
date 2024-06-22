@@ -6,6 +6,11 @@ const TIMEFRAMES = [
   'year',
 ];
 
+const CHAINS = [
+  'base',
+  'arbitrum'
+];
+
 function calculateAPY(apy, timeframe) {
   const periods = {
     'minute': 525600, // 365 days * 24 hours * 60 minutes
@@ -23,5 +28,6 @@ function calculateAPY(apy, timeframe) {
 
 module.exports = {
   TIMEFRAMES,
+  CHAINS,
   calculateAPY
 }
