@@ -1,7 +1,8 @@
 const { TIMEFRAMES, calculateAPY } = require('../helpers');
 
 /*
-  input: list of apy entries
+APY  
+input: list of apy entries
 
   output: list of apy entries with with apys for every timeframe
 */
@@ -36,6 +37,28 @@ const modifyAPYDataWithTimeframes = (data) => {
 
 };
 
+/*
+  TVL
+  input: list rows of tvl entries
+
+  output: list of formatted tvl entries
+*/
+const transformTVLEntries = (rows, chain) => {
+  const rowsTransformed = rows.map(row => {
+    const hourKey = `${row.ts.toISOString().slice(0, 13)}:00:00Z`;
+
+    return {
+      ...row,
+      block_ts: row.ts,
+      chain,
+      ts: new Date(hourKey)
+    };
+  });
+
+  return rowsTransformed;
+}
+
 module.exports = {
   modifyAPYDataWithTimeframes,
+  transformTVLEntries,
 };

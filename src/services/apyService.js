@@ -3,15 +3,29 @@ const { CHAINS } = require('../helpers');
 
 const getLatestAPYData = async (chain) => {
   try {
-    let query = knex('apy').orderBy('ts', 'desc').limit(1);
-
     if (chain && CHAINS.includes(chain)) {
-      query = query.where('chain', chain);
-    }
+      // Fetch the latest value for the specified chain
+      const result = await knex('apy')
+        .where('chain', chain)
+        .orderBy('ts', 'desc')
+        .limit(1);
 
-    const result = await query;
+      return result;
+    } 
 
-    return result;
+    // Fetch the latest value for each chain otherwise
+    const results = await Promise.all(
+      CHAINS.map(async (chain) => {
+        const result = await knex('apy')
+          .where('chain', chain)
+          .orderBy('ts', 'desc')
+          .limit(1);
+
+        return result[0];
+      })
+    );
+
+    return results.filter(Boolean); // Filter out any undefined results
   } catch (error) {
     throw new Error('Error fetching latest APY data: ' + error.message);
   }

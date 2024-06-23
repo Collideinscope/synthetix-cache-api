@@ -6,7 +6,7 @@ const cronUpdateCoreDelegations = async () => {
   await fetchAndUpdateLatestCoreDelegationsData('base');
   await fetchAndUpdateLatestCoreDelegationsData('arbitrum');
 
-  console.log('Cron job Core Delegations Update completed successfully');
+  console.log('Cron job Core Delegations Update completed');
 }
 
 cronUpdateCoreDelegations();

@@ -1,17 +1,32 @@
 const { knex, troyDBKnex } = require('../config/db');
 const { CHAINS } = require('../helpers');
+const { transformTVLEntries } = require('../transformers');
 
 const getLatestTVLData = async (chain) => {
   try {
-    let query = knex('tvl').orderBy('ts', 'desc').limit(1);
-
     if (chain && CHAINS.includes(chain)) {
-      query = query.where('chain', chain);
+      // Fetch the latest value for the specific chain
+      const result = await knex('tvl')
+        .where('chain', chain)
+        .orderBy('ts', 'desc')
+        .limit(1);
+
+      return result;
     }
 
-    const result = await query;
+    // Fetch the latest value for each chain otherwise
+    const results = await Promise.all(
+      CHAINS.map(async (chain) => {
+        const result = await knex('tvl')
+          .where('chain', chain)
+          .orderBy('ts', 'desc')
+          .limit(1);
 
-    return result;
+        return result[0];
+      })
+    );
+
+    return results.filter(Boolean); // Filter out any undefined results
   } catch (error) {
     throw new Error('Error fetching latest TVL data: ' + error.message);
   }
@@ -39,6 +54,11 @@ const fetchAndInsertAllTVLData = async (chain) => {
     console.error(`Chain must be provided for data updates.`);
   };
 
+  if (!CHAINS.includes(chain)) {
+    console.error(`Chain ${chain} not recognized.`);
+    return;
+  }
+
   try {
     const tableName = `${chain}_mainnet.core_vault_collateral`;
 
@@ -49,22 +69,32 @@ const fetchAndInsertAllTVLData = async (chain) => {
     `);
 
     // Aggregate the data to keep only the highest value per hour
+    // Need to transform
     const rowsAggregatedByHour = rows.rows.reduce((acc, row) => {
-      const hourKey = row.ts.toISOString().slice(0, 13); // Format as 'YYYY-MM-DDTHH'
+      // soft contraints chain, ts, pool_id, collateral_type
+      const hourKey = `${row.ts.toISOString().slice(0, 13)}_${row.pool_id}_${row.collateral_type}_${chain}`; // Format as 'YYYY-MM-DDTHH_poolId_collateralType_chain'
 
       if (!acc[hourKey] || row.amount > acc[hourKey].amount) {
         acc[hourKey] = {
           ...row,
           block_ts: row.ts,
           chain, // chain added
-          ts: new Date(hourKey + ':00:00Z') // Set the timestamp to the start of the hour
+          ts: new Date(row.ts.toISOString().slice(0, 13) + ':00:00Z') // Set the timestamp to the start of the hour
         };
       }
-    }, {})
+    
+      return acc;
+    }, {});
 
     const dataToInsert = Object.values(rowsAggregatedByHour);
 
-    await knex('tvl').insert(dataToInsert);
+    await knex('tvl')
+      .insert(dataToInsert)
+      .onConflict(['chain', 'ts', 'pool_id', 'collateral_type'])
+      .merge({
+        amount: knex.raw('GREATEST(tvl.amount, excluded.amount)'),
+        block_ts: knex.raw('CASE WHEN tvl.amount <= excluded.amount THEN excluded.block_ts ELSE tvl.block_ts END'),
+      });
 
     console.log(`TVL data seeded successfully for ${chain} chain.`);
   } catch (error) {
@@ -78,14 +108,23 @@ const fetchAndUpdateLatestTVLData = async (chain) => {
     return;
   }
 
+  if (!CHAINS.includes(chain)) {
+    console.error(`Chain ${chain} not recognized.`);
+    return;
+  }
+
   try {
     const tableName = `${chain}_mainnet.core_vault_collateral`;
 
     // Fetch the last timestamp from the cache
-    const lastTimestampResult = await knex('tvl').where('chain', chain).max('block_timestamp as last_ts').first();
-    const lastTimestamp = lastTimestampResult.last_ts || new Date(0);
+    const lastTimestampResult = await knex('tvl')
+      .where('chain', chain)
+      .orderBy('block_ts', 'desc')
+      .first();
 
-    // Fetch new data starting from last ts
+    const lastTimestamp = lastTimestampResult.block_ts;
+
+    // Fetch new data starting from the last timestamp
     const newRows = await troyDBKnex.raw(`
       SELECT ts, block_number, pool_id, collateral_type, contract_address, amount, collateral_value
       FROM ${tableName}
@@ -98,51 +137,33 @@ const fetchAndUpdateLatestTVLData = async (chain) => {
       return;
     }
 
-    // Process the data to keep only the highest value per hour
-    const rowsAggregatedByHour = {};
+    // Transform the data to keep only the highest value per hour
+    const rowsAggregatedByHour = rows.rows.reduce((acc, row) => {
+      // soft contraints chain, ts, pool_id, collateral_type
+      const hourKey = `${row.ts.toISOString().slice(0, 13)}_${row.pool_id}_${row.collateral_type}_${chain}`; // Format as 'YYYY-MM-DDTHH_poolId_collateralType_chain'
 
-    for (const row of newRows.rows) {
-      const hourKey = row.ts.toISOString().slice(0, 13); // Format as 'YYYY-MM-DDTHH'
-      const startOfHour = new Date(hourKey + ':00:00Z');
-      
-      // Check the existing entry for current hour in the cache
-      const existingEntry = await knex('tvl')
-        .where('chain', chain)
-        .andWhere('ts', startOfHour)
-        .andWhere('pool_id', row.pool_id)
-        .andWhere('collateral_type', row.collateral_type)
-        .first();
-      
-      if (!rowsAggregatedByHour[hourKey]) {
-        rowsAggregatedByHour[hourKey] = {
+      if (!acc[hourKey] || row.amount > acc[hourKey].amount) {
+        acc[hourKey] = {
           ...row,
           block_ts: row.ts,
           chain, // chain added
-          ts: startOfHour // Set the timestamp to the start of the hour
+          ts: new Date(row.ts.toISOString().slice(0, 13) + ':00:00Z') // Set the timestamp to the start of the hour
         };
       }
-
-      // Update the entry if the current row amount is greater than the existing one
-      if (!existingEntry || row.amount > existingEntry.amount
-          || !rowsAggregatedByHour[hourKey] || row.amount > rowsAggregatedByHour[hourKey]
-      ) {
-        rowsAggregatedByHour[hourKey] = {
-          ...row,
-          block_ts: row.ts,
-          chain, // chain added
-          ts: startOfHour // Set the timestamp to the start of the hour
-        };
-      }
-    }
+    
+      return acc;
+    }, {});
 
     const dataToInsert = Object.values(rowsAggregatedByHour);
 
-    // Insert or update the data in the cache
-    for (const data of dataToInsert) {
+    if (dataToInsert.length > 0) {
       await knex('tvl')
-        .insert(data)
+        .insert(dataToInsert)
         .onConflict(['chain', 'ts', 'pool_id', 'collateral_type'])
-        .merge();
+        .merge({
+          amount: knex.raw('GREATEST(tvl.amount, excluded.amount)'),
+          block_ts: knex.raw('CASE WHEN tvl.amount <= excluded.amount THEN excluded.block_ts ELSE tvl.block_ts END'),
+        });
     }
 
     console.log(`TVL data updated successfully for ${chain} chain.`);

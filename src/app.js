@@ -26,8 +26,7 @@ app.get('/apy/latest/:chain?', async (req, res) => {
 
     const transformedData = modifyAPYDataWithTimeframes(result);
 
-    // return the only value in the array (latest)
-    return res.json(transformedData[0]); 
+    return res.json(transformedData); 
   } catch (error) {
     console.error(error);
     return res.status(500).send('Server error');
@@ -62,7 +61,7 @@ app.get('/tvl/latest/:chain?', async (req, res) => {
     }
 
     // return the only value in the array (latest)
-    return res.json(result[0]); 
+    return res.json(result); 
   } catch (error) {
     console.error(error);
     return res.status(500).send('Server error');
@@ -95,7 +94,7 @@ app.get('/core-delegations/latest/:chain?', async (req, res) => {
     }
 
     // return the only value in the array (latest)
-    return res.json(result[0]); 
+    return res.json(result); 
   } catch (error) {
     console.error(error);
     return res.status(500).send('Server error');

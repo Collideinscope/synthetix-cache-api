@@ -6,7 +6,7 @@ const cronUpdateAPY = async () => {
   await fetchAndUpdateLatestAPYData('base');
   await fetchAndUpdateLatestAPYData('arbitrum');
 
-  console.log('Cron job APY Update completed successfully');
+  console.log('Cron job APY Update completed');
 }
 
 cronUpdateAPY();

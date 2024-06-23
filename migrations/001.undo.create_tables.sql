@@ -1,1 +1,3 @@
 DROP TABLE IF EXISTS apy;
+DROP TABLE IF EXISTS tvl;
+DROP TABLE IF EXISTS core_delegations;

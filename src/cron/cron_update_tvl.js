@@ -6,7 +6,7 @@ const cronUpdateTVL = async () => {
   await fetchAndUpdateLatestTVLData('base');
   await fetchAndUpdateLatestTVLData('arbitrum');
 
-  console.log('Cron job TVL Update completed successfully');
+  console.log('Cron job TVL Update completed');
 }
 
 cronUpdateTVL();
