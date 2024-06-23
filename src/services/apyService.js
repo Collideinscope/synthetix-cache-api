@@ -68,7 +68,17 @@ const fetchAndInsertAllAPYData = async (chain) => {
       return row;
     });
     
-    await knex('apy').insert(dataWithChainAdded);
+    // Insert and handle conflicts
+    await knex('apy')
+      .insert(dataWithChainAdded)
+      .onConflict(['ts', 'pool_id', 'collateral_type', 'chain'])
+      .merge({
+        collateral_value: knex.raw('excluded.collateral_value'),
+        apy_24h: knex.raw('excluded.apy_24h'),
+        apy_7d: knex.raw('excluded.apy_7d'),
+        apy_28d: knex.raw('excluded.apy_28d'),
+        ts: knex.raw('excluded.ts'), // Keep the newer value
+      });
 
     console.log(`APY data seeded successfully for ${chain}.`);
   } catch (error) {
@@ -106,7 +116,17 @@ const fetchAndUpdateLatestAPYData = async (chain) => {
       return row;
     });
 
-    await knex('apy').insert(dataWithChainAdded);
+    // Insert and handle conflicts
+    await knex('apy')
+      .insert(dataWithChainAdded)
+      .onConflict(['ts', 'pool_id', 'collateral_type', 'chain'])
+      .merge({
+        collateral_value: knex.raw('excluded.collateral_value'),
+        apy_24h: knex.raw('excluded.apy_24h'),
+        apy_7d: knex.raw('excluded.apy_7d'),
+        apy_28d: knex.raw('excluded.apy_28d'),
+        ts: knex.raw('excluded.ts'), // Keep the newer value
+      });
 
     console.log(`APY data updated successfully for ${chain}.`);  
   } catch (error) {

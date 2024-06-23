@@ -54,6 +54,11 @@ const fetchAndInsertAllCoreDelegationsData = async (chain) => {
     return;
   }
 
+  if (!CHAINS.includes(chain)) {
+    console.error(`Chain ${chain} not recognized.`);
+    return;
+  }
+
   try {
     const tableName = `${chain}_mainnet.fct_core_pool_delegation`;
 
@@ -63,29 +68,18 @@ const fetchAndInsertAllCoreDelegationsData = async (chain) => {
       ORDER BY ts DESC;
     `);
 
-    // Aggregate the data to keep only the highest value per hour
+    // Aggregate and transform the data to keep only the highest value per hour
     const rowsAggregatedByHour = rows.rows.reduce((acc, row) => {
-      // Soft constraints: chain, ts, pool_id, collateral_type
-      const hourKey = `${row.ts.toISOString().slice(0, 13)}_${row.pool_id}_${row.collateral_type}`;
+      // soft contraints chain, ts, pool_id, collateral_type
+      const hourKey = `${row.ts.toISOString().slice(0, 13)}_${row.pool_id}_${row.collateral_type}_${chain}`;
 
-      if (!acc[hourKey]) {
-        console.log(`Adding new entry for key: ${hourKey} with row:`, row);
+      if (!acc[hourKey] || row.amount_delegated > acc[hourKey].amount_delegated) {
         acc[hourKey] = {
           ...row,
           block_ts: row.ts,
-          chain, // Chain added
+          chain, // chain added
           ts: new Date(row.ts.toISOString().slice(0, 13) + ':00:00Z') // Set the timestamp to the start of the hour
         };
-      } else if (row.amount_delegated > acc[hourKey].amount_delegated) {
-        console.log(`Updating entry for key: ${hourKey} with row:`, row);
-        acc[hourKey] = {
-          ...row,
-          block_ts: row.ts,
-          chain, // Chain added
-          ts: new Date(row.ts.toISOString().slice(0, 13) + ':00:00Z') // Set the timestamp to the start of the hour
-        };
-      } else {
-        console.log(`Skipping entry for key: ${hourKey} with row:`, row);
       }
 
       return acc;
@@ -93,7 +87,13 @@ const fetchAndInsertAllCoreDelegationsData = async (chain) => {
 
     const dataToInsert = Object.values(rowsAggregatedByHour);
 
-    await knex('core_delegations').insert(dataToInsert);
+    await knex('core_delegations')
+      .insert(dataToInsert)
+      .onConflict(['chain', 'ts', 'pool_id', 'collateral_type'])
+      .merge({
+        amount_delegated: knex.raw('GREATEST(core_delegations.amount_delegated, excluded.amount_delegated)'),
+        block_ts: knex.raw('CASE WHEN core_delegations.amount_delegated <= excluded.amount_delegated THEN excluded.block_ts ELSE core_delegations.block_ts END'),
+      });
 
     console.log(`Core delegations data seeded successfully for ${chain} chain.`);
   } catch (error) {
@@ -107,14 +107,23 @@ const fetchAndUpdateLatestCoreDelegationsData = async (chain) => {
     return;
   }
 
+  if (!CHAINS.includes(chain)) {
+    console.error(`Chain ${chain} not recognized.`);
+    return;
+  }
+
   try {
     const tableName = `${chain}_mainnet.fct_core_pool_delegation`;
 
     // Fetch the last timestamp from the cache
-    const lastTimestampResult = await knex('core_delegations').where('chain', chain).max('block_ts as last_ts').first();
-    const lastTimestamp = lastTimestampResult.last_ts || new Date(0);
+    const lastTimestampResult = await knex('core_delegations')
+      .where('chain', chain)
+      .orderBy('block_ts', 'desc')
+      .first();
 
-    // Fetch new data starting from last ts
+    const lastTimestamp = lastTimestampResult.block_ts;
+
+    // Fetch new data starting from the last timestamp
     const newRows = await troyDBKnex.raw(`
       SELECT ts, pool_id, collateral_type, amount_delegated
       FROM ${tableName}
@@ -123,55 +132,37 @@ const fetchAndUpdateLatestCoreDelegationsData = async (chain) => {
     `, [lastTimestamp]);
 
     if (newRows.rows.length === 0) {
-      console.log(`No new core delegations data to update for ${chain}.`);
+      console.log(`No new core delegations data to update for ${chain} chain.`);
       return;
     }
 
-    // Process the data to keep only the highest value per hour
-    const rowsAggregatedByHour = {};
-
-    for (const row of newRows.rows) {
-      const hourKey = `${row.ts.toISOString().slice(0, 13)}_${row.pool_id}_${row.collateral_type}`;
-      
-      // Check the existing entry for current hour in the cache
+    // Transform the data to keep only the highest value per hour
+    const rowsAggregatedByHour = newRows.rows.reduce((acc, row) => {
       // soft contraints chain, ts, pool_id, collateral_type
-      const existingEntry = await knex('core_delegations')
-        .where('chain', chain)
-        .andWhere('ts', startOfHour)
-        .andWhere('pool_id', row.pool_id)
-        .andWhere('collateral_type', row.collateral_type)
-        .first();
+      const hourKey = `${row.ts.toISOString().slice(0, 13)}_${row.pool_id}_${row.collateral_type}_${chain}`;
 
-      // if there's an existing entry
-      if (existingEntry) {
-        // Update value right away if current row value is greater
-        if (row.amount_delegated > existingEntry.amount_delegated) {
-          await knex('core_delegations')
-            .where({ id: existingEntry.id })
-            .update({
-              amount_delegated: row.amount_delegated,
-              block_ts: row.ts,
-            });
-        }
-        // Considered value against existing entry, move on to next row
-        continue;
-      }
-
-      // Update the entry if needed
-      if (!rowsAggregatedByHour[hourKey] || row.amount_delegated > rowsAggregatedByHour[hourKey].amount_delegated) {
-        rowsAggregatedByHour[hourKey] = {
+      if (!acc[hourKey] || row.amount_delegated > acc[hourKey].amount_delegated) {
+        acc[hourKey] = {
           ...row,
           block_ts: row.ts,
           chain, // chain added
-          ts: startOfHour // Set the timestamp to the start of the hour
+          ts: new Date(row.ts.toISOString().slice(0, 13) + ':00:00Z') // Set the timestamp to the start of the hour
         };
       }
-    }
+
+      return acc;
+    }, {});
 
     const dataToInsert = Object.values(rowsAggregatedByHour);
 
     if (dataToInsert.length > 0) {
-      await knex('core_delegations').insert(dataToInsert);
+      await knex('core_delegations')
+        .insert(dataToInsert)
+        .onConflict(['chain', 'ts', 'pool_id', 'collateral_type'])
+        .merge({
+          amount_delegated: knex.raw('GREATEST(core_delegations.amount_delegated, excluded.amount_delegated)'),
+          block_ts: knex.raw('CASE WHEN core_delegations.amount_delegated <= excluded.amount_delegated THEN excluded.block_ts ELSE core_delegations.block_ts END'),
+        });
     }
 
     console.log(`Core delegations data updated successfully for ${chain} chain.`);

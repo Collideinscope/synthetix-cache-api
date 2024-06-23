@@ -1,6 +1,5 @@
 const { knex, troyDBKnex } = require('../config/db');
 const { CHAINS } = require('../helpers');
-const { transformTVLEntries } = require('../transformers');
 
 const getLatestTVLData = async (chain) => {
   try {
@@ -68,8 +67,7 @@ const fetchAndInsertAllTVLData = async (chain) => {
       ORDER BY ts DESC;
     `);
 
-    // Aggregate the data to keep only the highest value per hour
-    // Need to transform
+    // Aggregate and transform the data to keep only the highest value per hour
     const rowsAggregatedByHour = rows.rows.reduce((acc, row) => {
       // soft contraints chain, ts, pool_id, collateral_type
       const hourKey = `${row.ts.toISOString().slice(0, 13)}_${row.pool_id}_${row.collateral_type}_${chain}`; // Format as 'YYYY-MM-DDTHH_poolId_collateralType_chain'

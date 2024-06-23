@@ -3,7 +3,7 @@ const { fetchAndInsertAllTVLData } = require('../services/tvlService');
 const { fetchAndInsertAllCoreDelegationsData } = require('../services/coreDelegationsService');
 
 const seedAllData = async () => {
-  /* APY Seeding 
+  /* APY Seeding */
   console.log('Seeding APY data...');
 
   await fetchAndInsertAllAPYData('base');
@@ -19,14 +19,14 @@ const seedAllData = async () => {
 
   console.log('Seeding TVL data completed.');
 
-  /* Core Delegations Seeding 
+  /* Core Delegations Seeding */
   console.log('Seeding Core Delegations data...');
 
   await fetchAndInsertAllCoreDelegationsData('base');
   await fetchAndInsertAllCoreDelegationsData('arbitrum');
 
   console.log('Seeding TVL Core Delegations completed.');
-*/
+
 };
 
 seedAllData();
