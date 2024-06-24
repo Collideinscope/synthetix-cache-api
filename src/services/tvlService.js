@@ -127,7 +127,7 @@ const fetchAndUpdateLatestTVLData = async (chain) => {
       SELECT ts, block_number, pool_id, collateral_type, contract_address, amount, collateral_value
       FROM ${tableName}
       WHERE ts > ?
-      ORDER BY ts ASC;
+      ORDER BY ts DESC;
     `, [lastTimestamp]);
 
     if (newRows.rows.length === 0) {

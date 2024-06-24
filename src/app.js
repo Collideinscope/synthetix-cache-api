@@ -2,6 +2,13 @@ const express = require('express');
 const { getLatestAPYData, getAllAPYData } = require('./services/apyService');
 const { getLatestTVLData, getAllTVLData } = require('./services/tvlService');
 const { getLatestCoreDelegationsData, getAllCoreDelegationsData } = require('./services/coreDelegationsService');
+const { getLatestPoolRewardsData, getAllPoolRewardsData } = require('./services/poolRewardsService');
+const {
+  getStakerCount,
+  getLatestCoreAccountDelegationsDataOrderedByAccount,
+  getCoreAccountDelegationsDataByAccount,
+  getAllCoreAccountDelegationsData
+} = reqiure('/services/coreAccountDelegationsService.js');
 const { modifyAPYDataWithTimeframes } = require('./transformers/index');
 
 const app = express();
@@ -108,6 +115,99 @@ app.get('/core-delegations/all/:chain?', async (req, res) => {
 
     if (!result.length) {
       return res.status(404).send('Core Delegations data not found');
+    }
+
+    return res.json(result);
+  } catch (error) {
+    console.error(error);
+    return res.status(500).send('Server error');
+  }
+});
+
+app.get('/pool-rewards/latest/:chain?', async (req, res) => {
+  try {
+    const { chain } = req.params;
+    const result = await getLatestPoolRewardsData(chain);
+
+    if (!result.length) {
+      return res.status(404).send('Pool Rewards data not found');
+    }
+
+    // return the only value in the array (latest)
+    return res.json(result); 
+  } catch (error) {
+    console.error(error);
+    return res.status(500).send('Server error');
+  }
+});
+
+app.get('/pool-rewards/all/:chain?', async (req, res) => {
+  try {
+    const { chain } = req.params;
+    const result = await getAllPoolRewardsData(chain);
+
+    if (!result.length) {
+      return res.status(404).send('Pool Rewards data not found');
+    }
+
+    return res.json(result);
+  } catch (error) {
+    console.error(error);
+    return res.status(500).send('Server error');
+  }
+});
+
+router.get('/core-account-delegations/staker-count/:chain?', async (req, res) => {
+  try {
+    const { chain } = req.params;
+    const stakerCount = await getStakerCount(chain);
+
+    return res.json(stakerCount);
+  } catch (error) {
+    console.error(error);
+    return res.status(500).send('Server error');
+  }
+});
+
+router.get('/core-account-delegations/all/:chain?', async (req, res) => {
+  try {
+    const { chain } = req.params;
+    const result = await getAllCoreAccountDelegationsData(chain);
+
+    if (!result.length) {
+      return res.status(404).send('Core account delegations data not found');
+    }
+
+    return res.json(result);
+  } catch (error) {
+    console.error(error);
+    return res.status(500).send('Server error');
+  }
+});
+
+router.get('/core-account-delegations/account/:accountId', async (req, res) => {
+  try {
+    const { accountId } = req.params;
+    const result = await getCoreAccountDelegationsDataByAccount(accountId);
+
+    if (!result.length) {
+      return res.status(404).send('Core account delegations data not found for this account ID');
+    }
+
+    return res.json(result);
+  } catch (error) {
+    console.error(error);
+    return res.status(500).send('Server error');
+  }
+});
+
+router.get('/core-account-delegations/ordered-by-account/:chain?', async (req, res) => {
+  try {
+    const { chain } = req.params;
+    const result = await getLatestCoreAccountDelegationsDataOrderedByAccount(chain);
+
+    if (!result.length) {
+      return res.status(404).send('Core account delegations data not found');
     }
 
     return res.json(result);

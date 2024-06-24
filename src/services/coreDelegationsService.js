@@ -128,7 +128,7 @@ const fetchAndUpdateLatestCoreDelegationsData = async (chain) => {
       SELECT ts, pool_id, collateral_type, amount_delegated
       FROM ${tableName}
       WHERE ts > ?
-      ORDER BY ts ASC;
+      ORDER BY ts DESC;
     `, [lastTimestamp]);
 
     if (newRows.rows.length === 0) {

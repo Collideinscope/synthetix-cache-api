@@ -103,7 +103,7 @@ const fetchAndUpdateLatestAPYData = async (chain) => {
       SELECT ts, pool_id, collateral_type, collateral_value, apy_24h, apy_7d, apy_28d
       FROM ${tableName}
       WHERE ts > ?
-      ORDER BY ts ASC;
+      ORDER BY ts DESC;
     `, [lastTimestamp]);
 
     if (newRows.rows.length === 0) {
