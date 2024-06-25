@@ -13,6 +13,9 @@ CREATE TABLE apy (
     UNIQUE (chain, ts, pool_id, collateral_type)
 );
 
+CREATE INDEX idx_apy_chain_ts ON apy(chain, ts);
+CREATE INDEX idx_apy_pool_id ON apy(pool_id);
+
 CREATE TABLE tvl (
     id SERIAL PRIMARY KEY,
     created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
@@ -29,6 +32,9 @@ CREATE TABLE tvl (
     UNIQUE (chain, ts, pool_id, collateral_type)
 );
 
+CREATE INDEX idx_tvl_chain_ts ON tvl(chain, ts);
+CREATE INDEX idx_tvl_pool_id ON tvl(pool_id);
+
 CREATE TABLE core_delegations (
     id SERIAL PRIMARY KEY,
     created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
@@ -41,6 +47,9 @@ CREATE TABLE core_delegations (
     block_ts TIMESTAMP WITH TIME ZONE NOT NULL,
     UNIQUE (chain, ts, pool_id, collateral_type)
 );
+
+CREATE INDEX idx_core_delegations_chain_ts ON core_delegations(chain, ts);
+CREATE INDEX idx_core_delegations_pool_id ON core_delegations(pool_id);
 
 CREATE TABLE core_account_delegations (
     id SERIAL PRIMARY KEY,
@@ -55,6 +64,9 @@ CREATE TABLE core_account_delegations (
     UNIQUE (chain, account_id, pool_id, collateral_type)
 );
 
+CREATE INDEX idx_core_account_delegations_chain_account_id ON core_account_delegations(chain, account_id);
+CREATE INDEX idx_core_account_delegations_pool_id ON core_account_delegations(pool_id);
+
 CREATE TABLE pool_rewards (
     id SERIAL PRIMARY KEY,
     created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
@@ -66,6 +78,9 @@ CREATE TABLE pool_rewards (
     rewards_usd NUMERIC NOT NULL,
     UNIQUE (chain, ts, pool_id, collateral_type)
 );
+
+CREATE INDEX idx_pool_rewards_chain_ts ON pool_rewards(chain, ts);
+CREATE INDEX idx_pool_rewards_pool_id ON pool_rewards(pool_id);
 
 -- update_at column triggers
 CREATE OR REPLACE FUNCTION update_timestamp()
