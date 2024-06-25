@@ -8,7 +8,7 @@ const {
   getLatestCoreAccountDelegationsDataOrderedByAccount,
   getCoreAccountDelegationsDataByAccount,
   getAllCoreAccountDelegationsData
-} = reqiure('/services/coreAccountDelegationsService.js');
+} = require('./services/coreAccountDelegationsService.js');
 const { modifyAPYDataWithTimeframes } = require('./transformers/index');
 
 const app = express();
@@ -157,7 +157,7 @@ app.get('/pool-rewards/all/:chain?', async (req, res) => {
   }
 });
 
-router.get('/core-account-delegations/staker-count/:chain?', async (req, res) => {
+app.get('/core-account-delegations/staker-count/:chain?', async (req, res) => {
   try {
     const { chain } = req.params;
     const stakerCount = await getStakerCount(chain);
@@ -169,7 +169,7 @@ router.get('/core-account-delegations/staker-count/:chain?', async (req, res) =>
   }
 });
 
-router.get('/core-account-delegations/all/:chain?', async (req, res) => {
+app.get('/core-account-delegations/all/:chain?', async (req, res) => {
   try {
     const { chain } = req.params;
     const result = await getAllCoreAccountDelegationsData(chain);
@@ -185,7 +185,7 @@ router.get('/core-account-delegations/all/:chain?', async (req, res) => {
   }
 });
 
-router.get('/core-account-delegations/account/:accountId', async (req, res) => {
+app.get('/core-account-delegations/account/:accountId', async (req, res) => {
   try {
     const { accountId } = req.params;
     const result = await getCoreAccountDelegationsDataByAccount(accountId);
@@ -201,7 +201,7 @@ router.get('/core-account-delegations/account/:accountId', async (req, res) => {
   }
 });
 
-router.get('/core-account-delegations/ordered-by-account/:chain?', async (req, res) => {
+app.get('/core-account-delegations/ordered-by-account/:chain?', async (req, res) => {
   try {
     const { chain } = req.params;
     const result = await getLatestCoreAccountDelegationsDataOrderedByAccount(chain);

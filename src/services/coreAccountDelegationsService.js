@@ -120,7 +120,10 @@ const fetchAndInsertAllCoreAccountDelegationsData = async (chain) => {
     await knex('core_account_delegations')
       .insert(dataWithChainAdded)
       .onConflict(['chain', 'account_id', 'pool_id', 'collateral_type'])
-      .merge(knex.raw('EXCLUDED.*'));
+      .merge({
+        ts: knex.raw('EXCLUDED.ts'),
+        amount_delegated: knex.raw('EXCLUDED.amount_delegated')
+      });
 
     console.log(`Core account delegations data seeded successfully for ${chain} chain.`);
   } catch (error) {
@@ -171,8 +174,11 @@ const fetchAndUpdateLatestCoreAccountDelegationsData = async (chain) => {
     await knex('core_account_delegations')
       .insert(dataWithChainAdded)
       .onConflict(['chain', 'account_id', 'pool_id', 'collateral_type'])
-      .merge(knex.raw('EXCLUDED.*')); 
-
+      .merge({
+        ts: knex.raw('EXCLUDED.ts'),
+        amount_delegated: knex.raw('EXCLUDED.amount_delegated')
+      });
+      
     console.log(`Core account delegations data updated successfully for ${chain} chain.`);
   } catch (error) {
     console.error(`Error updating core account delegations data for ${chain} chain:`, error);
