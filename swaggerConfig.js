@@ -10,11 +10,14 @@ const options = {
     },
     servers: [
       {
-        url: 'https://synthetix-cache-api-f7db01015ec1.herokuapp.com/'
+        url: 'http://localhost:3001',
+      },
+      {
+        url: 'https://synthetix-cache-api-f7db01015ec1.herokuapp.com', 
       },
     ],
   },
-  apis: ['./routes/*.js'], 
+  apis: ['./src/routes/*.js'], 
 };
 
 const specs = swaggerJSDoc(options);

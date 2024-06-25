@@ -13,6 +13,8 @@ app.use('/core-delegations', coreDelegationsRoutes);
 app.use('/pool-rewards', poolRewardsRoutes);
 app.use('/core-account-delegations', coreAccountDelegationsRoutes);
 
+const setupSwagger = require('../swagger');
+
 app.get('/', async (req, res) => {
   try {
     return res.send('Synthetix V3 Cache API'); 
@@ -21,5 +23,8 @@ app.get('/', async (req, res) => {
     return res.status(500).send('Server error');
   }
 });
+
+// Setup Swagger
+setupSwagger(app);
 
 module.exports = app;
