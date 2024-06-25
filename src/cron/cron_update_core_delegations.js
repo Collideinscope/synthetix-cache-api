@@ -1,12 +1,18 @@
 const { fetchAndUpdateLatestCoreDelegationsData } = require('../services/coreDelegationsService');
 
 const cronUpdateCoreDelegations = async () => {
-  console.log('Running cron job to update CoreDelegations data...');
+  try {
+    console.log('Running cron job to update Core Delegations data...');
 
-  await fetchAndUpdateLatestCoreDelegationsData('base');
-  await fetchAndUpdateLatestCoreDelegationsData('arbitrum');
+    await fetchAndUpdateLatestCoreDelegationsData('base');
+    await fetchAndUpdateLatestCoreDelegationsData('arbitrum');
 
-  console.log('Cron job Core Delegations Update completed');
+    console.log('Cron job Core Delegations Update completed');
+  } catch (error) {
+    console.error('Error running cron job for Core Delegations update:', error);
+  } finally {
+    process.exit(0); 
+  }
 }
 
 cronUpdateCoreDelegations();
