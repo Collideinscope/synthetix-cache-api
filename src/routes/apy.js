@@ -62,18 +62,78 @@ const { modifyAPYDataWithTimeframes } = require('../transformers');
  *                     type: number
  *                     format: double
  *                     example: 1000.0
- *                   apy_24h:
- *                     type: number
- *                     format: double
- *                     example: 0.05
- *                   apy_7d:
- *                     type: number
- *                     format: double
- *                     example: 0.35
- *                   apy_28d:
- *                     type: number
- *                     format: double
- *                     example: 1.5
+ *                   apys:
+ *                     type: object
+ *                     properties:
+ *                       apy_24h:
+ *                         type: object
+ *                         properties:
+ *                           minute:
+ *                             type: number
+ *                             format: double
+ *                             example: 0.00000011
+ *                           hour:
+ *                             type: number
+ *                             format: double
+ *                             example: 0.00000640
+ *                           week:
+ *                             type: number
+ *                             format: double
+ *                             example: 0.00107918
+ *                           month:
+ *                             type: number
+ *                             format: double
+ *                             example: 0.00468485
+ *                           year:
+ *                             type: number
+ *                             format: double
+ *                             example: 0.05768958
+ *                       apy_7d:
+ *                         type: object
+ *                         properties:
+ *                           minute:
+ *                             type: number
+ *                             format: double
+ *                             example: 0.00000026
+ *                           hour:
+ *                             type: number
+ *                             format: double
+ *                             example: 0.00001536
+ *                           week:
+ *                             type: number
+ *                             format: double
+ *                             example: 0.00259109
+ *                           month:
+ *                             type: number
+ *                             format: double
+ *                             example: 0.01127665
+ *                           year:
+ *                             type: number
+ *                             format: double
+ *                             example: 0.14403616
+ *                       apy_28d:
+ *                         type: object
+ *                         properties:
+ *                           minute:
+ *                             type: number
+ *                             format: double
+ *                             example: 0.00000043
+ *                           hour:
+ *                             type: number
+ *                             format: double
+ *                             example: 0.00002573
+ *                           week:
+ *                             type: number
+ *                             format: double
+ *                             example: 0.00434311
+ *                           month:
+ *                             type: number
+ *                             format: double
+ *                             example: 0.01895681
+ *                           year:
+ *                             type: number
+ *                             format: double
+ *                             example: 0.25276421
  *       404:
  *         description: APY data not found
  *       500:
@@ -149,18 +209,78 @@ router.get('/latest/:chain?', async (req, res) => {
  *                     type: number
  *                     format: double
  *                     example: 1000.0
- *                   apy_24h:
- *                     type: number
- *                     format: double
- *                     example: 0.05
- *                   apy_7d:
- *                     type: number
- *                     format: double
- *                     example: 0.35
- *                   apy_28d:
- *                     type: number
- *                     format: double
- *                     example: 1.5
+ *                   apys:
+ *                     type: object
+ *                     properties:
+ *                       apy_24h:
+ *                         type: object
+ *                         properties:
+ *                           minute:
+ *                             type: number
+ *                             format: double
+ *                             example: 0.00000011
+ *                           hour:
+ *                             type: number
+ *                             format: double
+ *                             example: 0.00000640
+ *                           week:
+ *                             type: number
+ *                             format: double
+ *                             example: 0.00107918
+ *                           month:
+ *                             type: number
+ *                             format: double
+ *                             example: 0.00468485
+ *                           year:
+ *                             type: number
+ *                             format: double
+ *                             example: 0.05768958
+ *                       apy_7d:
+ *                         type: object
+ *                         properties:
+ *                           minute:
+ *                             type: number
+ *                             format: double
+ *                             example: 0.00000026
+ *                           hour:
+ *                             type: number
+ *                             format: double
+ *                             example: 0.00001536
+ *                           week:
+ *                             type: number
+ *                             format: double
+ *                             example: 0.00259109
+ *                           month:
+ *                             type: number
+ *                             format: double
+ *                             example: 0.01127665
+ *                           year:
+ *                             type: number
+ *                             format: double
+ *                             example: 0.14403616
+ *                       apy_28d:
+ *                         type: object
+ *                         properties:
+ *                           minute:
+ *                             type: number
+ *                             format: double
+ *                             example: 0.00000043
+ *                           hour:
+ *                             type: number
+ *                             format: double
+ *                             example: 0.00002573
+ *                           week:
+ *                             type: number
+ *                             format: double
+ *                             example: 0.00434311
+ *                           month:
+ *                             type: number
+ *                             format: double
+ *                             example: 0.01895681
+ *                           year:
+ *                             type: number
+ *                             format: double
+ *                             example: 0.25276421
  *       404:
  *         description: APY data not found
  *       500:
