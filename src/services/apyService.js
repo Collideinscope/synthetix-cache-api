@@ -54,7 +54,7 @@ const fetchAndInsertAllAPYData = async (chain) => {
   };
 
   try {
-    const tableName = `${chain}_mainnet.fct_core_apr`;
+    const tableName = `prod_${chain}_mainnet.fct_core_apr_${chain}_mainnet`;
 
     // Fetch initial 
     const rows = await troyDBKnex.raw(`
@@ -92,7 +92,7 @@ const fetchAndUpdateLatestAPYData = async (chain) => {
   };
 
   try {
-    const tableName = `${chain}_mainnet.fct_core_apr`;
+    const tableName = `prod_${chain}_mainnet.fct_core_apr_${chain}_mainnet`;
 
     // Fetch the last timestamp from the cache
     const lastTimestampResult = await knex('apy').where('chain', chain).max('ts as last_ts').first();
