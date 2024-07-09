@@ -46,6 +46,4 @@ const seedAllData = async () => {
   console.log('Seeding Core Accounts Delegations completed.'); 
 };
 
-seedAllData();
-
 module.exports = { seedAllData };
