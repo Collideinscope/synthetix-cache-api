@@ -33,15 +33,27 @@ const getLatestPoolRewardsData = async (chain) => {
 
 const getAllPoolRewardsData = async (chain) => {
   try {
-    let query = knex('pool_rewards').orderBy('ts', 'desc');
-
+    let query = knex('pool_rewards')
+      .select('ts', 'chain', 'pool_id', 'collateral_type', 'rewards_usd')
+      .orderBy('ts', 'asc');
+    
     if (chain && CHAINS.includes(chain)) {
       query = query.where('chain', chain);
     }
 
     const result = await query;
 
-    return result;
+    // Calculate cumulative rewards
+    let cumulativeRewards = 0;
+    const processedResult = result.map(row => {
+      cumulativeRewards += parseFloat(row.rewards_usd);
+      return {
+        ...row,
+        cumulative_rewards_usd: parseFloat(cumulativeRewards.toFixed(2)) 
+      };
+    });
+
+    return processedResult;
   } catch (error) {
     throw new Error('Error fetching all pool rewards data: ' + error.message);
   }
@@ -60,7 +72,7 @@ const fetchAndInsertAllPoolRewardsData = async (chain) => {
   }
 
   try {
-    const tableName = `${chain}_mainnet.fct_pool_rewards_hourly`;
+    const tableName = `prod_${chain}_mainnet.fct_pool_rewards_hourly_${chain}_mainnet`;
 
     const rows = await troyDBKnex.raw(`
       SELECT ts, pool_id, collateral_type, rewards_usd
@@ -98,7 +110,7 @@ const fetchAndUpdateLatestPoolRewardsData = async (chain) => {
   }
 
   try {
-    const tableName = `${chain}_mainnet.fct_pool_rewards_hourly`;
+    const tableName = `prod_${chain}_mainnet.fct_pool_rewards_hourly_${chain}_mainnet`;
 
     // Fetch the last timestamp from the cache
     const lastTimestampResult = await knex('pool_rewards')

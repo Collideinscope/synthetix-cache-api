@@ -33,7 +33,7 @@ const getLatestCoreDelegationsData = async (chain) => {
 
 const getAllCoreDelegationsData = async (chain) => {
   try {
-    let query = knex('core_delegations').orderBy('ts', 'desc');
+    let query = knex('core_delegations').orderBy('ts', 'asc');
 
     if (chain && CHAINS.includes(chain)) {
       query = query.where('chain', chain);
@@ -60,7 +60,9 @@ const fetchAndInsertAllCoreDelegationsData = async (chain) => {
   }
 
   try {
-    const tableName = `${chain}_mainnet.fct_core_pool_delegation`;
+    const tableName = chain === 'base'
+      ? `prod_${chain}_mainnet.fct_core_pool_delegation_${chain}_mainnet`
+      : `${chain}_mainnet.fct_core_pool_delegation`;
 
     const rows = await troyDBKnex.raw(`
       SELECT ts, pool_id, collateral_type, amount_delegated
@@ -113,7 +115,9 @@ const fetchAndUpdateLatestCoreDelegationsData = async (chain) => {
   }
 
   try {
-    const tableName = `${chain}_mainnet.fct_core_pool_delegation`;
+    const tableName = chain === 'base'
+      ? `prod_${chain}_mainnet.fct_core_pool_delegation_${chain}_mainnet`
+      : `${chain}_mainnet.fct_core_pool_delegation`;
 
     // Fetch the last timestamp from the cache
     const lastTimestampResult = await knex('core_delegations')

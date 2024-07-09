@@ -1,11 +1,14 @@
 const express = require('express');
 const app = express();
+const cors = require('cors');
 
 const apyRoutes = require('./routes/apy');
 const tvlRoutes = require('./routes/tvl');
 const coreDelegationsRoutes = require('./routes/coreDelegations');
 const poolRewardsRoutes = require('./routes/poolRewards');
 const coreAccountDelegationsRoutes = require('./routes/coreAccountDelegations');
+
+app.use(cors());
 
 app.use('/apy', apyRoutes);
 app.use('/tvl', tvlRoutes);

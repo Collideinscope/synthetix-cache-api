@@ -33,7 +33,7 @@ const getLatestAPYData = async (chain) => {
 
 const getAllAPYData = async (chain) => {
   try {
-    let query = knex('apy').orderBy('ts', 'desc');
+    let query = knex('apy').orderBy('ts', 'asc');
 
     if (chain && CHAINS.includes(chain)) {
       query = query.where('chain', chain);
@@ -77,7 +77,7 @@ const fetchAndInsertAllAPYData = async (chain) => {
         apy_24h: knex.raw('excluded.apy_24h'),
         apy_7d: knex.raw('excluded.apy_7d'),
         apy_28d: knex.raw('excluded.apy_28d'),
-        ts: knex.raw('excluded.ts'), // Keep the newer value
+        ts: knex.raw('excluded.ts'), 
       });
 
     console.log(`APY data seeded successfully for ${chain}.`);

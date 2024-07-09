@@ -104,7 +104,7 @@ const fetchAndInsertAllCoreAccountDelegationsData = async (chain) => {
   }
 
   try {
-    const tableName = `${chain}_mainnet.fct_core_account_delegation`;
+    const tableName = `prod_${chain}_mainnet.fct_core_account_delegation_${chain}_mainnet`;
 
     const rows = await troyDBKnex.raw(`
       SELECT ts, account_id, pool_id, collateral_type, amount_delegated
@@ -143,7 +143,7 @@ const fetchAndUpdateLatestCoreAccountDelegationsData = async (chain) => {
   }
 
   try {
-    const tableName = `${chain}_mainnet.fct_core_account_delegation`;
+    const tableName = `prod_${chain}_mainnet.fct_core_account_delegation_${chain}_mainnet`;
 
     // Fetch the last timestamp from the cache
     const lastTimestampResult = await knex('core_account_delegations')

@@ -33,7 +33,7 @@ const getLatestTVLData = async (chain) => {
 
 const getAllTVLData = async (chain) => {
   try {
-    let query = knex('tvl').orderBy('ts', 'desc');
+    let query = knex('tvl').orderBy('ts', 'asc');
 
     if (chain && CHAINS.includes(chain)) {
       query = query.where('chain', chain);

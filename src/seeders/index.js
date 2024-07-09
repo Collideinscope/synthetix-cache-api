@@ -43,7 +43,9 @@ const seedAllData = async () => {
   await fetchAndInsertAllCoreAccountDelegationsData('base');
   await fetchAndInsertAllCoreAccountDelegationsData('arbitrum');
 
-  console.log('Seeding Core Accounts Delegations completed.');  
+  console.log('Seeding Core Accounts Delegations completed.'); 
 };
+
+seedAllData();
 
 module.exports = { seedAllData };
