@@ -1,6 +1,13 @@
 const { knex, troyDBKnex } = require('../config/db');
 const { CHAINS } = require('../helpers');
 
+const {
+  calculateDelta,
+  calculatePercentage,
+  calculateStandardDeviation,
+  smoothData
+} = require('../helpers');
+
 const getLatestAPYData = async (chain) => {
   try {
     if (chain && CHAINS.includes(chain)) {
@@ -44,6 +51,60 @@ const getAllAPYData = async (chain) => {
     return result;
   } catch (error) {
     throw new Error('Error fetching all APY data: ' + error.message);
+  }
+};
+
+const getAPYSummaryStats = async (chain) => {
+  try {
+    const startDate = new Date('2024-05-01');
+    const baseQuery = () => knex('apy').where('chain', chain).andWhere('ts', '>=', startDate);
+
+    const allData = await baseQuery().orderBy('ts', 'asc');
+    if (allData.length === 0) {
+      throw new Error('No data found for the specified chain');
+    }
+
+    const smoothedData = smoothData(allData);
+    const reversedSmoothedData = [...smoothedData].reverse();
+
+    const latestData = reversedSmoothedData[0];
+    const latestTs = new Date(latestData.ts);
+
+    const getDateFromLatest = (days) => new Date(latestTs.getTime() - days * 24 * 60 * 60 * 1000);
+
+    const value24h = reversedSmoothedData.find(item => new Date(item.ts) <= getDateFromLatest(1));
+    const value7d = reversedSmoothedData.find(item => new Date(item.ts) <= getDateFromLatest(7));
+    const value28d = reversedSmoothedData.find(item => new Date(item.ts) <= getDateFromLatest(28));
+
+    let valueYtd = smoothedData.find(item => new Date(item.ts) >= new Date(latestTs.getFullYear(), 0, 1));
+    console.log('ytd 1', valueYtd, new Date(latestTs.getFullYear(), 0, 1))
+
+    if (!valueYtd) {
+      // use oldest date if no YTD data
+      valueYtd = reversedSmoothedData[reversedSmoothedData.length - 1]; 
+      console.log('ytd 2', valueYtd)
+    }
+
+    const apyValues = smoothedData.map(item => parseFloat(item.apy_7d));
+    const standardDeviation = calculateStandardDeviation(apyValues);
+
+    const ath = Math.max(...apyValues);
+    const atl = Math.min(...apyValues);
+
+    return {
+      current: parseFloat(latestData.apy_7d),
+      delta_24h: calculateDelta(parseFloat(latestData.apy_7d), value24h ? parseFloat(value24h.apy_7d) : null),
+      delta_7d: calculateDelta(parseFloat(latestData.apy_7d), value7d ? parseFloat(value7d.apy_7d) : null),
+      delta_28d: calculateDelta(parseFloat(latestData.apy_7d), value28d ? parseFloat(value28d.apy_7d) : null),
+      delta_ytd: calculateDelta(parseFloat(latestData.apy_7d), valueYtd ? parseFloat(valueYtd.apy_7d) : null),
+      ath,
+      atl,
+      ath_percentage: calculatePercentage(parseFloat(latestData.apy_7d), ath),
+      atl_percentage: calculatePercentage(parseFloat(latestData.apy_7d), atl),
+      standard_deviation: standardDeviation
+    };
+  } catch (error) {
+    throw new Error('Error fetching APY summary stats: ' + error.message);
   }
 };
 
@@ -139,4 +200,5 @@ module.exports = {
   getAllAPYData,
   fetchAndInsertAllAPYData,
   fetchAndUpdateLatestAPYData,
+  getAPYSummaryStats,
 };
