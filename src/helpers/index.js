@@ -43,7 +43,6 @@ const calculateStandardDeviation = (values) => {
   return Math.sqrt(variance);
 };
 
-
 // moving average, default 7d
 const smoothData = (data, windowSize = 168) => {
   return data.map((obj, idx, array) => {
