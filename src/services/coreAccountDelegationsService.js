@@ -28,6 +28,7 @@ const getStakerCount = async (chain) => {
     throw new Error('Error fetching staker count: ' + error.message);
   }
 };
+
 const getCumulativeUniqueStakers = async (chain) => {
   try {
     const fetchCumulativeData = async (chain) => {

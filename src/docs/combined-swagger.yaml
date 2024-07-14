@@ -615,6 +615,51 @@ paths:
                   example: '305'
         500:
           description: Server error
+  /core-account-delegations/cumulative-unique-stakers/{chain}:
+    get:
+      summary: Get cumulative unique staker data
+      tags: 
+        - Core Account Delegations
+      parameters:
+        - in: path
+          name: chain
+          schema:
+            type: string
+          required: false
+          description: The chain to get the cumulative unique staker data for
+      responses:
+        '200':
+          description: The cumulative unique staker data
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  chain:
+                    type: string
+                    example: base
+                  data:
+                    type: array
+                    items:
+                      type: object
+                      properties:
+                        ts:
+                          type: string
+                          format: date-time
+                          example: '2024-07-14T09:00:00Z'
+                        cumulative_staker_count:
+                          type: integer
+                          example: 150
+                        pool_id:
+                          type: integer
+                          example: 1
+                        collateral_type:
+                          type: string
+                          example: '0xC74eA762cF06c9151cE074E6a569a5945b6302E7'
+        '404':
+          description: Cumulative unique staker data not found
+        '500':
+          description: Server error
   /core-account-delegations/all/{chain}:
     get:
       summary: Get all core account delegations data
