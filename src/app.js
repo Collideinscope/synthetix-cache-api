@@ -1,6 +1,19 @@
 const express = require('express');
-const app = express();
 const cors = require('cors');
+const swaggerUi = require('swagger-ui-express');
+const YAML = require('yamljs');
+const path = require('path');
+
+const app = express();
+
+// Load the combined Swagger documentation file
+let swaggerDocument;
+try {
+  swaggerDocument = YAML.load('./src/docs/combined-swagger.yaml');
+  console.log('Swagger documentation loaded successfully.');
+} catch (error) {
+  console.error('Error loading Swagger documentation:', error);
+}
 
 const apyRoutes = require('./routes/apy');
 const tvlRoutes = require('./routes/tvl');
@@ -16,18 +29,20 @@ app.use('/core-delegations', coreDelegationsRoutes);
 app.use('/pool-rewards', poolRewardsRoutes);
 app.use('/core-account-delegations', coreAccountDelegationsRoutes);
 
-const setupSwagger = require('../swagger');
+// Setup Swagger UI with the combined document
+if (swaggerDocument) {
+  app.use('/api-docs', swaggerUi.serve, swaggerUi.setup(swaggerDocument));
+} else {
+  console.error('Swagger documentation is not available.');
+}
 
 app.get('/', async (req, res) => {
   try {
-    return res.send('Synthetix V3 Cache API'); 
+    return res.send('Synthetix V3 Cache API');
   } catch (error) {
     console.error(error);
     return res.status(500).send('Server error');
   }
 });
-
-// Setup Swagger
-setupSwagger(app);
 
 module.exports = app;

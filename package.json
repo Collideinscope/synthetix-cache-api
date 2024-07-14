@@ -11,7 +11,8 @@
     "migrate": "knex migrate:latest",
     "rollback": "knex migrate:rollback",
     "seed": "knex seed:run",
-    "reset": "npm run rollback --all && npm run migrate && npm run seed"
+    "reset": "npm run rollback --all && npm run migrate && npm run seed",
+    "bundle-swagger": "swagger-cli bundle -o src/docs/combined-swagger.yaml src/docs/swagger.yaml"
   },
   "keywords": [],
   "author": "",
@@ -22,7 +23,9 @@
     "express": "^4.19.2",
     "knex": "^3.1.0",
     "pg": "^8.11.5",
+    "swagger-combine": "^1.4.0",
     "swagger-jsdoc": "^6.2.8",
-    "swagger-ui-express": "^5.0.1"
+    "swagger-ui-express": "^5.0.1",
+    "yamljs": "^0.3.0"
   }
 }

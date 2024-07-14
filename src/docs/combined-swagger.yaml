@@ -1,0 +1,896 @@
+openapi: 3.0.0
+info:
+  title: Synthetix Cache API
+  version: 1.0.0
+  description: API documentation for the Synthetix Cache API
+servers:
+  - url: http://localhost:3001
+  - url: https://synthetix-cache-api-f7db01015ec1.herokuapp.com
+paths:
+  /apy/latest/{chain}:
+    get:
+      summary: Get the latest APY data
+      tags:
+        - APY
+      parameters:
+        - in: path
+          name: chain
+          schema:
+            type: string
+          required: false
+          description: The chain to get the APY data for
+      responses:
+        200:
+          description: The latest APY data
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  type: object
+                  properties:
+                    id:
+                      type: integer
+                      example: 1
+                    created_at:
+                      type: string
+                      format: date-time
+                      example: '2023-06-24T12:34:56Z'
+                    updated_at:
+                      type: string
+                      format: date-time
+                      example: '2023-06-24T12:34:56Z'
+                    ts:
+                      type: string
+                      format: date-time
+                      example: '2023-06-24T12:34:56Z'
+                    chain:
+                      type: string
+                      example: 'mainnet'
+                    pool_id:
+                      type: integer
+                      example: 1
+                    collateral_type:
+                      type: string
+                      example: '0x1234567890abcdef'
+                    collateral_value:
+                      type: number
+                      format: double
+                      example: 1000.0
+                    apys:
+                      type: object
+                      properties:
+                        apy_24h:
+                          type: object
+                          properties:
+                            minute:
+                              type: number
+                              format: double
+                              example: 0.00000011
+                            hour:
+                              type: number
+                              format: double
+                              example: 0.00000640
+                            week:
+                              type: number
+                              format: double
+                              example: 0.00107918
+                            month:
+                              type: number
+                              format: double
+                              example: 0.00468485
+                            year:
+                              type: number
+                              format: double
+                              example: 0.05768958
+                        apy_7d:
+                          type: object
+                          properties:
+                            minute:
+                              type: number
+                              format: double
+                              example: 0.00000026
+                            hour:
+                              type: number
+                              format: double
+                              example: 0.00001536
+                            week:
+                              type: number
+                              format: double
+                              example: 0.00259109
+                            month:
+                              type: number
+                              format: double
+                              example: 0.01127665
+                            year:
+                              type: number
+                              format: double
+                              example: 0.14403616
+                        apy_28d:
+                          type: object
+                          properties:
+                            minute:
+                              type: number
+                              format: double
+                              example: 0.00000043
+                            hour:
+                              type: number
+                              format: double
+                              example: 0.00002573
+                            week:
+                              type: number
+                              format: double
+                              example: 0.00434311
+                            month:
+                              type: number
+                              format: double
+                              example: 0.01895681
+                            year:
+                              type: number
+                              format: double
+                              example: 0.25276421
+        404:
+          description: APY data not found
+        500:
+          description: Server error
+  /apy/all/{chain}:
+    get:
+      summary: Get all APY data
+      tags:
+        - APY
+      parameters:
+        - in: path
+          name: chain
+          schema:
+            type: string
+          required: false
+          description: The chain to get the APY data for
+      responses:
+        200:
+          description: All APY data
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  type: object
+                  properties:
+                    id:
+                      type: integer
+                      example: 1
+                    created_at:
+                      type: string
+                      format: date-time
+                      example: '2023-06-24T12:34:56Z'
+                    updated_at:
+                      type: string
+                      format: date-time
+                      example: '2023-06-24T12:34:56Z'
+                    ts:
+                      type: string
+                      format: date-time
+                      example: '2023-06-24T12:34:56Z'
+                    chain:
+                      type: string
+                      example: 'mainnet'
+                    pool_id:
+                      type: integer
+                      example: 1
+                    collateral_type:
+                      type: string
+                      example: '0x1234567890abcdef'
+                    collateral_value:
+                      type: number
+                      format: double
+                      example: 1000.0
+                    apys:
+                      type: object
+                      properties:
+                        apy_24h:
+                          type: object
+                          properties:
+                            minute:
+                              type: number
+                              format: double
+                              example: 0.00000011
+                            hour:
+                              type: number
+                              format: double
+                              example: 0.00000640
+                            week:
+                              type: number
+                              format: double
+                              example: 0.00107918
+                            month:
+                              type: number
+                              format: double
+                              example: 0.00468485
+                            year:
+                              type: number
+                              format: double
+                              example: 0.05768958
+                        apy_7d:
+                          type: object
+                          properties:
+                            minute:
+                              type: number
+                              format: double
+                              example: 0.00000026
+                            hour:
+                              type: number
+                              format: double
+                              example: 0.00001536
+                            week:
+                              type: number
+                              format: double
+                              example: 0.00259109
+                            month:
+                              type: number
+                              format: double
+                              example: 0.01127665
+                            year:
+                              type: number
+                              format: double
+                              example: 0.14403616
+                        apy_28d:
+                          type: object
+                          properties:
+                            minute:
+                              type: number
+                              format: double
+                              example: 0.00000043
+                            hour:
+                              type: number
+                              format: double
+                              example: 0.00002573
+                            week:
+                              type: number
+                              format: double
+                              example: 0.00434311
+                            month:
+                              type: number
+                              format: double
+                              example: 0.01895681
+                            year:
+                              type: number
+                              format: double
+                              example: 0.25276421
+        404:
+          description: APY data not found
+        500:
+          description: Server error
+  /apy/summary/{chain}:
+    get:
+      summary: Get the APY summary statistics
+      tags:
+        - APY
+      parameters:
+        - in: path
+          name: chain
+          schema:
+            type: string
+          required: true
+          description: The chain to get the APY summary statistics for
+      responses:
+        200:
+          description: The APY summary statistics
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  total_collateral_value:
+                    type: number
+                    format: double
+                    example: 5000000.0
+                  average_apy:
+                    type: number
+                    format: double
+                    example: 0.12
+                  max_apy:
+                    type: number
+                    format: double
+                    example: 0.25
+                  min_apy:
+                    type: number
+                    format: double
+                    example: 0.05
+                  current:
+                    type: number
+                    format: double
+                    example: 0.14403616
+                  delta_24h:
+                    type: number
+                    format: double
+                    example: 0.00259109
+                  delta_7d:
+                    type: number
+                    format: double
+                    example: 0.01127665
+                  delta_28d:
+                    type: number
+                    format: double
+                    example: 0.01895681
+                  delta_ytd:
+                    type: number
+                    format: double
+                    example: 0.25276421
+                  ath:
+                    type: number
+                    format: double
+                    example: 0.25276421
+                  atl:
+                    type: number
+                    format: double
+                    example: 0.05768958
+                  ath_percentage:
+                    type: number
+                    format: double
+                    example: 0.1
+                  atl_percentage:
+                    type: number
+                    format: double
+                    example: 0.2
+                  standard_deviation:
+                    type: number
+                    format: double
+                    example: 0.03
+        404:
+          description: APY summary statistics not found
+        500:
+          description: Server error
+  /tvl/latest/{chain}:
+    get:
+      summary: Get the latest TVL data
+      tags:
+        - TVL
+      parameters:
+        - in: path
+          name: chain
+          schema:
+            type: string
+          required: false
+          description: The chain to get the TVL data for
+      responses:
+        200:
+          description: The latest TVL data
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  type: object
+                  properties:
+                    id:
+                      type: integer
+                      example: 1
+                    created_at:
+                      type: string
+                      format: date-time
+                      example: '2024-06-25T15:44:39.678Z'
+                    updated_at:
+                      type: string
+                      format: date-time
+                      example: '2024-06-25T15:44:39.678Z'
+                    ts:
+                      type: string
+                      format: date-time
+                      example: '2024-06-25T13:00:00.000Z'
+                    chain:
+                      type: string
+                      example: base
+                    pool_id:
+                      type: integer
+                      example: 1
+                    collateral_type:
+                      type: string
+                      example: '0xc74ea762cf06c9151ce074e6a569a5945b6302e7'
+                    amount:
+                      type: number
+                      format: double
+                      example: 25611607.372685123
+                    collateral_value:
+                      type: number
+                      format: double
+                      example: 25611607.372685123
+                    block_ts:
+                      type: string
+                      format: date-time
+                      example: '2024-06-25T13:15:47.000Z'
+                    block_number:
+                      type: integer
+                      example: 16266000
+                    contract_address:
+                      type: string
+                      example: '0x32c222a9a159782afd7529c87fa34b96ca72c696'
+        404:
+          description: TVL data not found
+        500:
+          description: Server error
+  /tvl/all/{chain}:
+    get:
+      summary: Get all TVL data
+      tags:
+        - TVL
+      parameters:
+        - in: path
+          name: chain
+          schema:
+            type: string
+          required: false
+          description: The chain to get the TVL data for
+      responses:
+        200:
+          description: All TVL data
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  type: object
+                  properties:
+                    id:
+                      type: integer
+                      example: 2531
+                    created_at:
+                      type: string
+                      format: date-time
+                      example: '2024-06-25T15:44:41.072Z'
+                    updated_at:
+                      type: string
+                      format: date-time
+                      example: '2024-06-25T15:44:41.072Z'
+                    ts:
+                      type: string
+                      format: date-time
+                      example: '2024-06-25T14:00:00.000Z'
+                    chain:
+                      type: string
+                      example: arbitrum
+                    pool_id:
+                      type: integer
+                      example: 1
+                    collateral_type:
+                      type: string
+                      example: '0x82af49447d8a07e3bd95bd0d56f35241523fbab1'
+                    amount:
+                      type: number
+                      format: double
+                      example: 495.375381402
+                    collateral_value:
+                      type: number
+                      format: double
+                      example: 1684819.8145111112
+                    block_ts:
+                      type: string
+                      format: date-time
+                      example: '2024-06-25T14:52:28.000Z'
+                    block_number:
+                      type: integer
+                      example: 225600000
+                    contract_address:
+                      type: string
+                      example: '0xffffffaeff0b96ea8e4f94b2253f31abdd875847'
+        404:
+          description: TVL data not found
+        500:
+          description: Server error
+  /core-delegations/latest/{chain}:
+    get:
+      summary: Get the latest core delegations data
+      tags:
+        - Core Delegations
+      parameters:
+        - in: path
+          name: chain
+          schema:
+            type: string
+          required: false
+          description: The chain to get the core delegations data for
+      responses:
+        200:
+          description: The latest core delegations data
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  type: object
+                  properties:
+                    id:
+                      type: integer
+                      example: 1910
+                    created_at:
+                      type: string
+                      format: date-time
+                      example: '2024-06-27T16:00:47.837Z'
+                    updated_at:
+                      type: string
+                      format: date-time
+                      example: '2024-06-27T16:00:47.837Z'
+                    ts:
+                      type: string
+                      format: date-time
+                      example: '2024-06-27T15:00:00.000Z'
+                    chain:
+                      type: string
+                      example: base
+                    pool_id:
+                      type: integer
+                      example: 1
+                    collateral_type:
+                      type: string
+                      example: '0xC74eA762cF06c9151cE074E6a569a5945b6302E7'
+                    amount_delegated:
+                      type: number
+                      format: double
+                      example: 26161135.01363557
+                    block_ts:
+                      type: string
+                      format: date-time
+                      example: '2024-06-27T15:37:37.000Z'
+        404:
+          description: Core delegations data not found
+        500:
+          description: Server error
+  /core-delegations/all/{chain}:
+    get:
+      summary: Get all core delegations data
+      tags:
+        - Core Delegations
+      parameters:
+        - in: path
+          name: chain
+          schema:
+            type: string
+          required: false
+          description: The chain to get the core delegations data for
+      responses:
+        200:
+          description: All core delegations data
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  type: object
+                  properties:
+                    id:
+                      type: integer
+                      example: 1912
+                    created_at:
+                      type: string
+                      format: date-time
+                      example: '2024-06-27T16:00:47.950Z'
+                    updated_at:
+                      type: string
+                      format: date-time
+                      example: '2024-06-27T16:00:47.950Z'
+                    ts:
+                      type: string
+                      format: date-time
+                      example: '2024-06-27T15:00:00.000Z'
+                    chain:
+                      type: string
+                      example: arbitrum
+                    pool_id:
+                      type: integer
+                      example: 1
+                    collateral_type:
+                      type: string
+                      example: '0x912CE59144191C1204E64559FE8253a0e49E6548'
+                    amount_delegated:
+                      type: number
+                      format: double
+                      example: 3485854.86809026
+                    block_ts:
+                      type: string
+                      format: date-time
+                      example: '2024-06-27T15:11:44.000Z'
+        404:
+          description: Core delegations data not found
+        500:
+          description: Server error
+  /core-account-delegations/staker-count/{chain}:
+    get:
+      summary: Get the unique staker count
+      tags:
+        - Core Account Delegations
+      parameters:
+        - in: path
+          name: chain
+          schema:
+            type: string
+          required: false
+          description: The chain to get the staker count for
+      responses:
+        200:
+          description: The unique staker count
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties:
+                  type: string
+                  example: '305'
+        500:
+          description: Server error
+  /core-account-delegations/all/{chain}:
+    get:
+      summary: Get all core account delegations data
+      tags:
+        - Core Account Delegations
+      parameters:
+        - in: path
+          name: chain
+          schema:
+            type: string
+          required: false
+          description: The chain to get the data for
+      responses:
+        200:
+          description: All core account delegations data
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  type: object
+                  properties:
+                    id:
+                      type: integer
+                      example: 1450
+                    created_at:
+                      type: string
+                      format: date-time
+                      example: '2024-06-27T15:00:50.345Z'
+                    updated_at:
+                      type: string
+                      format: date-time
+                      example: '2024-06-27T15:00:50.345Z'
+                    ts:
+                      type: string
+                      format: date-time
+                      example: '2024-06-27T14:58:45.000Z'
+                    chain:
+                      type: string
+                      example: arbitrum
+                    account_id:
+                      type: string
+                      example: '170141183460469231731687303715884105785'
+                    pool_id:
+                      type: integer
+                      example: 1
+                    collateral_type:
+                      type: string
+                      example: '0x912CE59144191C1204E64559FE8253a0e49E6548'
+                    amount_delegated:
+                      type: number
+                      format: double
+                      example: 19128.7385237578
+        404:
+          description: Core account delegations data not found
+        500:
+          description: Server error
+  /core-account-delegations/account/{accountId}:
+    get:
+      summary: Get core account delegations data by account ID
+      tags:
+        - Core Account Delegations
+      parameters:
+        - in: path
+          name: accountId
+          schema:
+            type: string
+          required: true
+          description: The account ID to get the data for
+      responses:
+        200:
+          description: Core account delegations data for the given account ID
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  type: object
+                  properties:
+                    id:
+                      type: integer
+                      example: 879
+                    created_at:
+                      type: string
+                      format: date-time
+                      example: '2024-06-25T15:45:11.350Z'
+                    updated_at:
+                      type: string
+                      format: date-time
+                      example: '2024-06-25T15:45:11.350Z'
+                    ts:
+                      type: string
+                      format: date-time
+                      example: '2023-12-15T08:04:45.000Z'
+                    chain:
+                      type: string
+                      example: base
+                    account_id:
+                      type: string
+                      example: '1'
+                    pool_id:
+                      type: integer
+                      example: 1
+                    collateral_type:
+                      type: string
+                      example: '0xC74eA762cF06c9151cE074E6a569a5945b6302E7'
+                    amount_delegated:
+                      type: number
+                      format: double
+                      example: 200
+        404:
+          description: Core account delegations data not found for this account ID
+        500:
+          description: Server error
+  /core-account-delegations/ordered-by-account/{chain}:
+    get:
+      summary: Get core account delegations data ordered by account
+      tags:
+        - Core Account Delegations
+      parameters:
+        - in: path
+          name: chain
+          schema:
+            type: string
+          required: false
+          description: The chain to get the data for
+      responses:
+        200:
+          description: Core account delegations data ordered by account
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  type: object
+                  properties:
+                    id:
+                      type: integer
+                      example: 879
+                    created_at:
+                      type: string
+                      format: date-time
+                      example: '2024-06-25T15:45:11.350Z'
+                    updated_at:
+                      type: string
+                      format: date-time
+                      example: '2024-06-25T15:45:11.350Z'
+                    ts:
+                      type: string
+                      format: date-time
+                      example: '2023-12-15T08:04:45.000Z'
+                    chain:
+                      type: string
+                      example: base
+                    account_id:
+                      type: string
+                      example: '1'
+                    pool_id:
+                      type: integer
+                      example: 1
+                    collateral_type:
+                      type: string
+                      example: '0xC74eA762cF06c9151cE074E6a569a5945b6302E7'
+                    amount_delegated:
+                      type: number
+                      format: double
+                      example: 200
+        404:
+          description: Core account delegations data not found
+        500:
+          description: Server error
+  /pool-rewards/latest/{chain}:
+    get:
+      summary: Get the latest pool rewards data
+      tags:
+        - Pool Rewards
+      parameters:
+        - in: path
+          name: chain
+          schema:
+            type: string
+          required: false
+          description: The chain to get the pool rewards data for
+      responses:
+        200:
+          description: The latest pool rewards data
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  type: object
+                  properties:
+                    id:
+                      type: integer
+                      example: 2780
+                    created_at:
+                      type: string
+                      format: date-time
+                      example: '2024-06-27T14:01:04.001Z'
+                    updated_at:
+                      type: string
+                      format: date-time
+                      example: '2024-06-27T14:01:04.001Z'
+                    ts:
+                      type: string
+                      format: date-time
+                      example: '2024-06-27T13:00:00.000Z'
+                    chain:
+                      type: string
+                      example: base
+                    pool_id:
+                      type: integer
+                      example: 1
+                    collateral_type:
+                      type: string
+                      example: '0xc74ea762cf06c9151ce074e6a569a5945b6302e7'
+                    rewards_usd:
+                      type: number
+                      format: double
+                      example: 139.08178975083112
+        404:
+          description: Pool rewards data not found
+        500:
+          description: Server error
+  /pool-rewards/all/{chain}:
+    get:
+      summary: Get all pool rewards data
+      tags:
+        - Pool Rewards
+      parameters:
+        - in: path
+          name: chain
+          schema:
+            type: string
+          required: false
+          description: The chain to get the pool rewards data for
+      responses:
+        200:
+          description: All pool rewards data
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  type: object
+                  properties:
+                    id:
+                      type: integer
+                      example: 2780
+                    created_at:
+                      type: string
+                      format: date-time
+                      example: '2024-06-27T14:01:04.001Z'
+                    updated_at:
+                      type: string
+                      format: date-time
+                      example: '2024-06-27T14:01:04.001Z'
+                    ts:
+                      type: string
+                      format: date-time
+                      example: '2024-06-27T13:00:00.000Z'
+                    chain:
+                      type: string
+                      example: base
+                    pool_id:
+                      type: integer
+                      example: 1
+                    collateral_type:
+                      type: string
+                      example: '0xc74ea762cf06c9151ce074e6a569a5945b6302e7'
+                    rewards_usd:
+                      type: number
+                      format: double
+                      example: 139.08178975083112
+        404:
+          description: Pool rewards data not found
+        500:
+          description: Server error

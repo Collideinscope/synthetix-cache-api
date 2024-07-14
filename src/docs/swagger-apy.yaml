@@ -1,0 +1,344 @@
+openapi: 3.0.0
+info:
+  title: Synthetix API
+  version: 1.0.0
+  description: API documentation for Synthetix V3
+tags:
+  - name: APY
+    description: Endpoints related to core APY
+
+paths:
+  /apy/latest/{chain}:
+    get:
+      summary: Get the latest APY data
+      tags: 
+        - APY
+      parameters:
+        - in: path
+          name: chain
+          schema:
+            type: string
+          required: false
+          description: The chain to get the APY data for
+      responses:
+        200:
+          description: The latest APY data
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  type: object
+                  properties:
+                    id:
+                      type: integer
+                      example: 1
+                    created_at:
+                      type: string
+                      format: date-time
+                      example: '2023-06-24T12:34:56Z'
+                    updated_at:
+                      type: string
+                      format: date-time
+                      example: '2023-06-24T12:34:56Z'
+                    ts:
+                      type: string
+                      format: date-time
+                      example: '2023-06-24T12:34:56Z'
+                    chain:
+                      type: string
+                      example: 'mainnet'
+                    pool_id:
+                      type: integer
+                      example: 1
+                    collateral_type:
+                      type: string
+                      example: '0x1234567890abcdef'
+                    collateral_value:
+                      type: number
+                      format: double
+                      example: 1000.0
+                    apys:
+                      type: object
+                      properties:
+                        apy_24h:
+                          type: object
+                          properties:
+                            minute:
+                              type: number
+                              format: double
+                              example: 0.00000011
+                            hour:
+                              type: number
+                              format: double
+                              example: 0.00000640
+                            week:
+                              type: number
+                              format: double
+                              example: 0.00107918
+                            month:
+                              type: number
+                              format: double
+                              example: 0.00468485
+                            year:
+                              type: number
+                              format: double
+                              example: 0.05768958
+                        apy_7d:
+                          type: object
+                          properties:
+                            minute:
+                              type: number
+                              format: double
+                              example: 0.00000026
+                            hour:
+                              type: number
+                              format: double
+                              example: 0.00001536
+                            week:
+                              type: number
+                              format: double
+                              example: 0.00259109
+                            month:
+                              type: number
+                              format: double
+                              example: 0.01127665
+                            year:
+                              type: number
+                              format: double
+                              example: 0.14403616
+                        apy_28d:
+                          type: object
+                          properties:
+                            minute:
+                              type: number
+                              format: double
+                              example: 0.00000043
+                            hour:
+                              type: number
+                              format: double
+                              example: 0.00002573
+                            week:
+                              type: number
+                              format: double
+                              example: 0.00434311
+                            month:
+                              type: number
+                              format: double
+                              example: 0.01895681
+                            year:
+                              type: number
+                              format: double
+                              example: 0.25276421
+        404:
+          description: APY data not found
+        500:
+          description: Server error
+
+  /apy/all/{chain}:
+    get:
+      summary: Get all APY data
+      tags: 
+        - APY
+      parameters:
+        - in: path
+          name: chain
+          schema:
+            type: string
+          required: false
+          description: The chain to get the APY data for
+      responses:
+        200:
+          description: All APY data
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  type: object
+                  properties:
+                    id:
+                      type: integer
+                      example: 1
+                    created_at:
+                      type: string
+                      format: date-time
+                      example: '2023-06-24T12:34:56Z'
+                    updated_at:
+                      type: string
+                      format: date-time
+                      example: '2023-06-24T12:34:56Z'
+                    ts:
+                      type: string
+                      format: date-time
+                      example: '2023-06-24T12:34:56Z'
+                    chain:
+                      type: string
+                      example: 'mainnet'
+                    pool_id:
+                      type: integer
+                      example: 1
+                    collateral_type:
+                      type: string
+                      example: '0x1234567890abcdef'
+                    collateral_value:
+                      type: number
+                      format: double
+                      example: 1000.0
+                    apys:
+                      type: object
+                      properties:
+                        apy_24h:
+                          type: object
+                          properties:
+                            minute:
+                              type: number
+                              format: double
+                              example: 0.00000011
+                            hour:
+                              type: number
+                              format: double
+                              example: 0.00000640
+                            week:
+                              type: number
+                              format: double
+                              example: 0.00107918
+                            month:
+                              type: number
+                              format: double
+                              example: 0.00468485
+                            year:
+                              type: number
+                              format: double
+                              example: 0.05768958
+                        apy_7d:
+                          type: object
+                          properties:
+                            minute:
+                              type: number
+                              format: double
+                              example: 0.00000026
+                            hour:
+                              type: number
+                              format: double
+                              example: 0.00001536
+                            week:
+                              type: number
+                              format: double
+                              example: 0.00259109
+                            month:
+                              type: number
+                              format: double
+                              example: 0.01127665
+                            year:
+                              type: number
+                              format: double
+                              example: 0.14403616
+                        apy_28d:
+                          type: object
+                          properties:
+                            minute:
+                              type: number
+                              format: double
+                              example: 0.00000043
+                            hour:
+                              type: number
+                              format: double
+                              example: 0.00002573
+                            week:
+                              type: number
+                              format: double
+                              example: 0.00434311
+                            month:
+                              type: number
+                              format: double
+                              example: 0.01895681
+                            year:
+                              type: number
+                              format: double
+                              example: 0.25276421
+        404:
+          description: APY data not found
+        500:
+          description: Server error
+
+  /apy/summary/{chain}:
+    get:
+      summary: Get the APY summary statistics
+      tags: 
+        - APY
+      parameters:
+        - in: path
+          name: chain
+          schema:
+            type: string
+          required: true
+          description: The chain to get the APY summary statistics for
+      responses:
+        200:
+          description: The APY summary statistics
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  total_collateral_value:
+                    type: number
+                    format: double
+                    example: 5000000.0
+                  average_apy:
+                    type: number
+                    format: double
+                    example: 0.12
+                  max_apy:
+                    type: number
+                    format: double
+                    example: 0.25
+                  min_apy:
+                    type: number
+                    format: double
+                    example: 0.05
+                  current:
+                    type: number
+                    format: double
+                    example: 0.14403616
+                  delta_24h:
+                    type: number
+                    format: double
+                    example: 0.00259109
+                  delta_7d:
+                    type: number
+                    format: double
+                    example: 0.01127665
+                  delta_28d:
+                    type: number
+                    format: double
+                    example: 0.01895681
+                  delta_ytd:
+                    type: number
+                    format: double
+                    example: 0.25276421
+                  ath:
+                    type: number
+                    format: double
+                    example: 0.25276421
+                  atl:
+                    type: number
+                    format: double
+                    example: 0.05768958
+                  ath_percentage:
+                    type: number
+                    format: double
+                    example: 0.1
+                  atl_percentage:
+                    type: number
+                    format: double
+                    example: 0.2
+                  standard_deviation:
+                    type: number
+                    format: double
+                    example: 0.03
+        404:
+          description: APY summary statistics not found
+        500:
+          description: Server error
