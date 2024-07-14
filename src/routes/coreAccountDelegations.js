@@ -2,9 +2,10 @@ const express = require('express');
 const router = express.Router();
 const {
   getStakerCount,
+  getCumulativeUniqueStakers,
   getLatestCoreAccountDelegationsDataOrderedByAccount,
   getCoreAccountDelegationsDataByAccount,
-  getAllCoreAccountDelegationsData
+  getAllCoreAccountDelegationsData,
 } = require('../services/coreAccountDelegationsService');
 
 router.get('/staker-count/:chain?', async (req, res) => {
@@ -13,6 +14,18 @@ router.get('/staker-count/:chain?', async (req, res) => {
     const stakerCount = await getStakerCount(chain);
 
     return res.json(stakerCount);
+  } catch (error) {
+    console.error(error);
+    return res.status(500).send('Server error');
+  }
+});
+
+router.get('/cumulative-unique-stakers/:chain?', async (req, res) => {
+  try {
+    const { chain } = req.params;
+    const result = await getCumulativeUniqueStakers(chain);
+
+    return res.json(result);
   } catch (error) {
     console.error(error);
     return res.status(500).send('Server error');

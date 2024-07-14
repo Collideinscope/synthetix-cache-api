@@ -28,6 +28,70 @@ const getStakerCount = async (chain) => {
     throw new Error('Error fetching staker count: ' + error.message);
   }
 };
+const getCumulativeUniqueStakers = async (chain) => {
+  try {
+    const fetchCumulativeData = async (chain) => {
+      const result = await knex.raw(`
+        WITH hourly_staker_counts AS (
+            SELECT 
+                date_trunc('hour', ts) AS hour,
+                pool_id,
+                collateral_type,
+                COUNT(DISTINCT account_id) AS unique_staker_count
+            FROM 
+                core_account_delegations
+            WHERE
+                chain = ?
+            GROUP BY 
+                date_trunc('hour', ts), pool_id, collateral_type
+            ORDER BY 
+                hour
+        ),
+        cumulative_counts AS (
+            SELECT
+                hour AS ts,
+                pool_id,
+                collateral_type,
+                SUM(unique_staker_count) OVER (PARTITION BY pool_id, collateral_type ORDER BY hour) AS cumulative_staker_count
+            FROM
+                hourly_staker_counts
+        )
+        SELECT 
+            ts,
+            pool_id,
+            collateral_type,
+            cumulative_staker_count
+        FROM 
+            cumulative_counts;
+      `, [chain]);
+
+      return result.rows.map(row => ({
+        ts: row.ts,
+        cumulative_staker_count: row.cumulative_staker_count,
+        pool_id: row.pool_id,
+        collateral_type: row.collateral_type,
+      }));
+    };
+
+    if (chain && CHAINS.includes(chain)) {
+      const data = await fetchCumulativeData(chain);
+
+      return { [chain]:  data };
+    }
+
+    const results = await Promise.all(
+      CHAINS.map(async (chain) => {
+        const data = await fetchCumulativeData(chain);
+
+        return { [chain]: data };
+      })
+    );
+
+    return results.reduce((acc, curr) => ({ ...acc, ...curr }), {});
+  } catch (error) {
+    throw new Error('Error fetching cumulative unique staker data: ' + error.message);
+  }
+};
 
 const getLatestCoreAccountDelegationsDataOrderedByAccount = async (chain) => {
   try {
@@ -192,4 +256,5 @@ module.exports = {
   getAllCoreAccountDelegationsData,
   fetchAndInsertAllCoreAccountDelegationsData,
   fetchAndUpdateLatestCoreAccountDelegationsData,
+  getCumulativeUniqueStakers,
 };
