@@ -1,6 +1,13 @@
 const { knex, troyDBKnex } = require('../config/db');
 const { CHAINS } = require('../helpers');
 
+const {
+  calculateDelta,
+  calculatePercentage,
+  calculateStandardDeviation,
+  smoothData
+} = require('../helpers');
+
 const getLatestCoreDelegationsData = async (chain) => {
   try {
     if (chain && CHAINS.includes(chain)) {
@@ -46,6 +53,58 @@ const getAllCoreDelegationsData = async (chain) => {
     throw new Error('Error fetching all core delegations data: ' + error.message);
   }
 };
+
+const getCoreDelegationsSummaryStats = async (chain) => {
+  try {
+    const baseQuery = () => knex('core_delegations').where('chain', chain);
+
+    const allData = await baseQuery().orderBy('ts', 'asc');
+    if (allData.length === 0) {
+      throw new Error('No data found for the specified chain');
+    }
+
+    const smoothedData = smoothData(allData, 'amount_delegated'); 
+    const reversedSmoothedData = [...smoothedData].reverse();
+
+    const latestData = reversedSmoothedData[0];
+    const latestTs = new Date(latestData.ts);
+
+    const getDateFromLatest = (days) => new Date(latestTs.getTime() - days * 24 * 60 * 60 * 1000);
+
+    const value24h = reversedSmoothedData.find(item => new Date(item.ts) <= getDateFromLatest(1));
+    const value7d = reversedSmoothedData.find(item => new Date(item.ts) <= getDateFromLatest(7));
+    const value28d = reversedSmoothedData.find(item => new Date(item.ts) <= getDateFromLatest(28));
+
+    let valueYtd = smoothedData.find(item => new Date(item.ts) >= new Date(latestTs.getFullYear(), 0, 1));
+
+    if (!valueYtd) {
+      valueYtd = reversedSmoothedData[reversedSmoothedData.length - 1];
+    }
+
+    const delegationsValues = smoothedData.map(item => parseFloat(item.amount_delegated));
+    const standardDeviation = calculateStandardDeviation(delegationsValues);
+
+    const current = parseFloat(allData[allData.length - 1].amount_delegated);
+    const ath = Math.max(...delegationsValues, current);
+    const atl = Math.min(...delegationsValues, current);
+
+    return {
+      current,
+      delta_24h: calculateDelta(current, value24h ? parseFloat(value24h.amount_delegated) : null),
+      delta_7d: calculateDelta(current, value7d ? parseFloat(value7d.amount_delegated) : null),
+      delta_28d: calculateDelta(current, value28d ? parseFloat(value28d.amount_delegated) : null),
+      delta_ytd: calculateDelta(current, valueYtd ? parseFloat(valueYtd.amount_delegated) : null),
+      ath,
+      atl,
+      ath_percentage: calculatePercentage(current, ath),
+      atl_percentage: atl === 0 ? 100 : calculatePercentage(current, atl),
+      standard_deviation: standardDeviation
+    };
+  } catch (error) {
+    throw new Error('Error fetching Core Delegations summary stats: ' + error.message);
+  }
+};
+
 
 // Initial seed
 const fetchAndInsertAllCoreDelegationsData = async (chain) => {
@@ -180,4 +239,5 @@ module.exports = {
   getAllCoreDelegationsData,
   fetchAndInsertAllCoreDelegationsData,
   fetchAndUpdateLatestCoreDelegationsData,
+  getCoreDelegationsSummaryStats,
 };
