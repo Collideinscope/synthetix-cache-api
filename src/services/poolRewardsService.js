@@ -1,6 +1,13 @@
 const { knex, troyDBKnex } = require('../config/db');
 const { CHAINS } = require('../helpers');
 
+const {
+  calculateDelta,
+  calculatePercentage,
+  calculateStandardDeviation,
+  smoothData
+} = require('../helpers');
+
 const getLatestPoolRewardsData = async (chain) => {
   try {
     if (chain && CHAINS.includes(chain)) {
@@ -43,19 +50,105 @@ const getAllPoolRewardsData = async (chain) => {
 
     const result = await query;
 
+    const calculateCumulativeRewards = (data) => {
+      let cumulativeRewards = 0;
+
+      return data.map(row => {
+        cumulativeRewards += parseFloat(row.rewards_usd);
+
+        return {
+          ...row,
+          cumulative_rewards_usd: parseFloat(cumulativeRewards.toFixed(2)) 
+        };
+      });
+    };
+
+    if (chain && CHAINS.includes(chain)) {
+      const processedResult = calculateCumulativeRewards(result);
+
+      return processedResult;
+    } else {
+      const independentResults = {};
+
+      for (const ch of CHAINS) {
+        const chainData = result.filter(row => row.chain === ch);
+        independentResults[ch] = calculateCumulativeRewards(chainData);
+      }
+
+      const combinedResult = calculateCumulativeRewards(result);
+
+      return {
+        ...independentResults,
+        combined: combinedResult
+      };
+    }
+  } catch (error) {
+    throw new Error('Error fetching all pool rewards data: ' + error.message);
+  }
+};
+
+const getPoolRewardsSummaryStats = async (chain) => {
+  try {
+    const baseQuery = () => knex('pool_rewards')
+      .select('ts', 'chain', 'pool_id', 'collateral_type', 'rewards_usd')
+      .where('chain', chain)
+      .orderBy('ts', 'asc');
+
+    const allData = await baseQuery();
+    if (allData.length === 0) {
+      throw new Error('No data found for the specified chain');
+    }
+
     // Calculate cumulative rewards
     let cumulativeRewards = 0;
-    const processedResult = result.map(row => {
+    const processedResult = allData.map(row => {
       cumulativeRewards += parseFloat(row.rewards_usd);
       return {
         ...row,
-        cumulative_rewards_usd: parseFloat(cumulativeRewards.toFixed(2)) 
+        cumulative_rewards_usd: parseFloat(cumulativeRewards.toFixed(2))
       };
     });
 
-    return processedResult;
+    const smoothedData = smoothData([...processedResult], 'cumulative_rewards_usd');  
+    const reversedSmoothedData = [...smoothedData].reverse();
+
+    const latestData = reversedSmoothedData[0];
+    const latestTs = new Date(latestData.ts);
+
+    const getDateFromLatest = (days) => new Date(latestTs.getTime() - days * 24 * 60 * 60 * 1000);
+
+    const value24h = reversedSmoothedData.find(item => new Date(item.ts) <= getDateFromLatest(1));
+    const value7d = reversedSmoothedData.find(item => new Date(item.ts) <= getDateFromLatest(7));
+    const value28d = reversedSmoothedData.find(item => new Date(item.ts) <= getDateFromLatest(28));
+
+    let valueYtd = smoothedData.find(item => new Date(item.ts) >= new Date(latestTs.getFullYear(), 0, 1));
+
+    if (!valueYtd) {
+      valueYtd = reversedSmoothedData[reversedSmoothedData.length - 1];
+    }
+
+    const rewardsValues = smoothedData.map(item => parseFloat(item.cumulative_rewards_usd));
+    const standardDeviation = calculateStandardDeviation(rewardsValues);
+
+    const current = parseFloat(processedResult[processedResult.length - 1].cumulative_rewards_usd);
+
+    const ath = Math.max(...rewardsValues, current);
+    const atl = Math.min(...rewardsValues, current);
+
+    return {
+      current,
+      delta_24h: calculateDelta(current, value24h ? parseFloat(value24h.cumulative_rewards_usd) : null),
+      delta_7d: calculateDelta(current, value7d ? parseFloat(value7d.cumulative_rewards_usd) : null),
+      delta_28d: calculateDelta(current, value28d ? parseFloat(value28d.cumulative_rewards_usd) : null),
+      delta_ytd: calculateDelta(current, valueYtd ? parseFloat(valueYtd.cumulative_rewards_usd) : null),
+      ath,
+      atl,
+      ath_percentage: calculatePercentage(current, ath),
+      atl_percentage: atl === 0 ? 100 : calculatePercentage(current, atl),
+      standard_deviation: standardDeviation
+    };
   } catch (error) {
-    throw new Error('Error fetching all pool rewards data: ' + error.message);
+    throw new Error('Error fetching Pool Rewards summary stats: ' + error.message);
   }
 };
 
@@ -156,4 +249,5 @@ module.exports = {
   getAllPoolRewardsData,
   fetchAndInsertAllPoolRewardsData,
   fetchAndUpdateLatestPoolRewardsData,
+  getPoolRewardsSummaryStats,
 };

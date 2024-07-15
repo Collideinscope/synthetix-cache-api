@@ -26,7 +26,6 @@ function calculateAPY(apy, timeframe) {
   return (Math.pow(1 + apy, 1 / n) - 1).toFixed(8);
 }
 
-
 const calculateDelta = (current, previous) => {
   console.log(current, previous)
   return ((current - previous) / previous) * 100;
