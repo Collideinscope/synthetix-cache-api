@@ -1,6 +1,13 @@
 const { knex, troyDBKnex } = require('../config/db');
 const { CHAINS } = require('../helpers');
 
+const {
+  calculateDelta,
+  calculatePercentage,
+  calculateStandardDeviation,
+  smoothData
+} = require('../helpers');
+
 const getStakerCount = async (chain) => {
   try {
     if (chain && CHAINS.includes(chain)) {
@@ -156,6 +163,57 @@ const getAllCoreAccountDelegationsData = async (chain) => {
   }
 };
 
+const getUniqueStakersSummaryStats = async (chain) => {
+  try {
+    const cumulativeData = await getCumulativeUniqueStakers(chain);
+
+    const allData = cumulativeData[chain] || [];
+    if (allData.length === 0) {
+      throw new Error('No data found for the specified chain');
+    }
+
+    const smoothedData = smoothData(allData, 'cumulative_staker_count');  // Smooth unique stakers data
+    const reversedSmoothedData = [...smoothedData].reverse();
+
+    const latestData = reversedSmoothedData[0];
+    const latestTs = new Date(latestData.ts);
+
+    const getDateFromLatest = (days) => new Date(latestTs.getTime() - days * 24 * 60 * 60 * 1000);
+
+    const value24h = reversedSmoothedData.find(item => new Date(item.ts) <= getDateFromLatest(1));
+    const value7d = reversedSmoothedData.find(item => new Date(item.ts) <= getDateFromLatest(7));
+    const value28d = reversedSmoothedData.find(item => new Date(item.ts) <= getDateFromLatest(28));
+
+    let valueYtd = smoothedData.find(item => new Date(item.ts) >= new Date(latestTs.getFullYear(), 0, 1));
+
+    if (!valueYtd) {
+      valueYtd = reversedSmoothedData[reversedSmoothedData.length - 1];
+    }
+
+    const stakerValues = smoothedData.map(item => parseFloat(item.cumulative_staker_count));
+    const standardDeviation = calculateStandardDeviation(stakerValues);
+
+    const current = parseFloat(allData[allData.length - 1].cumulative_staker_count);
+    const ath = Math.max(...stakerValues, current);
+    const atl = Math.min(...stakerValues, current);
+
+    return {
+      current,
+      delta_24h: calculateDelta(current, value24h ? parseFloat(value24h.cumulative_staker_count) : null),
+      delta_7d: calculateDelta(current, value7d ? parseFloat(value7d.cumulative_staker_count) : null),
+      delta_28d: calculateDelta(current, value28d ? parseFloat(value28d.cumulative_staker_count) : null),
+      delta_ytd: calculateDelta(current, valueYtd ? parseFloat(valueYtd.cumulative_staker_count) : null),
+      ath,
+      atl,
+      ath_percentage: calculatePercentage(current, ath),
+      atl_percentage: atl === 0 ? 100 : calculatePercentage(current, atl),
+      standard_deviation: standardDeviation
+    };
+  } catch (error) {
+    throw new Error('Error fetching Unique Stakers summary stats: ' + error.message);
+  }
+};
+
 // Initial seed
 const fetchAndInsertAllCoreAccountDelegationsData = async (chain) => {
   if (!chain) {
@@ -258,4 +316,5 @@ module.exports = {
   fetchAndInsertAllCoreAccountDelegationsData,
   fetchAndUpdateLatestCoreAccountDelegationsData,
   getCumulativeUniqueStakers,
+  getUniqueStakersSummaryStats,
 };
