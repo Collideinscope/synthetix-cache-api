@@ -1,0 +1,17 @@
+const { fetchAndUpdateLatestPerpStatsData } = require('../services/perpStatsService');
+
+const cronUpdateTVL = async () => {
+  try {
+    console.log('Running cron job to update TVL data...');
+
+    await fetchAndUpdateLatestPerpStatsData('base');
+
+    console.log('Cron job Perp Stats Update completed');
+  } catch (error) {
+    console.error('Error running cron job for Perp Stats update:', error);
+  } finally {
+    process.exit(0);
+  }
+}
+
+cronUpdateTVL();

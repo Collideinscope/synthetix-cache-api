@@ -1,4 +1,4 @@
-CREATE TABLE apy (
+/*CREATE TABLE apy (
     id SERIAL PRIMARY KEY,
     created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
@@ -81,6 +81,18 @@ CREATE TABLE pool_rewards (
 
 CREATE INDEX idx_pool_rewards_chain_ts ON pool_rewards(chain, ts);
 CREATE INDEX idx_pool_rewards_pool_id ON pool_rewards(pool_id);
+*/
+CREATE TABLE perp_stats (
+    id SERIAL PRIMARY KEY,
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+    ts TIMESTAMP WITH TIME ZONE NOT NULL,
+    chain TEXT NOT NULL,
+    cumulative_volume NUMERIC NOT NULL,
+    UNIQUE (chain, ts)
+);
+
+CREATE INDEX idx_perp_stats_chain_ts ON perp_stats(chain, ts);
 
 -- update_at column triggers
 CREATE OR REPLACE FUNCTION update_timestamp()
@@ -90,7 +102,7 @@ BEGIN
    RETURN NEW;
 END;
 $$ LANGUAGE plpgsql;
-
+/*
 CREATE TRIGGER update_apy_updated_at
 BEFORE UPDATE ON apy
 FOR EACH ROW
@@ -113,5 +125,10 @@ EXECUTE FUNCTION update_timestamp();
 
 CREATE TRIGGER update_pool_rewards_updated_at
 BEFORE UPDATE ON pool_rewards
+FOR EACH ROW
+EXECUTE FUNCTION update_timestamp();
+*/
+CREATE TRIGGER update_perp_stats_updated_at
+BEFORE UPDATE ON perp_stats
 FOR EACH ROW
 EXECUTE FUNCTION update_timestamp();

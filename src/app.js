@@ -2,7 +2,6 @@ const express = require('express');
 const cors = require('cors');
 const swaggerUi = require('swagger-ui-express');
 const YAML = require('yamljs');
-const path = require('path');
 
 const app = express();
 
@@ -20,6 +19,7 @@ const tvlRoutes = require('./routes/tvl');
 const coreDelegationsRoutes = require('./routes/coreDelegations');
 const poolRewardsRoutes = require('./routes/poolRewards');
 const coreAccountDelegationsRoutes = require('./routes/coreAccountDelegations');
+const perpStatsRoutes = require('./routes/perpStats');
 
 app.use(cors());
 
@@ -28,6 +28,7 @@ app.use('/tvl', tvlRoutes);
 app.use('/core-delegations', coreDelegationsRoutes);
 app.use('/pool-rewards', poolRewardsRoutes);
 app.use('/core-account-delegations', coreAccountDelegationsRoutes);
+app.use('/perp-stats', perpStatsRoutes);
 
 // Setup Swagger UI with the combined document
 if (swaggerDocument) {
