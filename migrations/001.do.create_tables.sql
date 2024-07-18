@@ -89,11 +89,32 @@ CREATE TABLE perp_stats (
     ts TIMESTAMP WITH TIME ZONE NOT NULL,
     chain TEXT NOT NULL,
     cumulative_volume NUMERIC NOT NULL,
+    cumulative_collected_fees NUMERIC NOT NULL,
+    cumulative_exchange_fees NUMERIC NOT NULL,
     UNIQUE (chain, ts)
 );
 
 CREATE INDEX idx_perp_stats_chain_ts ON perp_stats(chain, ts);
+/*
+CREATE TABLE perp_account_stats (
+    id SERIAL PRIMARY KEY,
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+    ts TIMESTAMP WITH TIME ZONE NOT NULL,
+    chain TEXT NOT NULL,
+    account_id TEXT NOT NULL,
+    fees NUMERIC NOT NULL,
+    volume NUMERIC NOT NULL,
+    amount_liquidated NUMERIC NOT NULL,
+    liquidations INTEGER NOT NULL,
+    cumulative_fees NUMERIC NOT NULL,
+    cumulative_volume NUMERIC NOT NULL,
+    UNIQUE (chain, ts, account_id)
+);
 
+CREATE INDEX idx_perp_account_stats_chain_ts ON perp_account_stats(chain, ts);
+CREATE INDEX idx_perp_account_stats_account_id ON perp_account_stats(account_id);
+*/
 -- update_at column triggers
 CREATE OR REPLACE FUNCTION update_timestamp()
 RETURNS TRIGGER AS $$
@@ -132,3 +153,9 @@ CREATE TRIGGER update_perp_stats_updated_at
 BEFORE UPDATE ON perp_stats
 FOR EACH ROW
 EXECUTE FUNCTION update_timestamp();
+/*
+CREATE TRIGGER update_perp_account_stats_updated_at
+BEFORE UPDATE ON perp_account_stats
+FOR EACH ROW
+EXECUTE FUNCTION update_timestamp();
+*/

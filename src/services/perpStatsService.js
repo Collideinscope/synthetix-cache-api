@@ -54,7 +54,7 @@ const getAllPerpStatsData = async (chain) => {
   }
 };
 
-const getPerpStatsSummaryStats = async (chain) => {
+const getCumulativeVolumeSummarystats = async (chain) => {
   try {
     const baseQuery = () => knex('perp_stats').where('chain', chain);
 
@@ -105,6 +105,108 @@ const getPerpStatsSummaryStats = async (chain) => {
   }
 };
 
+const getCumulativeExchangeFeesSummaryData = async (chain) => {
+  try {
+    const baseQuery = () => knex('perp_stats').where('chain', chain);
+
+    const allData = await baseQuery().orderBy('ts', 'asc');
+    if (allData.length === 0) {
+      throw new Error('No data found for the specified chain');
+    }
+
+    const smoothedData = smoothData(allData, 'cumulative_exchange_fees');  // Smooth perp stats data
+    const reversedSmoothedData = [...smoothedData].reverse();
+
+    const latestData = reversedSmoothedData[0];
+    const latestTs = new Date(latestData.ts);
+
+    const getDateFromLatest = (days) => new Date(latestTs.getTime() - days * 24 * 60 * 60 * 1000);
+
+    const value24h = reversedSmoothedData.find(item => new Date(item.ts) <= getDateFromLatest(1));
+    const value7d = reversedSmoothedData.find(item => new Date(item.ts) <= getDateFromLatest(7));
+    const value28d = reversedSmoothedData.find(item => new Date(item.ts) <= getDateFromLatest(28));
+
+    let valueYtd = smoothedData.find(item => new Date(item.ts) >= new Date(latestTs.getFullYear(), 0, 1));
+
+    if (!valueYtd) {
+      valueYtd = reversedSmoothedData[reversedSmoothedData.length - 1];
+    }
+
+    const perpValues = smoothedData.map(item => parseFloat(item.cumulative_exchange_fees));
+    const standardDeviation = calculateStandardDeviation(perpValues);
+
+    const current = parseFloat(allData[allData.length - 1].cumulative_exchange_fees);
+    const ath = Math.max(...perpValues, current);
+    const atl = Math.min(...perpValues, current);
+
+    return {
+      current,
+      delta_24h: calculateDelta(current, value24h ? parseFloat(value24h.cumulative_exchange_fees) : null),
+      delta_7d: calculateDelta(current, value7d ? parseFloat(value7d.cumulative_exchange_fees) : null),
+      delta_28d: calculateDelta(current, value28d ? parseFloat(value28d.cumulative_exchange_fees) : null),
+      delta_ytd: calculateDelta(current, valueYtd ? parseFloat(valueYtd.cumulative_exchange_fees) : null),
+      ath,
+      atl,
+      ath_percentage: calculatePercentage(current, ath),
+      atl_percentage: atl === 0 ? 100 : calculatePercentage(current, atl),
+      standard_deviation: standardDeviation
+    };
+  } catch (error) {
+    throw new Error('Error fetching perp stats summary stats: ' + error.message);
+  }
+};
+
+const getCumulativeCollectedFeesSummaryData = async (chain) => {
+  try {
+    const baseQuery = () => knex('perp_stats').where('chain', chain);
+
+    const allData = await baseQuery().orderBy('ts', 'asc');
+    if (allData.length === 0) {
+      throw new Error('No data found for the specified chain');
+    }
+
+    const smoothedData = smoothData(allData, 'cumulative_collected_fees');  // Smooth perp stats data
+    const reversedSmoothedData = [...smoothedData].reverse();
+
+    const latestData = reversedSmoothedData[0];
+    const latestTs = new Date(latestData.ts);
+
+    const getDateFromLatest = (days) => new Date(latestTs.getTime() - days * 24 * 60 * 60 * 1000);
+
+    const value24h = reversedSmoothedData.find(item => new Date(item.ts) <= getDateFromLatest(1));
+    const value7d = reversedSmoothedData.find(item => new Date(item.ts) <= getDateFromLatest(7));
+    const value28d = reversedSmoothedData.find(item => new Date(item.ts) <= getDateFromLatest(28));
+
+    let valueYtd = smoothedData.find(item => new Date(item.ts) >= new Date(latestTs.getFullYear(), 0, 1));
+
+    if (!valueYtd) {
+      valueYtd = reversedSmoothedData[reversedSmoothedData.length - 1];
+    }
+
+    const perpValues = smoothedData.map(item => parseFloat(item.cumulative_exchange_fees));
+    const standardDeviation = calculateStandardDeviation(perpValues);
+
+    const current = parseFloat(allData[allData.length - 1].cumulative_exchange_fees);
+    const ath = Math.max(...perpValues, current);
+    const atl = Math.min(...perpValues, current);
+
+    return {
+      current,
+      delta_24h: calculateDelta(current, value24h ? parseFloat(value24h.cumulative_exchange_fees) : null),
+      delta_7d: calculateDelta(current, value7d ? parseFloat(value7d.cumulative_exchange_fees) : null),
+      delta_28d: calculateDelta(current, value28d ? parseFloat(value28d.cumulative_exchange_fees) : null),
+      delta_ytd: calculateDelta(current, valueYtd ? parseFloat(valueYtd.cumulative_exchange_fees) : null),
+      ath,
+      atl,
+      ath_percentage: calculatePercentage(current, ath),
+      atl_percentage: atl === 0 ? 100 : calculatePercentage(current, atl),
+      standard_deviation: standardDeviation
+    };
+  } catch (error) {
+    throw new Error('Error fetching perp stats summary stats: ' + error.message);
+  }
+};
+
 const fetchAndInsertAllPerpStatsData = async (chain) => {
   if (!chain) {
     console.error(`Chain must be provided for data updates.`);
@@ -119,7 +221,7 @@ const fetchAndInsertAllPerpStatsData = async (chain) => {
     const tableName = `prod_${chain}_mainnet.fct_perp_stats_daily_${chain}_mainnet`;
 
     const rows = await troyDBKnex.raw(`
-      SELECT ts, cumulative_volume
+      SELECT ts, cumulative_volume, cumulative_collected_fees, cumulative_exchange_fees
       FROM ${tableName}
       ORDER BY ts DESC;
     `);
@@ -133,7 +235,9 @@ const fetchAndInsertAllPerpStatsData = async (chain) => {
       .insert(dataToInsert)
       .onConflict(['chain', 'ts'])
       .merge({
-        cumulative_volume: knex.raw('GREATEST(perp_stats.cumulative_volume, excluded.cumulative_volume)')
+        cumulative_volume: knex.raw('GREATEST(perp_stats.cumulative_volume, excluded.cumulative_volume)'),
+        cumulative_collected_fees: knex.raw('EXCLUDED.cumulative_collected_fees'),
+        cumulative_exchange_fees: knex.raw('EXCLUDED.cumulative_exchange_fees')
       });
 
     console.log(`Perp stats data seeded successfully for ${chain} chain.`);
@@ -164,7 +268,7 @@ const fetchAndUpdateLatestPerpStatsData = async (chain) => {
     const lastTimestamp = lastTimestampResult.ts;
 
     const newRows = await troyDBKnex.raw(`
-      SELECT ts, cumulative_volume
+      SELECT ts, cumulative_volume, cumulative_collected_fees, cumulative_exchange_fees
       FROM ${tableName}
       WHERE ts > ?
       ORDER BY ts DESC;
@@ -185,8 +289,9 @@ const fetchAndUpdateLatestPerpStatsData = async (chain) => {
         .insert(dataToInsert)
         .onConflict(['chain', 'ts'])
         .merge({
-          cumulative_volume: knex.raw('GREATEST(perp_stats.cumulative_volume, excluded.cumulative_volume)')
-        });
+          cumulative_volume: knex.raw('EXCLUDED.cumulative_volume'),
+          cumulative_collected_fees: knex.raw('EXCLUDED.cumulative_collected_fees'),
+          cumulative_exchange_fees: knex.raw('EXCLUDED.cumulative_exchange_fees')        });
     }
 
     console.log(`Perp stats data updated successfully for ${chain} chain.`);
@@ -200,5 +305,7 @@ module.exports = {
   getAllPerpStatsData,
   fetchAndInsertAllPerpStatsData,
   fetchAndUpdateLatestPerpStatsData,
-  getPerpStatsSummaryStats,
+  getCumulativeVolumeSummarystats,
+  getCumulativeExchangeFeesSummaryData,
+  getCumulativeCollectedFeesSummaryData,
 };

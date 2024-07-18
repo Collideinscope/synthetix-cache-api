@@ -20,6 +20,7 @@ const coreDelegationsRoutes = require('./routes/coreDelegations');
 const poolRewardsRoutes = require('./routes/poolRewards');
 const coreAccountDelegationsRoutes = require('./routes/coreAccountDelegations');
 const perpStatsRoutes = require('./routes/perpStats');
+const perpAccountStatsRoutes = require('./routes/perpAccountStats');
 
 app.use(cors());
 
@@ -29,6 +30,7 @@ app.use('/core-delegations', coreDelegationsRoutes);
 app.use('/pool-rewards', poolRewardsRoutes);
 app.use('/core-account-delegations', coreAccountDelegationsRoutes);
 app.use('/perp-stats', perpStatsRoutes);
+app.use('/perp-account-stats', perpAccountStatsRoutes);
 
 // Setup Swagger UI with the combined document
 if (swaggerDocument) {
