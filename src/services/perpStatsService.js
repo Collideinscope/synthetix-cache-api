@@ -54,109 +54,19 @@ const getAllPerpStatsData = async (chain) => {
   }
 };
 
-const getCumulativeVolumeSummarystats = async (chain) => {
-  try {
-    const baseQuery = () => knex('perp_stats').where('chain', chain);
-
-    const allData = await baseQuery().orderBy('ts', 'asc');
-    if (allData.length === 0) {
-      throw new Error('No data found for the specified chain');
-    }
-
-    const smoothedData = smoothData(allData, 'cumulative_volume');  
-    const reversedSmoothedData = [...smoothedData].reverse();
-
-    const latestData = reversedSmoothedData[0];
-    const latestTs = new Date(latestData.ts);
-
-    const getDateFromLatest = (days) => new Date(latestTs.getTime() - days * 24 * 60 * 60 * 1000);
-
-    const value24h = reversedSmoothedData.find(item => new Date(item.ts) <= getDateFromLatest(1));
-    const value7d = reversedSmoothedData.find(item => new Date(item.ts) <= getDateFromLatest(7));
-    const value28d = reversedSmoothedData.find(item => new Date(item.ts) <= getDateFromLatest(28));
-
-    let valueYtd = smoothedData.find(item => new Date(item.ts) >= new Date(latestTs.getFullYear(), 0, 1));
-
-    if (!valueYtd) {
-      valueYtd = reversedSmoothedData[reversedSmoothedData.length - 1];
-    }
-
-    const volumeValues = smoothedData.map(item => parseFloat(item.cumulative_volume));
-    const standardDeviation = calculateStandardDeviation(volumeValues);
-
-    const current = parseFloat(allData[allData.length - 1].cumulative_volume);
-    const ath = Math.max(...volumeValues, current);
-    const atl = Math.min(...volumeValues, current);
-
-    return {
-      current,
-      delta_24h: calculateDelta(current, value24h ? parseFloat(value24h.cumulative_volume) : null),
-      delta_7d: calculateDelta(current, value7d ? parseFloat(value7d.cumulative_volume) : null),
-      delta_28d: calculateDelta(current, value28d ? parseFloat(value28d.cumulative_volume) : null),
-      delta_ytd: calculateDelta(current, valueYtd ? parseFloat(valueYtd.cumulative_volume) : null),
-      ath,
-      atl,
-      ath_percentage: calculatePercentage(current, ath),
-      atl_percentage: atl === 0 ? 100 : calculatePercentage(current, atl),
-      standard_deviation: standardDeviation
-    };
-  } catch (error) {
-    throw new Error('Error fetching perp stats summary stats: ' + error.message);
-  }
+const getCumulativeVolumeSummaryStats = async (chain) => {
+  return getSummaryStats(chain, 'cumulative_volume');
 };
 
-const getCumulativeExchangeFeesSummaryData = async (chain) => {
-  try {
-    const baseQuery = () => knex('perp_stats').where('chain', chain);
-
-    const allData = await baseQuery().orderBy('ts', 'asc');
-    if (allData.length === 0) {
-      throw new Error('No data found for the specified chain');
-    }
-
-    const smoothedData = smoothData(allData, 'cumulative_exchange_fees');  // Smooth perp stats data
-    const reversedSmoothedData = [...smoothedData].reverse();
-
-    const latestData = reversedSmoothedData[0];
-    const latestTs = new Date(latestData.ts);
-
-    const getDateFromLatest = (days) => new Date(latestTs.getTime() - days * 24 * 60 * 60 * 1000);
-
-    const value24h = reversedSmoothedData.find(item => new Date(item.ts) <= getDateFromLatest(1));
-    const value7d = reversedSmoothedData.find(item => new Date(item.ts) <= getDateFromLatest(7));
-    const value28d = reversedSmoothedData.find(item => new Date(item.ts) <= getDateFromLatest(28));
-
-    let valueYtd = smoothedData.find(item => new Date(item.ts) >= new Date(latestTs.getFullYear(), 0, 1));
-
-    if (!valueYtd) {
-      valueYtd = reversedSmoothedData[reversedSmoothedData.length - 1];
-    }
-
-    const perpValues = smoothedData.map(item => parseFloat(item.cumulative_exchange_fees));
-    const standardDeviation = calculateStandardDeviation(perpValues);
-
-    const current = parseFloat(allData[allData.length - 1].cumulative_exchange_fees);
-    const ath = Math.max(...perpValues, current);
-    const atl = Math.min(...perpValues, current);
-
-    return {
-      current,
-      delta_24h: calculateDelta(current, value24h ? parseFloat(value24h.cumulative_exchange_fees) : null),
-      delta_7d: calculateDelta(current, value7d ? parseFloat(value7d.cumulative_exchange_fees) : null),
-      delta_28d: calculateDelta(current, value28d ? parseFloat(value28d.cumulative_exchange_fees) : null),
-      delta_ytd: calculateDelta(current, valueYtd ? parseFloat(valueYtd.cumulative_exchange_fees) : null),
-      ath,
-      atl,
-      ath_percentage: calculatePercentage(current, ath),
-      atl_percentage: atl === 0 ? 100 : calculatePercentage(current, atl),
-      standard_deviation: standardDeviation
-    };
-  } catch (error) {
-    throw new Error('Error fetching perp stats summary stats: ' + error.message);
-  }
+const getCumulativeExchangeFeesSummaryStats = async (chain) => {
+  return getSummaryStats(chain, 'cumulative_exchange_fees');
 };
 
-const getCumulativeCollectedFeesSummaryData = async (chain) => {
+const getCumulativeCollectedFeesSummaryStats = async (chain) => {
+  return getSummaryStats(chain, 'cumulative_collected_fees');
+};
+
+const getSummaryStats = async (chain, column) => {
   try {
     const baseQuery = () => knex('perp_stats').where('chain', chain);
 
@@ -165,7 +75,7 @@ const getCumulativeCollectedFeesSummaryData = async (chain) => {
       throw new Error('No data found for the specified chain');
     }
 
-    const smoothedData = smoothData(allData, 'cumulative_collected_fees');  // Smooth perp stats data
+    const smoothedData = smoothData(allData, column);  
     const reversedSmoothedData = [...smoothedData].reverse();
 
     const latestData = reversedSmoothedData[0];
@@ -183,19 +93,19 @@ const getCumulativeCollectedFeesSummaryData = async (chain) => {
       valueYtd = reversedSmoothedData[reversedSmoothedData.length - 1];
     }
 
-    const perpValues = smoothedData.map(item => parseFloat(item.cumulative_exchange_fees));
-    const standardDeviation = calculateStandardDeviation(perpValues);
+    const columnValues = smoothedData.map(item => parseFloat(item[column]));
+    const standardDeviation = calculateStandardDeviation(columnValues);
 
-    const current = parseFloat(allData[allData.length - 1].cumulative_exchange_fees);
-    const ath = Math.max(...perpValues, current);
-    const atl = Math.min(...perpValues, current);
+    const current = parseFloat(allData[allData.length - 1][column]);
+    const ath = Math.max(...columnValues, current);
+    const atl = Math.min(...columnValues, current);
 
     return {
       current,
-      delta_24h: calculateDelta(current, value24h ? parseFloat(value24h.cumulative_exchange_fees) : null),
-      delta_7d: calculateDelta(current, value7d ? parseFloat(value7d.cumulative_exchange_fees) : null),
-      delta_28d: calculateDelta(current, value28d ? parseFloat(value28d.cumulative_exchange_fees) : null),
-      delta_ytd: calculateDelta(current, valueYtd ? parseFloat(valueYtd.cumulative_exchange_fees) : null),
+      delta_24h: calculateDelta(current, value24h ? parseFloat(value24h[column]) : null),
+      delta_7d: calculateDelta(current, value7d ? parseFloat(value7d[column]) : null),
+      delta_28d: calculateDelta(current, value28d ? parseFloat(value28d[column]) : null),
+      delta_ytd: calculateDelta(current, valueYtd ? parseFloat(valueYtd[column]) : null),
       ath,
       atl,
       ath_percentage: calculatePercentage(current, ath),
@@ -300,12 +210,98 @@ const fetchAndUpdateLatestPerpStatsData = async (chain) => {
   }
 };
 
+const fetchCumulativeData = async (chain, dataType) => {
+  try {
+    const result = await knex.raw(`
+      SELECT 
+        ts,
+        ${dataType}
+      FROM 
+        perp_stats
+      WHERE
+        chain = ?
+      ORDER BY 
+        ts;
+    `, [chain]);
+
+    return result.rows.map(row => ({
+      ts: row.ts,
+      [dataType]: row[dataType],
+    }));
+  } catch (error) {
+    throw new Error(`Error fetching cumulative ${dataType} data: ` + error.message);
+  }
+};
+
+const getCumulativeVolumeData = async (chain) => {
+  try {
+    if (chain && CHAINS.includes(chain)) {
+      const data = await fetchCumulativeData(chain, 'cumulative_volume');
+      return { [chain]: data };
+    }
+
+    const results = await Promise.all(
+      CHAINS.map(async (chain) => {
+        const data = await fetchCumulativeData(chain, 'cumulative_volume');
+        return { [chain]: data };
+      })
+    );
+
+    return results.reduce((acc, curr) => ({ ...acc, ...curr }), {});
+  } catch (error) {
+    throw new Error('Error fetching cumulative volume data: ' + error.message);
+  }
+};
+
+const getCumulativeExchangeFeesData = async (chain) => {
+  try {
+    if (chain && CHAINS.includes(chain)) {
+      const data = await fetchCumulativeData(chain, 'cumulative_exchange_fees');
+      return { [chain]: data };
+    }
+
+    const results = await Promise.all(
+      CHAINS.map(async (chain) => {
+        const data = await fetchCumulativeData(chain, 'cumulative_exchange_fees');
+        return { [chain]: data };
+      })
+    );
+
+    return results.reduce((acc, curr) => ({ ...acc, ...curr }), {});
+  } catch (error) {
+    throw new Error('Error fetching cumulative exchange fees data: ' + error.message);
+  }
+};
+
+const getCumulativeCollectedFeesData = async (chain) => {
+  try {
+    if (chain && CHAINS.includes(chain)) {
+      const data = await fetchCumulativeData(chain, 'cumulative_collected_fees');
+      return { [chain]: data };
+    }
+
+    const results = await Promise.all(
+      CHAINS.map(async (chain) => {
+        const data = await fetchCumulativeData(chain, 'cumulative_collected_fees');
+        return { [chain]: data };
+      })
+    );
+
+    return results.reduce((acc, curr) => ({ ...acc, ...curr }), {});
+  } catch (error) {
+    throw new Error('Error fetching cumulative collected fees data: ' + error.message);
+  }
+};
+
 module.exports = {
   getLatestPerpStatsData,
   getAllPerpStatsData,
   fetchAndInsertAllPerpStatsData,
   fetchAndUpdateLatestPerpStatsData,
-  getCumulativeVolumeSummarystats,
-  getCumulativeExchangeFeesSummaryData,
-  getCumulativeCollectedFeesSummaryData,
+  getCumulativeVolumeSummaryStats,
+  getCumulativeExchangeFeesSummaryStats,
+  getCumulativeCollectedFeesSummaryStats,
+  getCumulativeVolumeData,
+  getCumulativeExchangeFeesData,
+  getCumulativeCollectedFeesData,
 };
