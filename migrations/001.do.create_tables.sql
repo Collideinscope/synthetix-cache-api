@@ -81,7 +81,7 @@ CREATE TABLE pool_rewards (
 
 CREATE INDEX idx_pool_rewards_chain_ts ON pool_rewards(chain, ts);
 CREATE INDEX idx_pool_rewards_pool_id ON pool_rewards(pool_id);
-*/
+
 CREATE TABLE perp_stats (
     id SERIAL PRIMARY KEY,
     created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
@@ -95,7 +95,7 @@ CREATE TABLE perp_stats (
 );
 
 CREATE INDEX idx_perp_stats_chain_ts ON perp_stats(chain, ts);
-/*
+
 CREATE TABLE perp_account_stats (
     id SERIAL PRIMARY KEY,
     created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
@@ -115,6 +115,32 @@ CREATE TABLE perp_account_stats (
 CREATE INDEX idx_perp_account_stats_chain_ts ON perp_account_stats(chain, ts);
 CREATE INDEX idx_perp_account_stats_account_id ON perp_account_stats(account_id);
 */
+
+CREATE TABLE perp_market_history (
+    id SERIAL PRIMARY KEY,
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+    ts TIMESTAMP WITH TIME ZONE NOT NULL,
+    chain TEXT NOT NULL,
+    block_number INTEGER NOT NULL,
+    market_id INTEGER NOT NULL,
+    market_symbol TEXT NOT NULL,
+    price NUMERIC NOT NULL,
+    size NUMERIC NOT NULL,
+    funding_rate NUMERIC NOT NULL,
+    long_rate_apr NUMERIC NOT NULL,
+    short_rate_apr NUMERIC NOT NULL,
+    size_usd NUMERIC NOT NULL,
+    long_oi NUMERIC NOT NULL,
+    short_oi NUMERIC NOT NULL,
+    long_oi_pct NUMERIC,
+    short_oi_pct NUMERIC,
+    UNIQUE (chain, ts, market_id)
+);
+
+CREATE INDEX idx_perp_market_history_ts ON perp_market_history(chain, ts);
+CREATE INDEX idx_perp_market_history_market_id ON perp_market_history(market_id);
+
 -- update_at column triggers
 CREATE OR REPLACE FUNCTION update_timestamp()
 RETURNS TRIGGER AS $$
@@ -148,14 +174,19 @@ CREATE TRIGGER update_pool_rewards_updated_at
 BEFORE UPDATE ON pool_rewards
 FOR EACH ROW
 EXECUTE FUNCTION update_timestamp();
-*/
+
 CREATE TRIGGER update_perp_stats_updated_at
 BEFORE UPDATE ON perp_stats
 FOR EACH ROW
 EXECUTE FUNCTION update_timestamp();
-/*
+
 CREATE TRIGGER update_perp_account_stats_updated_at
 BEFORE UPDATE ON perp_account_stats
 FOR EACH ROW
 EXECUTE FUNCTION update_timestamp();
 */
+
+CREATE TRIGGER update_perp_market_history
+BEFORE UPDATE ON perp_market_history
+FOR EACH ROW
+EXECUTE FUNCTION update_timestamp();

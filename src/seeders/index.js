@@ -5,6 +5,7 @@ const { fetchAndInsertAllPoolRewardsData } = require('../services/poolRewardsSer
 const { fetchAndInsertAllCoreAccountDelegationsData } = require('../services/coreAccountDelegationsService');
 const { fetchAndInsertAllPerpStatsData } = require('../services/perpStatsService');
 const { fetchAndInsertAllPerpAccountStatsData } = require('../services/perpAccountStatsService');
+const { fetchAndInsertAllPerpMarketHistoryData } = require('../services/perpMarketHistoryService');
 
 const seedAllData = async () => {
   
@@ -48,7 +49,7 @@ const seedAllData = async () => {
 
   console.log('Seeding Core Accounts Delegations completed.'); 
 
-  /* Perp Stats */
+  /* Perp Stats 
   console.log('Seeding Perp Stats data...');
 
   await fetchAndInsertAllPerpStatsData('base');
@@ -61,6 +62,13 @@ const seedAllData = async () => {
   await fetchAndInsertAllPerpAccountStatsData('base');
 
   console.log('Seeding Perp Account Stats completed.'); */
+
+  /* Perp Market History */
+  console.log('Seeding Perp Market History data...');
+
+  await fetchAndInsertAllPerpMarketHistoryData('base');
+
+  console.log('Seeding Perp Market History completed.'); 
 };
 
 module.exports = { seedAllData };

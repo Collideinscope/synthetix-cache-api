@@ -64,7 +64,7 @@ const getAPYSummaryStats = async (chain) => {
       throw new Error('No data found for the specified chain');
     }
 
-    const smoothedData = smoothData(allData);
+    const smoothedData = smoothData(allData, apy_7d);
     const reversedSmoothedData = [...smoothedData].reverse();
 
     const latestData = reversedSmoothedData[0];

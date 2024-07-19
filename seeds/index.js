@@ -12,9 +12,10 @@ exports.seed = async function(knex) {
   await knex('tvl').del();
   await knex('core_delegations').del();
   await knex('pool_rewards').del();
-  await knex('core_account_delegations').del();*/
+  await knex('core_account_delegations').del();
   await knex('perp_stats').del();
-  //await knex('perp_account_stats').del();
+  await knex('perp_account_stats').del(); */
+  await knex('perp_market_history').del();
 
   await seedAllData();
 };

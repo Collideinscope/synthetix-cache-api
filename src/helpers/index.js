@@ -43,18 +43,18 @@ const calculateStandardDeviation = (values) => {
 };
 
 // moving average, default 7d
-const smoothData = (data, windowSize = 168) => {
+const smoothData = (data, property, windowSize = 168) => {
   return data.map((obj, idx, array) => {
     if (idx < windowSize - 1) {
       // Not enough previous data objs, return original
       return obj;
     }
     const window = array.slice(idx - windowSize + 1, idx + 1);
-    const sum = window.reduce((acc, curr) => acc + parseFloat(curr.apy_7d), 0);
+    const sum = window.reduce((acc, curr) => acc + parseFloat(curr[property]), 0);
 
     return {
       ...obj,
-      apy_7d: sum / windowSize,
+      [property]: sum / windowSize,
     }
   });
 };
