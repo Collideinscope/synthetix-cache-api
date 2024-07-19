@@ -2,8 +2,8 @@ const express = require('express');
 const router = express.Router();
 const { 
   getAllPerpMarketHistoryData, 
-  getDailyOIData,
-  getDailyOISummaryStats,
+  getOpenInterestData,
+  getOpenInterestSummaryStats,
 } = require('../services/perpMarketHistoryService');
 const { CHAINS } = require('../helpers');
 
@@ -23,7 +23,7 @@ router.get('/all/:chain?', async (req, res) => {
   }
 });
 
-router.get('/cumulative-oi/:chain?', async (req, res) => {
+router.get('/open-interest/:chain?', async (req, res) => {
   try {
     const { chain } = req.params;
 
@@ -35,20 +35,20 @@ router.get('/cumulative-oi/:chain?', async (req, res) => {
       return res.status(400).json({ error: "Invalid chain parameter" });
     }
 
-    const data = await getDailyOIData(chain);
+    const data = await getOpenInterestData(chain);
 
     if (!data.length) {
-      return res.status(404).send('Cumulative OI data not found');
+      return res.status(404).send('Open interest data not found');
     }
 
     res.json(data);
   } catch (error) {
-    console.error('Error in /perp-market-history/cumulative-oi route:', error);
+    console.error('Error in /perp-market-history/open-interest route:', error);
     res.status(500).json({ error: error.message });
   }
 });
 
-router.get('/cumulative-oi/summary/:chain?', async (req, res) => {
+router.get('/open-interest/summary/:chain?', async (req, res) => {
   try {
     const { chain } = req.params;
 
@@ -60,7 +60,7 @@ router.get('/cumulative-oi/summary/:chain?', async (req, res) => {
       return res.status(400).json({ error: "Invalid chain parameter" });
     }
 
-    const stats = await getDailyOISummaryStats(chain);
+    const stats = await getOpenInterestSummaryStats(chain);
 
     res.json(stats);
   } catch (error) {

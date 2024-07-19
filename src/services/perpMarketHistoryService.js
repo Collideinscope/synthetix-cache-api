@@ -169,7 +169,7 @@ const getAllPerpMarketHistoryData = async (chain) => {
   }
 };
 
-const getDailyOIData = async (chain) => {
+const getOpenInterestData = async (chain) => {
   try {
     // Calculate daily average OI per market and then sum them up to get daily OI
     const result = await knex.raw(`
@@ -210,9 +210,9 @@ const getDailyOIData = async (chain) => {
   }
 };
 
-const getDailyOISummaryStats = async (chain) => {
+const getOpenInterestSummaryStats = async (chain) => {
   try {
-    const allData = await getDailyOIData(chain);
+    const allData = await getOpenInterestData(chain);
 
     if (allData.length === 0) {
       throw new Error('No data found');
@@ -243,7 +243,7 @@ const getDailyOISummaryStats = async (chain) => {
     const current = parseFloat(allData[allData.length -1].daily_oi);
     const ath = Math.max(...oiValues, current);
     const atl = Math.min(...oiValues, current);
-    
+
     return {
       current,
       delta_24h: calculateDelta(current, value24h ? parseFloat(value24h.daily_oi) : null),
@@ -265,6 +265,6 @@ module.exports = {
   fetchAndInsertAllPerpMarketHistoryData,
   fetchAndUpdateLatestPerpMarketHistoryData,
   getAllPerpMarketHistoryData,
-  getDailyOIData,
-  getDailyOISummaryStats,
+  getOpenInterestData,
+  getOpenInterestSummaryStats,
 };
