@@ -130,21 +130,26 @@ const fetchAndUpdateLatestPerpMarketHistoryData = async (chain) => {
     }));
 
     if (dataToInsert.length > 0) {
-      await knex('perp_market_history')
-        .insert(dataToInsert)
-        .onConflict(['chain', 'ts', 'market_id'])
-        .merge({
-          price: knex.raw('EXCLUDED.price'),
-          size: knex.raw('EXCLUDED.size'),
-          funding_rate: knex.raw('EXCLUDED.funding_rate'),
-          long_rate_apr: knex.raw('EXCLUDED.long_rate_apr'),
-          short_rate_apr: knex.raw('EXCLUDED.short_rate_apr'),
-          size_usd: knex.raw('EXCLUDED.size_usd'),
-          long_oi: knex.raw('EXCLUDED.long_oi'),
-          short_oi: knex.raw('EXCLUDED.short_oi'),
-          long_oi_pct: knex.raw('EXCLUDED.long_oi_pct'),
-          short_oi_pct: knex.raw('EXCLUDED.short_oi_pct')
-        });
+      const insertInChunks = async (data) => {
+        for (let i = 0; i < data.length; i += CHUNK_SIZE) {
+          const chunk = data.slice(i, i + CHUNK_SIZE);
+          await knex('perp_market_history')
+            .insert(chunk)
+            .onConflict(['chain', 'ts', 'market_id'])
+            .merge({
+              price: knex.raw('EXCLUDED.price'),
+              size: knex.raw('EXCLUDED.size'),
+              funding_rate: knex.raw('EXCLUDED.funding_rate'),
+              long_rate_apr: knex.raw('EXCLUDED.long_rate_apr'),
+              short_rate_apr: knex.raw('EXCLUDED.short_rate_apr'),
+              size_usd: knex.raw('EXCLUDED.size_usd'),
+              long_oi: knex.raw('EXCLUDED.long_oi'),
+              short_oi: knex.raw('EXCLUDED.short_oi'),
+              long_oi_pct: knex.raw('EXCLUDED.long_oi_pct'),
+              short_oi_pct: knex.raw('EXCLUDED.short_oi_pct')
+            });
+        }
+      };
     }
 
     console.log(`Perp market history data updated successfully for ${chain} chain.`);
@@ -177,32 +182,37 @@ const getOpenInterestData = async (chain) => {
         SELECT
           date_trunc('day', ts) AS day,
           market_symbol,
-          AVG(size * price) AS daily_market_oi
+          AVG(size * price) AS daily_market_oi,
+          chain
         FROM 
           perp_market_history
         WHERE
           chain = ?
         GROUP BY 
           date_trunc('day', ts),
-          market_symbol
+          market_symbol,
+          chain
       ),
       daily_oi AS (
         SELECT
           day,
-          SUM(daily_market_oi) AS daily_oi
+          SUM(daily_market_oi) AS daily_oi,
+          chain
         FROM
           daily_market_oi
         GROUP BY
-          day
+          day,
+          chain
       )
       SELECT 
         day AS ts,
-        daily_oi
+        daily_oi,
+        chain
       FROM 
         daily_oi
       ORDER BY 
         ts ASC;
-    `, [chain]);
+    `, [chain]);    
 
     return result.rows;
   } catch (error) {

@@ -475,6 +475,70 @@ paths:
           description: TVL data not found
         500:
           description: Server error
+  /tvl/summary/{chain}:
+    get:
+      summary: Get the TVL summary statistics
+      tags:
+        - TVL
+      parameters:
+        - in: path
+          name: chain
+          schema:
+            type: string
+          required: true
+          description: The chain to get the TVL summary statistics for
+      responses:
+        200:
+          description: The TVL summary statistics
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  current:
+                    type: number
+                    format: double
+                    example: 25611607.372685123
+                  delta_24h:
+                    type: number
+                    format: double
+                    example: 1000000.5
+                  delta_7d:
+                    type: number
+                    format: double
+                    example: 2500000.75
+                  delta_28d:
+                    type: number
+                    format: double
+                    example: 5000000.25
+                  delta_ytd:
+                    type: number
+                    format: double
+                    example: 10000000.5
+                  ath:
+                    type: number
+                    format: double
+                    example: 30000000.0
+                  atl:
+                    type: number
+                    format: double
+                    example: 20000000.0
+                  ath_percentage:
+                    type: number
+                    format: double
+                    example: 85.37
+                  atl_percentage:
+                    type: number
+                    format: double
+                    example: 128.06
+                  standard_deviation:
+                    type: number
+                    format: double
+                    example: 1500000.25
+        400:
+          description: Bad request (invalid or missing chain parameter)
+        500:
+          description: Server error
   /core-delegations/latest/{chain}:
     get:
       summary: Get the latest core delegations data
@@ -589,6 +653,70 @@ paths:
                       example: '2024-06-27T15:11:44.000Z'
         404:
           description: Core delegations data not found
+        500:
+          description: Server error
+  /core-delegations/summary/{chain}:
+    get:
+      summary: Get the core delegations summary statistics
+      tags:
+        - Core Delegations
+      parameters:
+        - in: path
+          name: chain
+          schema:
+            type: string
+          required: true
+          description: The chain to get the core delegations summary statistics for
+      responses:
+        200:
+          description: The core delegations summary statistics
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  current:
+                    type: number
+                    format: double
+                    example: 26161135.01363557
+                  delta_24h:
+                    type: number
+                    format: double
+                    example: 1000000.5
+                  delta_7d:
+                    type: number
+                    format: double
+                    example: 2500000.75
+                  delta_28d:
+                    type: number
+                    format: double
+                    example: 5000000.25
+                  delta_ytd:
+                    type: number
+                    format: double
+                    example: 10000000.5
+                  ath:
+                    type: number
+                    format: double
+                    example: 30000000.0
+                  atl:
+                    type: number
+                    format: double
+                    example: 20000000.0
+                  ath_percentage:
+                    type: number
+                    format: double
+                    example: 87.20
+                  atl_percentage:
+                    type: number
+                    format: double
+                    example: 130.81
+                  standard_deviation:
+                    type: number
+                    format: double
+                    example: 1500000.25
+        400:
+          description: Bad request (invalid or missing chain parameter)
         500:
           description: Server error
   /core-account-delegations/staker-count/{chain}:
@@ -831,6 +959,70 @@ paths:
           description: Core account delegations data not found
         500:
           description: Server error
+  /core-account-delegations/cumulative-unique-stakers/summary/{chain}:
+    get:
+      summary: Get the cumulative unique stakers summary statistics
+      tags:
+        - Core Account Delegations
+      parameters:
+        - in: path
+          name: chain
+          schema:
+            type: string
+          required: true
+          description: The chain to get the cumulative unique stakers summary statistics for
+      responses:
+        200:
+          description: The cumulative unique stakers summary statistics
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  current:
+                    type: number
+                    format: double
+                    example: 305
+                  delta_24h:
+                    type: number
+                    format: double
+                    example: 10
+                  delta_7d:
+                    type: number
+                    format: double
+                    example: 25
+                  delta_28d:
+                    type: number
+                    format: double
+                    example: 50
+                  delta_ytd:
+                    type: number
+                    format: double
+                    example: 100
+                  ath:
+                    type: number
+                    format: double
+                    example: 310
+                  atl:
+                    type: number
+                    format: double
+                    example: 200
+                  ath_percentage:
+                    type: number
+                    format: double
+                    example: 98.39
+                  atl_percentage:
+                    type: number
+                    format: double
+                    example: 152.50
+                  standard_deviation:
+                    type: number
+                    format: double
+                    example: 15.5
+        400:
+          description: Bad request (invalid or missing chain parameter)
+        500:
+          description: Server error
   /pool-rewards/latest/{chain}:
     get:
       summary: Get the latest pool rewards data
@@ -937,5 +1129,849 @@ paths:
                       example: 139.08178975083112
         404:
           description: Pool rewards data not found
+        500:
+          description: Server error
+  /pool-rewards/summary/{chain}:
+    get:
+      summary: Get the pool rewards summary statistics
+      tags:
+        - Pool Rewards
+      parameters:
+        - in: path
+          name: chain
+          schema:
+            type: string
+          required: true
+          description: The chain to get the pool rewards summary statistics for
+      responses:
+        200:
+          description: The pool rewards summary statistics
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  current:
+                    type: number
+                    format: double
+                    example: 1000000.5
+                  delta_24h:
+                    type: number
+                    format: double
+                    example: 10000.5
+                  delta_7d:
+                    type: number
+                    format: double
+                    example: 50000.75
+                  delta_28d:
+                    type: number
+                    format: double
+                    example: 200000.25
+                  delta_ytd:
+                    type: number
+                    format: double
+                    example: 500000.5
+                  ath:
+                    type: number
+                    format: double
+                    example: 1100000.0
+                  atl:
+                    type: number
+                    format: double
+                    example: 500000.0
+                  ath_percentage:
+                    type: number
+                    format: double
+                    example: 90.91
+                  atl_percentage:
+                    type: number
+                    format: double
+                    example: 200.00
+                  standard_deviation:
+  /perp-account-stats/all/{chain}:
+    get:
+      summary: Get all perp account stats data
+      tags:
+        - Perp Account Stats
+      parameters:
+        - in: path
+          name: chain
+          schema:
+            type: string
+          required: false
+          description: The chain to get the perp account stats data for
+      responses:
+        200:
+          description: All perp account stats data
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  type: object
+                  properties:
+                    id:
+                      type: integer
+                      example: 1
+                    created_at:
+                      type: string
+                      format: date-time
+                      example: '2024-06-27T14:01:04.001Z'
+                    updated_at:
+                      type: string
+                      format: date-time
+                      example: '2024-06-27T14:01:04.001Z'
+                    ts:
+                      type: string
+                      format: date-time
+                      example: '2024-06-27T13:00:00.000Z'
+                    chain:
+                      type: string
+                      example: base
+                    account_id:
+                      type: string
+                      example: '0x1234567890123456789012345678901234567890'
+                    fees:
+                      type: number
+                      format: double
+                      example: 10.5
+                    volume:
+                      type: number
+                      format: double
+                      example: 1000.0
+                    amount_liquidated:
+                      type: number
+                      format: double
+                      example: 50.0
+                    liquidations:
+                      type: integer
+                      example: 2
+                    cumulative_fees:
+                      type: number
+                      format: double
+                      example: 100.5
+                    cumulative_volume:
+                      type: number
+                      format: double
+                      example: 10000.0
+        404:
+          description: Perp account stats data not found
+        500:
+          description: Server error
+
+  /perp-account-stats/cumulative-unique-traders/{chain}:
+    get:
+      summary: Get cumulative unique traders data
+      tags:
+        - Perp Account Stats
+      parameters:
+        - in: path
+          name: chain
+          schema:
+            type: string
+          required: false
+          description: The chain to get the cumulative unique traders data for
+      responses:
+        200:
+          description: The cumulative unique traders data
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties:
+                  type: array
+                  items:
+                    type: object
+                    properties:
+                      ts:
+                        type: string
+                        format: date-time
+                        example: '2024-06-27T00:00:00.000Z'
+                      cumulative_trader_count:
+                        type: integer
+                        example: 150
+        500:
+          description: Server error
+
+  /perp-account-stats/cumulative-unique-traders/summary/{chain}:
+    get:
+      summary: Get the cumulative unique traders summary statistics
+      tags:
+        - Perp Account Stats
+      parameters:
+        - in: path
+          name: chain
+          schema:
+            type: string
+          required: true
+          description: The chain to get the cumulative unique traders summary statistics for
+      responses:
+        200:
+          description: The cumulative unique traders summary statistics
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  current:
+                    type: number
+                    format: double
+                    example: 1000
+                  delta_24h:
+                    type: number
+                    format: double
+                    example: 50
+                  delta_7d:
+                    type: number
+                    format: double
+                    example: 200
+                  delta_28d:
+                    type: number
+                    format: double
+                    example: 500
+                  delta_ytd:
+                    type: number
+                    format: double
+                    example: 800
+                  ath:
+                    type: number
+                    format: double
+                    example: 1100
+                  atl:
+                    type: number
+                    format: double
+                    example: 100
+                  ath_percentage:
+                    type: number
+                    format: double
+                    example: 90.91
+                  atl_percentage:
+                    type: number
+                    format: double
+                    example: 1000.00
+                  standard_deviation:
+                    type: number
+                    format: double
+                    example: 150.25
+        400:
+          description: Bad request (invalid or missing chain parameter)
+        500:
+          description: Server error
+            
+  /perp-stats/latest/{chain}:
+      get:
+        summary: Get the latest perp stats data
+        tags:
+          - Perp Stats
+        parameters:
+          - in: path
+            name: chain
+            schema:
+              type: string
+            required: false
+            description: The chain to get the perp stats data for
+        responses:
+          200:
+            description: The latest perp stats data
+            content:
+              application/json:
+                schema:
+                  type: array
+                  items:
+                    type: object
+                    properties:
+                      id:
+                        type: integer
+                        example: 1
+                      created_at:
+                        type: string
+                        format: date-time
+                        example: '2024-06-27T14:01:04.001Z'
+                      updated_at:
+                        type: string
+                        format: date-time
+                        example: '2024-06-27T14:01:04.001Z'
+                      ts:
+                        type: string
+                        format: date-time
+                        example: '2024-06-27T13:00:00.000Z'
+                      chain:
+                        type: string
+                        example: base
+                      cumulative_volume:
+                        type: number
+                        format: double
+                        example: 1000000.5
+                      cumulative_collected_fees:
+                        type: number
+                        format: double
+                        example: 10000.25
+                      cumulative_exchange_fees:
+                        type: number
+                        format: double
+                        example: 5000.75
+          404:
+            description: Perp stats data not found
+          500:
+            description: Server error
+
+  /perp-stats/all/{chain}:
+    get:
+      summary: Get all perp stats data
+      tags:
+        - Perp Stats
+      parameters:
+        - in: path
+          name: chain
+          schema:
+            type: string
+          required: false
+          description: The chain to get the perp stats data for
+      responses:
+        200:
+          description: All perp stats data
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  type: object
+                  properties:
+                    id:
+                      type: integer
+                      example: 1
+                    created_at:
+                      type: string
+                      format: date-time
+                      example: '2024-06-27T14:01:04.001Z'
+                    updated_at:
+                      type: string
+                      format: date-time
+                      example: '2024-06-27T14:01:04.001Z'
+                    ts:
+                      type: string
+                      format: date-time
+                      example: '2024-06-27T13:00:00.000Z'
+                    chain:
+                      type: string
+                      example: base
+                    cumulative_volume:
+                      type: number
+                      format: double
+                      example: 1000000.5
+                    cumulative_collected_fees:
+                      type: number
+                      format: double
+                      example: 10000.25
+                    cumulative_exchange_fees:
+                      type: number
+                      format: double
+                      example: 5000.75
+        404:
+          description: Perp stats data not found
+        500:
+          description: Server error
+
+  /perp-stats/cumulative-volume/summary/{chain}:
+    get:
+      summary: Get the cumulative volume summary statistics
+      tags:
+        - Perp Stats
+      parameters:
+        - in: path
+          name: chain
+          schema:
+            type: string
+          required: true
+          description: The chain to get the cumulative volume summary statistics for
+      responses:
+        200:
+          description: The cumulative volume summary statistics
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  current:
+                    type: number
+                    format: double
+                    example: 1000000.5
+                  delta_24h:
+                    type: number
+                    format: double
+                    example: 50000.25
+                  delta_7d:
+                    type: number
+                    format: double
+                    example: 200000.75
+                  delta_28d:
+                    type: number
+                    format: double
+                    example: 500000.5
+                  delta_ytd:
+                    type: number
+                    format: double
+                    example: 800000.25
+                  ath:
+                    type: number
+                    format: double
+                    example: 1100000.0
+                  atl:
+                    type: number
+                    format: double
+                    example: 500000.0
+                  ath_percentage:
+                    type: number
+                    format: double
+                    example: 90.91
+                  atl_percentage:
+                    type: number
+                    format: double
+                    example: 200.00
+                  standard_deviation:
+                    type: number
+                    format: double
+                    example: 100000.25
+        400:
+          description: Bad request (invalid or missing chain parameter)
+        500:
+          description: Server error
+
+  /perp-stats/cumulative-exchange-fees/summary/{chain}:
+    get:
+      summary: Get the cumulative exchange fees summary statistics
+      tags:
+        - Perp Stats
+      parameters:
+        - in: path
+          name: chain
+          schema:
+            type: string
+          required: true
+          description: The chain to get the cumulative exchange fees summary statistics for
+      responses:
+        200:
+          description: The cumulative exchange fees summary statistics
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  current:
+                    type: number
+                    format: double
+                    example: 10000.25
+                  delta_24h:
+                    type: number
+                    format: double
+                    example: 500.25
+                  delta_7d:
+                    type: number
+                    format: double
+                    example: 2000.75
+                  delta_28d:
+                    type: number
+                    format: double
+                    example: 5000.5
+                  delta_ytd:
+                    type: number
+                    format: double
+                    example: 8000.25
+                  ath:
+                    type: number
+                    format: double
+                    example: 11000.0
+                  atl:
+                    type: number
+                    format: double
+                    example: 5000.0
+                  ath_percentage:
+                    type: number
+                    format: double
+                    example: 90.91
+                  atl_percentage:
+                    type: number
+                    format: double
+                    example: 200.00
+                  standard_deviation:
+                    type: number
+                    format: double
+                    example: 1000.25
+        400:
+          description: Bad request (invalid or missing chain parameter)
+        500:
+          description: Server error
+
+  /perp-stats/cumulative-collected-fees/summary/{chain}:
+    get:
+      summary: Get the cumulative collected fees summary statistics
+      tags:
+        - Perp Stats
+      parameters:
+        - in: path
+          name: chain
+          schema:
+            type: string
+          required: true
+          description: The chain to get the cumulative collected fees summary statistics for
+      responses:
+        200:
+          description: The cumulative collected fees summary statistics
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  current:
+                    type: number
+                    format: double
+                    example: 5000.75
+                  delta_24h:
+                    type: number
+                    format: double
+                    example: 250.25
+                  delta_7d:
+                    type: number
+                    format: double
+                    example: 1000.75
+                  delta_28d:
+                    type: number
+                    format: double
+                    example: 2500.5
+                  delta_ytd:
+                    type: number
+                    format: double
+                    example: 4000.25
+                  ath:
+                    type: number
+                    format: double
+                    example: 5500.0
+                  atl:
+                    type: number
+                    format: double
+                    example: 2500.0
+                  ath_percentage:
+                    type: number
+                    format: double
+                    example: 90.91
+                  atl_percentage:
+                    type: number
+                    format: double
+                    example: 200.00
+                  standard_deviation:
+                    type: number
+                    format: double
+                    example: 500.25
+        400:
+          description: Bad request (invalid or missing chain parameter)
+        500:
+          description: Server error
+
+  /perp-stats/cumulative-volume/{chain}:
+    get:
+      summary: Get cumulative volume data
+      tags:
+        - Perp Stats
+      parameters:
+        - in: path
+          name: chain
+          schema:
+            type: string
+          required: true
+          description: The chain to get the cumulative volume data for
+      responses:
+        200:
+          description: The cumulative volume data
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties:
+                  type: array
+                  items:
+                    type: object
+                    properties:
+                      ts:
+                        type: string
+                        format: date-time
+                        example: '2024-06-27T13:00:00.000Z'
+                      cumulative_volume:
+                        type: number
+                        format: double
+                        example: 1000000.5
+        400:
+          description: Bad request (invalid or missing chain parameter)
+        500:
+          description: Server error
+
+  /perp-stats/cumulative-exchange-fees/{chain}:
+    get:
+      summary: Get cumulative exchange fees data
+      tags:
+        - Perp Stats
+      parameters:
+        - in: path
+          name: chain
+          schema:
+            type: string
+          required: true
+          description: The chain to get the cumulative exchange fees data for
+      responses:
+        200:
+          description: The cumulative exchange fees data
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties:
+                  type: array
+                  items:
+                    type: object
+                    properties:
+                      ts:
+                        type: string
+                        format: date-time
+                        example: '2024-06-27T13:00:00.000Z'
+                      cumulative_exchange_fees:
+                        type: number
+                        format: double
+                        example: 10000.25
+        400:
+          description: Bad request (invalid or missing chain parameter)
+        500:
+          description: Server error
+
+  /perp-stats/cumulative-collected-fees/{chain}:
+    get:
+      summary: Get cumulative collected fees data
+      tags:
+        - Perp Stats
+      parameters:
+        - in: path
+          name: chain
+          schema:
+            type: string
+          required: true
+          description: The chain to get the cumulative collected fees data for
+      responses:
+        200:
+          description: The cumulative collected fees data
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties:
+                  type: array
+                  items:
+                    type: object
+                    properties:
+                      ts:
+                        type: string
+                        format: date-time
+                        example: '2024-06-27T13:00:00.000Z'
+                      cumulative_collected_fees:
+                        type: number
+                        format: double
+                        example: 5000.75
+        400:
+          description: Bad request (invalid or missing chain parameter)
+        500:
+          description: Server error
+  /perp-market-history/all/{chain}:
+    get:
+      summary: Get all perp market history data
+      tags:
+        - Perp Market History
+      parameters:
+        - in: path
+          name: chain
+          schema:
+            type: string
+          required: false
+          description: The chain to get the perp market history data for
+      responses:
+        200:
+          description: All perp market history data
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  type: object
+                  properties:
+                    id:
+                      type: integer
+                      example: 1
+                    created_at:
+                      type: string
+                      format: date-time
+                      example: '2024-06-27T14:01:04.001Z'
+                    updated_at:
+                      type: string
+                      format: date-time
+                      example: '2024-06-27T14:01:04.001Z'
+                    ts:
+                      type: string
+                      format: date-time
+                      example: '2024-06-27T13:00:00.000Z'
+                    chain:
+                      type: string
+                      example: base
+                    block_number:
+                      type: integer
+                      example: 1234567
+                    market_id:
+                      type: integer
+                      example: 1
+                    market_symbol:
+                      type: string
+                      example: 'ETH-USD'
+                    price:
+                      type: number
+                      format: double
+                      example: 2000.5
+                    size:
+                      type: number
+                      format: double
+                      example: 10.5
+                    funding_rate:
+                      type: number
+                      format: double
+                      example: 0.0001
+                    long_rate_apr:
+                      type: number
+                      format: double
+                      example: 0.05
+                    short_rate_apr:
+                      type: number
+                      format: double
+                      example: 0.04
+                    size_usd:
+                      type: number
+                      format: double
+                      example: 21005.25
+                    long_oi:
+                      type: number
+                      format: double
+                      example: 15000.75
+                    short_oi:
+                      type: number
+                      format: double
+                      example: 14000.5
+                    long_oi_pct:
+                      type: number
+                      format: double
+                      example: 0.52
+                    short_oi_pct:
+                      type: number
+                      format: double
+                      example: 0.48
+        404:
+          description: Perp market history data not found
+        500:
+          description: Server error
+
+  /perp-market-history/open-interest/{chain}:
+    get:
+      summary: Get open interest data
+      tags:
+        - Perp Market History
+      parameters:
+        - in: path
+          name: chain
+          schema:
+            type: string
+          required: true
+          description: The chain to get the open interest data for
+      responses:
+        200:
+          description: The open interest data
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  type: object
+                  properties:
+                    ts:
+                      type: string
+                      format: date-time
+                      example: '2024-06-27T00:00:00.000Z'
+                    daily_oi:
+                      type: number
+                      format: double
+                      example: 1000000.5
+                    chain:
+                      type: string
+                      example: base
+        400:
+          description: Bad request (invalid or missing chain parameter)
+        404:
+          description: Open interest data not found
+        500:
+          description: Server error
+
+  /perp-market-history/open-interest/summary/{chain}:
+    get:
+      summary: Get the open interest summary statistics
+      tags:
+        - Perp Market History
+      parameters:
+        - in: path
+          name: chain
+          schema:
+            type: string
+          required: true
+          description: The chain to get the open interest summary statistics for
+      responses:
+        200:
+          description: The open interest summary statistics
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  current:
+                    type: number
+                    format: double
+                    example: 1000000.5
+                  delta_24h:
+                    type: number
+                    format: double
+                    example: 50000.25
+                  delta_7d:
+                    type: number
+                    format: double
+                    example: 200000.75
+                  delta_28d:
+                    type: number
+                    format: double
+                    example: 500000.5
+                  delta_ytd:
+                    type: number
+                    format: double
+                    example: 800000.25
+                  ath:
+                    type: number
+                    format: double
+                    example: 1100000.0
+                  atl:
+                    type: number
+                    format: double
+                    example: 500000.0
+                  ath_percentage:
+                    type: number
+                    format: double
+                    example: 90.91
+                  atl_percentage:
+                    type: number
+                    format: double
+                    example: 200.00
+                  standard_deviation:
+                    type: number
+                    format: double
+                    example: 100000.25
+        400:
+          description: Bad request (invalid or missing chain parameter)
         500:
           description: Server error
