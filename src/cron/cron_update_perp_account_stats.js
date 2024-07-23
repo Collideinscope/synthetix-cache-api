@@ -1,4 +1,4 @@
-const { fetchAndUpdateLatestPerpAccountStatsData } = require('../services/perpStatsService');
+const { fetchAndUpdateLatestPerpAccountStatsData } = require('../services/perpAccountStatsService');
 
 const cronUpdateTVL = async () => {
   try {
