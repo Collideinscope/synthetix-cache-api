@@ -9,7 +9,7 @@ const { fetchAndInsertAllPerpMarketHistoryData } = require('../services/perpMark
 
 const seedAllData = async () => {
   
-  /* APY Seeding 
+  /* APY Seeding */
   console.log('Seeding APY data...');
 
   await fetchAndInsertAllAPYData('base');
@@ -17,7 +17,7 @@ const seedAllData = async () => {
 
   console.log('Seeding APY data completed.');
 
-  /* TVL Seeding 
+  /* TVL Seeding */
   console.log('Seeding TVL data...');
 
   await fetchAndInsertAllTVLData('base');
@@ -25,7 +25,7 @@ const seedAllData = async () => {
 
   console.log('Seeding TVL data completed.');
 
-  /* Core Delegations Seeding 
+  /* Core Delegations Seeding */
   console.log('Seeding Core Delegations data...');
 
   await fetchAndInsertAllCoreDelegationsData('base');
@@ -33,7 +33,7 @@ const seedAllData = async () => {
 
   console.log('Seeding TVL Core Delegations completed.');
 
-  /* Pool Rewards Seeding 
+  /* Pool Rewards Seeding */
   console.log('Seeding Pool Rewards data...');
 
   await fetchAndInsertAllPoolRewardsData('base');
@@ -41,7 +41,7 @@ const seedAllData = async () => {
 
   console.log('Seeding Pool Rewards completed.');  
 
-  /* Core Accounts Delegations 
+  /* Core Accounts Delegations */
   console.log('Seeding Core Accounts Delegations data...');
 
   await fetchAndInsertAllCoreAccountDelegationsData('base');
@@ -49,19 +49,19 @@ const seedAllData = async () => {
 
   console.log('Seeding Core Accounts Delegations completed.'); 
 
-  /* Perp Stats 
+  /* Perp Stats */
   console.log('Seeding Perp Stats data...');
 
   await fetchAndInsertAllPerpStatsData('base');
 
   console.log('Seeding Perp Stats completed.'); 
 
-  /* Perp Account Stats 
+  /* Perp Account Stats */
   console.log('Seeding Perp Account Stats data...');
 
   await fetchAndInsertAllPerpAccountStatsData('base');
 
-  console.log('Seeding Perp Account Stats completed.'); */
+  console.log('Seeding Perp Account Stats completed.'); 
 
   /* Perp Market History */
   console.log('Seeding Perp Market History data...');

@@ -1,4 +1,4 @@
-/*CREATE TABLE apy (
+CREATE TABLE apy (
     id SERIAL PRIMARY KEY,
     created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
@@ -114,7 +114,6 @@ CREATE TABLE perp_account_stats (
 
 CREATE INDEX idx_perp_account_stats_chain_ts ON perp_account_stats(chain, ts);
 CREATE INDEX idx_perp_account_stats_account_id ON perp_account_stats(account_id);
-*/
 
 CREATE TABLE perp_market_history (
     id SERIAL PRIMARY KEY,
@@ -149,7 +148,7 @@ BEGIN
    RETURN NEW;
 END;
 $$ LANGUAGE plpgsql;
-/*
+
 CREATE TRIGGER update_apy_updated_at
 BEFORE UPDATE ON apy
 FOR EACH ROW
@@ -184,7 +183,6 @@ CREATE TRIGGER update_perp_account_stats_updated_at
 BEFORE UPDATE ON perp_account_stats
 FOR EACH ROW
 EXECUTE FUNCTION update_timestamp();
-*/
 
 CREATE TRIGGER update_perp_market_history
 BEFORE UPDATE ON perp_market_history
