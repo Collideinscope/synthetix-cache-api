@@ -64,7 +64,7 @@ const getAPYSummaryStats = async (chain) => {
       throw new Error('No data found for the specified chain');
     }
 
-    const smoothedData = smoothData(allData, 'apy_7d');
+    const smoothedData = smoothData(allData, 'apy_28d');
     const reversedSmoothedData = [...smoothedData].reverse();
 
     const latestData = reversedSmoothedData[0];
@@ -83,20 +83,20 @@ const getAPYSummaryStats = async (chain) => {
       valueYtd = reversedSmoothedData[reversedSmoothedData.length - 1]; 
     }
 
-    const apyValues = smoothedData.map(item => parseFloat(item.apy_7d));
+    const apyValues = smoothedData.map(item => parseFloat(item.apy_28d));
     const standardDeviation = calculateStandardDeviation(apyValues);
 
-    const current = parseFloat(allData[allData.length - 1].apy_7d);
+    const current = parseFloat(allData[allData.length - 1].apy_28d);
     // include comparison to current (unsmoothed) value 
     const ath = Math.max(...apyValues, current);
     const atl = Math.min(...apyValues, current);
 
     return {
-      current: parseFloat(allData[allData.length - 1].apy_7d),
-      delta_24h: calculateDelta(parseFloat(current), value24h ? parseFloat(value24h.apy_7d) : null),
-      delta_7d: calculateDelta(parseFloat(current), value7d ? parseFloat(value7d.apy_7d) : null),
-      delta_28d: calculateDelta(parseFloat(current), value28d ? parseFloat(value28d.apy_7d) : null),
-      delta_ytd: calculateDelta(parseFloat(current), valueYtd ? parseFloat(valueYtd.apy_7d) : null),
+      current: parseFloat(allData[allData.length - 1].apy_28d),
+      delta_24h: calculateDelta(parseFloat(current), value24h ? parseFloat(value24h.apy_28d) : null),
+      delta_7d: calculateDelta(parseFloat(current), value7d ? parseFloat(value7d.apy_28d) : null),
+      delta_28d: calculateDelta(parseFloat(current), value28d ? parseFloat(value28d.apy_28d) : null),
+      delta_ytd: calculateDelta(parseFloat(current), valueYtd ? parseFloat(valueYtd.apy_28d) : null),
       ath,
       atl,
       ath_percentage: calculatePercentage(parseFloat(current), ath),
