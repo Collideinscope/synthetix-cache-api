@@ -719,6 +719,7 @@ paths:
           description: Bad request (invalid or missing chain parameter)
         500:
           description: Server error
+
   /core-account-delegations/staker-count/{chain}:
     get:
       summary: Get the unique staker count
@@ -959,6 +960,7 @@ paths:
           description: Core account delegations data not found
         500:
           description: Server error
+
   /core-account-delegations/cumulative-unique-stakers/summary/{chain}:
     get:
       summary: Get the cumulative unique stakers summary statistics
@@ -1023,6 +1025,43 @@ paths:
           description: Bad request (invalid or missing chain parameter)
         500:
           description: Server error
+
+  /core-account-delegations/daily-new-unique-stakers/{chain}:
+    get:
+      summary: Get daily new unique stakers data
+      tags:
+        - Core Account Delegations
+      parameters:
+        - in: path
+          name: chain
+          schema:
+            type: string
+          required: true
+          description: The chain to get the daily new unique stakers data for
+      responses:
+        200:
+          description: The daily new unique stakers data
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  type: object
+                  properties:
+                    date:
+                      type: string
+                      format: date
+                      example: '2024-06-27'
+                    new_unique_stakers:
+                      type: integer
+                      example: 150
+        400:
+          description: Bad request (invalid or missing chain parameter)
+        404:
+          description: Data not found
+        500:
+          description: Server error
+
   /pool-rewards/latest/{chain}:
     get:
       summary: Get the latest pool rewards data
@@ -1777,6 +1816,81 @@ paths:
           description: Bad request (invalid or missing chain parameter)
         500:
           description: Server error
+
+  /perp-stats/daily-volume/{chain}:
+    get:
+      summary: Get daily volume data
+      tags:
+        - Perp Stats
+      parameters:
+        - in: path
+          name: chain
+          schema:
+            type: string
+          required: true
+          description: The chain to get the daily volume data for
+      responses:
+        200:
+          description: The daily volume data
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  type: object
+                  properties:
+                    date:
+                      type: string
+                      format: date
+                      example: '2024-06-27'
+                    daily_volume:
+                      type: number
+                      format: double
+                      example: 1000000.50
+        400:
+          description: Bad request (invalid or missing chain parameter)
+        500:
+          description: Server error
+
+  /perp-stats/daily-fees/{chain}:
+    get:
+      summary: Get daily fees data
+      tags:
+        - Perp Stats
+      parameters:
+        - in: path
+          name: chain
+          schema:
+            type: string
+          required: true
+          description: The chain to get the daily fees data for
+      responses:
+        200:
+          description: The daily fees data
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  type: object
+                  properties:
+                    date:
+                      type: string
+                      format: date
+                      example: '2024-06-27'
+                    daily_exchange_fees:
+                      type: number
+                      format: double
+                      example: 5000.75
+                    daily_collected_fees:
+                      type: number
+                      format: double
+                      example: 4500.25
+        400:
+          description: Bad request (invalid or missing chain parameter)
+        500:
+          description: Server error
+
   /perp-market-history/all/{chain}:
     get:
       summary: Get all perp market history data

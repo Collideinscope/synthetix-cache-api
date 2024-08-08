@@ -308,6 +308,59 @@ const fetchAndUpdateLatestCoreAccountDelegationsData = async (chain) => {
   }
 };
 
+const getDailyNewUniqueStakers = async (chain) => {
+  try {
+    if (!chain || !CHAINS.includes(chain)) {
+      throw new Error('Invalid chain parameter');
+    }
+
+    const result = await knex.raw(`
+      WITH daily_stakers AS (
+        SELECT 
+          DATE_TRUNC('day', ts) AS date,
+          ARRAY_AGG(DISTINCT account_id) AS stakers
+        FROM 
+          core_account_delegations
+        WHERE 
+          chain = ?
+        GROUP BY 
+          DATE_TRUNC('day', ts)
+        ORDER BY 
+          date
+      ),
+      new_stakers AS (
+        SELECT 
+          date,
+          stakers,
+          LAG(stakers) OVER (ORDER BY date) AS prev_stakers
+        FROM 
+          daily_stakers
+      )
+      SELECT 
+        date,
+        COALESCE(
+          ARRAY_LENGTH(
+            ARRAY(
+              SELECT UNNEST(stakers)
+              EXCEPT
+              SELECT UNNEST(prev_stakers)
+            ),
+            1
+          ),
+          ARRAY_LENGTH(stakers, 1)
+        ) AS new_unique_stakers
+      FROM 
+        new_stakers
+      ORDER BY 
+        date;
+    `, [chain]);
+
+    return result.rows;
+  } catch (error) {
+    throw new Error('Error fetching daily new unique stakers: ' + error.message);
+  }
+};
+
 module.exports = {
   getStakerCount,
   getLatestCoreAccountDelegationsDataOrderedByAccount,
@@ -317,4 +370,5 @@ module.exports = {
   fetchAndUpdateLatestCoreAccountDelegationsData,
   getCumulativeUniqueStakers,
   getUniqueStakersSummaryStats,
+  getDailyNewUniqueStakers,
 };
