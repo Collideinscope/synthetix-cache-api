@@ -9,6 +9,8 @@ const {
   getCumulativeVolumeData,
   getCumulativeExchangeFeesData,
   getCumulativeCollectedFeesData,
+  getDailyVolumeData,
+  getDailyFeesData,
 } = require('../services/perpStatsService');
 const { CHAINS } = require('../helpers');
 
@@ -166,6 +168,48 @@ router.get('/cumulative-collected-fees/:chain?', async (req, res) => {
     res.json(data);
   } catch (error) {
     console.error('Error in /perp-stats/cumulative-collected-fees route:', error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
+router.get('/daily-volume/:chain?', async (req, res) => {
+  try {
+    const { chain } = req.params;
+
+    if (!chain) {
+      return res.status(400).json({ error: "Chain parameter is required" });
+    }
+
+    if (!CHAINS.includes(chain)) {
+      return res.status(400).json({ error: "Invalid chain parameter" });
+    }
+
+    const data = await getDailyVolumeData(chain);
+
+    res.json(data);
+  } catch (error) {
+    console.error('Error in /perp-stats/daily-volume route:', error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
+router.get('/daily-fees/:chain?', async (req, res) => {
+  try {
+    const { chain } = req.params;
+
+    if (!chain) {
+      return res.status(400).json({ error: "Chain parameter is required" });
+    }
+
+    if (!CHAINS.includes(chain)) {
+      return res.status(400).json({ error: "Invalid chain parameter" });
+    }
+
+    const data = await getDailyFeesData(chain);
+
+    res.json(data);
+  } catch (error) {
+    console.error('Error in /perp-stats/daily-fees route:', error);
     res.status(500).json({ error: error.message });
   }
 });

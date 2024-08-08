@@ -10,6 +10,8 @@ const {
 // base only for now 
 const CHAINS = ['base'];
 
+
+
 const getLatestPerpStatsData = async (chain) => {
   try {
     if (chain && CHAINS.includes(chain)) {
@@ -293,6 +295,73 @@ const getCumulativeCollectedFeesData = async (chain) => {
   }
 };
 
+const getDailyVolumeData = async (chain) => {
+  try {
+    const result = await knex.raw(`
+      WITH daily_data AS (
+        SELECT 
+          DATE_TRUNC('day', ts) AS date,
+          cumulative_volume,
+          LAG(cumulative_volume) OVER (ORDER BY ts) AS prev_cumulative_volume
+        FROM 
+          perp_stats
+        WHERE
+          chain = ?
+        ORDER BY 
+          ts
+      )
+      SELECT 
+        date,
+        COALESCE(cumulative_volume - prev_cumulative_volume, cumulative_volume) AS daily_volume
+      FROM 
+        daily_data
+      WHERE
+        prev_cumulative_volume IS NOT NULL OR date = (SELECT MIN(date) FROM daily_data)
+      ORDER BY 
+        date;
+    `, [chain]);
+
+    return result.rows;
+  } catch (error) {
+    throw new Error('Error fetching daily volume data: ' + error.message);
+  }
+};
+
+const getDailyFeesData = async (chain) => {
+  try {
+    const result = await knex.raw(`
+      WITH daily_data AS (
+        SELECT 
+          DATE_TRUNC('day', ts) AS date,
+          cumulative_exchange_fees,
+          cumulative_collected_fees,
+          LAG(cumulative_exchange_fees) OVER (ORDER BY ts) AS prev_cumulative_exchange_fees,
+          LAG(cumulative_collected_fees) OVER (ORDER BY ts) AS prev_cumulative_collected_fees
+        FROM 
+          perp_stats
+        WHERE
+          chain = ?
+        ORDER BY 
+          ts
+      )
+      SELECT 
+        date,
+        COALESCE(cumulative_exchange_fees - prev_cumulative_exchange_fees, cumulative_exchange_fees) AS daily_exchange_fees,
+        COALESCE(cumulative_collected_fees - prev_cumulative_collected_fees, cumulative_collected_fees) AS daily_collected_fees
+      FROM 
+        daily_data
+      WHERE
+        prev_cumulative_exchange_fees IS NOT NULL OR date = (SELECT MIN(date) FROM daily_data)
+      ORDER BY 
+        date;
+    `, [chain]);
+
+    return result.rows;
+  } catch (error) {
+    throw new Error('Error fetching daily fees data: ' + error.message);
+  }
+};
+
 module.exports = {
   getLatestPerpStatsData,
   getAllPerpStatsData,
@@ -304,4 +373,6 @@ module.exports = {
   getCumulativeVolumeData,
   getCumulativeExchangeFeesData,
   getCumulativeCollectedFeesData,
+  getDailyVolumeData,
+  getDailyFeesData,
 };
