@@ -348,7 +348,7 @@ const getDailyNewUniqueStakers = async (chain) => {
             1
           ),
           ARRAY_LENGTH(stakers, 1)
-        ) AS new_unique_stakers
+        ) AS daily_new_unique_stakers
       FROM 
         new_stakers
       ORDER BY 

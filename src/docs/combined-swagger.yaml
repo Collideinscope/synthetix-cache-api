@@ -1052,7 +1052,7 @@ paths:
                       type: string
                       format: date
                       example: '2024-06-27'
-                    new_unique_stakers:
+                    daily_new_unique_stakers:
                       type: integer
                       example: 150
         400:
