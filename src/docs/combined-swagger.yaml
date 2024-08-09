@@ -1026,42 +1026,58 @@ paths:
           description: Bad request (invalid or missing chain parameter)
         500:
           description: Server error
-
-  /core-account-delegations/daily-new-unique-stakers/{chain}:
-    get:
-      summary: Get daily new unique stakers data
-      tags:
-        - Core Account Delegations
-      parameters:
-        - in: path
-          name: chain
-          schema:
-            type: string
-          required: true
-          description: The chain to get the daily new unique stakers data for
-      responses:
-        200:
-          description: The daily new unique stakers data
-          content:
-            application/json:
-              schema:
+          
+/core-account-delegations/daily-new-unique-stakers/{chain}:
+  get:
+    summary: Get daily new unique stakers data
+    tags:
+      - Core Account Delegations
+    parameters:
+      - in: path
+        name: chain
+        schema:
+          type: string
+        required: false
+        description: The chain to get the daily new unique stakers data for. If not provided, returns data for all chains.
+    responses:
+      '200':
+        description: Daily new unique stakers data
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties:
                 type: array
                 items:
                   type: object
                   properties:
-                    date:
+                    ts:
                       type: string
-                      format: date
-                      example: '2024-06-27'
+                      format: date-time
+                      example: "2023-05-01T00:00:00Z"
                     daily_new_unique_stakers:
                       type: integer
-                      example: 150
-        400:
-          description: Bad request (invalid or missing chain parameter)
-        404:
-          description: Data not found
-        500:
-          description: Server error
+                      example: 42
+      '400':
+        description: Bad request - Invalid chain parameter
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                error:
+                  type: string
+      '404':
+        description: Daily new unique stakers data not found
+      '500':
+        description: Server error
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                error:
+                  type: string
 
   /core-account-delegations/daily-new-unique-stakers/summary/{chain}:
     get:

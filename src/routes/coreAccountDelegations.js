@@ -119,7 +119,7 @@ router.get('/daily-new-unique-stakers/:chain', async (req, res) => {
 
     const result = await getDailyNewUniqueStakers(chain);
 
-    if (!result.length) {
+    if (!result[chain] || result[chain].length === 0) {
       return res.status(404).send('Daily new unique stakers data not found');
     }
 
