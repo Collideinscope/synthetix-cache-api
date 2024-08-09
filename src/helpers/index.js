@@ -27,7 +27,6 @@ function calculateAPY(apy, timeframe) {
 }
 
 const calculateDelta = (current, previous) => {
-  console.log(current, previous)
   return ((current - previous) / previous) * 100;
 };
 

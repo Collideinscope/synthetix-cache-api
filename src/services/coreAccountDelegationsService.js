@@ -214,6 +214,56 @@ const getUniqueStakersSummaryStats = async (chain) => {
   }
 };
 
+const getDailyNewUniqueStakersSummary = async (chain) => {
+  try {
+    if (!chain || !CHAINS.includes(chain)) {
+      throw new Error('Invalid chain parameter');
+    }
+
+    const dailyData = await getDailyNewUniqueStakers(chain);
+
+    if (dailyData.length === 0) {
+      throw new Error('No data found for the specified chain');
+    }
+
+    const latestData = dailyData[dailyData.length - 1];
+    const latestDate = new Date(latestData.date);
+
+    const getDataFromLatest = (days) => {
+      const targetDate = new Date(latestDate.getTime() - days * 24 * 60 * 60 * 1000);
+      return dailyData.find(item => new Date(item.date) <= targetDate);
+    };
+
+    const value24h = getDataFromLatest(1);
+    const value7d = getDataFromLatest(7);
+    const value28d = getDataFromLatest(28);
+
+    const valueYtd = dailyData.find(item => new Date(item.date).getFullYear() === latestDate.getFullYear());
+
+    const allValues = dailyData.map(item => item.daily_new_unique_stakers);
+    const standardDeviation = calculateStandardDeviation(allValues);
+
+    const current = latestData.daily_new_unique_stakers;
+    const ath = Math.max(...allValues);
+    const atl = Math.min(...allValues);
+
+    return {
+      current,
+      delta_24h: calculateDelta(current, value24h ? value24h.daily_new_unique_stakers : null),
+      delta_7d: calculateDelta(current, value7d ? value7d.daily_new_unique_stakers : null),
+      delta_28d: calculateDelta(current, value28d ? value28d.daily_new_unique_stakers : null),
+      delta_ytd: calculateDelta(current, valueYtd ? valueYtd.daily_new_unique_stakers : null),
+      ath,
+      atl,
+      ath_percentage: calculatePercentage(current, ath),
+      atl_percentage: atl === 0 ? 100 : calculatePercentage(current, atl),
+      standard_deviation: standardDeviation
+    };
+  } catch (error) {
+    throw new Error('Error fetching Daily New Unique Stakers summary stats: ' + error.message);
+  }
+};
+
 // Initial seed
 const fetchAndInsertAllCoreAccountDelegationsData = async (chain) => {
   if (!chain) {
@@ -371,4 +421,5 @@ module.exports = {
   getCumulativeUniqueStakers,
   getUniqueStakersSummaryStats,
   getDailyNewUniqueStakers,
+  getDailyNewUniqueStakersSummary,
 };

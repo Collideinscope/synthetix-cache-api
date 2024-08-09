@@ -744,6 +744,7 @@ paths:
                   example: '305'
         500:
           description: Server error
+
   /core-account-delegations/cumulative-unique-stakers/{chain}:
     get:
       summary: Get cumulative unique staker data
@@ -1061,6 +1062,82 @@ paths:
           description: Data not found
         500:
           description: Server error
+
+  /core-account-delegations/daily-new-unique-stakers/summary/{chain}:
+    get:
+      summary: Get summary statistics for daily new unique stakers
+      tags:
+        - Core Account Delegations
+      parameters:
+        - in: path
+          name: chain
+          schema:
+            type: string
+          required: true
+          description: The chain to get the summary statistics for
+      responses:
+        '200':
+          description: Summary statistics for daily new unique stakers
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  current:
+                    type: integer
+                    example: 42
+                  delta_24h:
+                    type: number
+                    format: float
+                    example: 5.5
+                  delta_7d:
+                    type: number
+                    format: float
+                    example: -2.3
+                  delta_28d:
+                    type: number
+                    format: float
+                    example: 10.1
+                  delta_ytd:
+                    type: number
+                    format: float
+                    example: 15.7
+                  ath:
+                    type: integer
+                    example: 100
+                  atl:
+                    type: integer
+                    example: 5
+                  ath_percentage:
+                    type: number
+                    format: float
+                    example: 42.0
+                  atl_percentage:
+                    type: number
+                    format: float
+                    example: 840.0
+                  standard_deviation:
+                    type: number
+                    format: float
+                    example: 12.3
+        '400':
+          description: Bad request - Invalid or missing chain parameter
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  error:
+                    type: string
+        '500':
+          description: Server error
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  error:
+                    type: string
 
   /pool-rewards/latest/{chain}:
     get:
