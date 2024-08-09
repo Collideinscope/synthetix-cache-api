@@ -220,25 +220,26 @@ const getDailyNewUniqueStakersSummary = async (chain) => {
       throw new Error('Invalid chain parameter');
     }
 
-    const dailyData = await getDailyNewUniqueStakers(chain);
+    const result = await getDailyNewUniqueStakers(chain);
+    const dailyData = result[chain];
 
-    if (dailyData.length === 0) {
+    if (!dailyData || dailyData.length === 0) {
       throw new Error('No data found for the specified chain');
     }
 
     const latestData = dailyData[dailyData.length - 1];
-    const latestDate = new Date(latestData.date);
+    const latestDate = new Date(latestData.ts);
 
     const getDataFromLatest = (days) => {
       const targetDate = new Date(latestDate.getTime() - days * 24 * 60 * 60 * 1000);
-      return dailyData.find(item => new Date(item.date) <= targetDate);
+      return dailyData.find(item => new Date(item.ts) <= targetDate);
     };
 
     const value24h = getDataFromLatest(1);
     const value7d = getDataFromLatest(7);
     const value28d = getDataFromLatest(28);
 
-    const valueYtd = dailyData.find(item => new Date(item.date).getFullYear() === latestDate.getFullYear());
+    const valueYtd = dailyData.find(item => new Date(item.ts).getFullYear() === latestDate.getFullYear());
 
     const allValues = dailyData.map(item => item.daily_new_unique_stakers);
     const standardDeviation = calculateStandardDeviation(allValues);
