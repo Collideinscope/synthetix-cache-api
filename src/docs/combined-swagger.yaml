@@ -655,6 +655,7 @@ paths:
           description: Core delegations data not found
         500:
           description: Server error
+
   /core-delegations/summary/{chain}:
     get:
       summary: Get the core delegations summary statistics
@@ -758,7 +759,7 @@ paths:
           required: false
           description: The chain to get the cumulative unique staker data for
       responses:
-        '200':
+        200:
           description: The cumulative unique staker data
           content:
             application/json:
@@ -786,10 +787,11 @@ paths:
                         collateral_type:
                           type: string
                           example: '0xC74eA762cF06c9151cE074E6a569a5945b6302E7'
-        '404':
+        404:
           description: Cumulative unique staker data not found
-        '500':
+        500:
           description: Server error
+
   /core-account-delegations/all/{chain}:
     get:
       summary: Get all core account delegations data
@@ -1026,58 +1028,58 @@ paths:
           description: Bad request (invalid or missing chain parameter)
         500:
           description: Server error
-          
-/core-account-delegations/daily-new-unique-stakers/{chain}:
-  get:
-    summary: Get daily new unique stakers data
-    tags:
-      - Core Account Delegations
-    parameters:
-      - in: path
-        name: chain
-        schema:
-          type: string
-        required: false
-        description: The chain to get the daily new unique stakers data for. If not provided, returns data for all chains.
-    responses:
-      '200':
-        description: Daily new unique stakers data
-        content:
-          application/json:
-            schema:
-              type: object
-              additionalProperties:
-                type: array
-                items:
-                  type: object
-                  properties:
-                    ts:
-                      type: string
-                      format: date-time
-                      example: "2023-05-01T00:00:00Z"
-                    daily_new_unique_stakers:
-                      type: integer
-                      example: 42
-      '400':
-        description: Bad request - Invalid chain parameter
-        content:
-          application/json:
-            schema:
-              type: object
-              properties:
-                error:
-                  type: string
-      '404':
-        description: Daily new unique stakers data not found
-      '500':
-        description: Server error
-        content:
-          application/json:
-            schema:
-              type: object
-              properties:
-                error:
-                  type: string
+
+  /core-account-delegations/daily-new-unique-stakers/{chain}:
+    get:
+      summary: Get daily new unique stakers data
+      tags:
+        - Core Account Delegations
+      parameters:
+        - in: path
+          name: chain
+          schema:
+            type: string
+          required: false
+          description: The chain to get the daily new unique stakers data for. If not provided, returns data for all chains.
+      responses:
+        200:
+          description: Daily new unique stakers data
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties:
+                  type: array
+                  items:
+                    type: object
+                    properties:
+                      ts:
+                        type: string
+                        format: date-time
+                        example: "2023-05-01T00:00:00Z"
+                      daily_new_unique_stakers:
+                        type: integer
+                        example: 42
+        400:
+          description: Bad request - Invalid chain parameter
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  error:
+                    type: string
+        404:
+          description: Daily new unique stakers data not found
+        500:
+          description: Server error
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  error:
+                    type: string
 
   /core-account-delegations/daily-new-unique-stakers/summary/{chain}:
     get:
@@ -1092,7 +1094,7 @@ paths:
           required: true
           description: The chain to get the summary statistics for
       responses:
-        '200':
+        200:
           description: Summary statistics for daily new unique stakers
           content:
             application/json:
@@ -1136,7 +1138,7 @@ paths:
                     type: number
                     format: float
                     example: 12.3
-        '400':
+        400:
           description: Bad request - Invalid or missing chain parameter
           content:
             application/json:
@@ -1145,7 +1147,16 @@ paths:
                 properties:
                   error:
                     type: string
-        '500':
+        404:
+          description: No data found for the specified chain
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  error:
+                    type: string
+        500:
           description: Server error
           content:
             application/json:
@@ -1489,7 +1500,144 @@ paths:
           description: Bad request (invalid or missing chain parameter)
         500:
           description: Server error
-            
+
+  /perp-account-stats/daily-new-unique-traders/{chain}:
+    get:
+      summary: Get daily new unique traders data
+      tags:
+        - Perp Account Stats
+      parameters:
+        - in: path
+          name: chain
+          schema:
+            type: string
+          required: true
+          description: The chain to get the daily new unique traders data for
+      responses:
+        200:
+          description: Daily new unique traders data
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties:
+                  type: array
+                  items:
+                    type: object
+                    properties:
+                      ts:
+                        type: string
+                        format: date-time
+                        example: "2023-05-01T00:00:00Z"
+                      daily_new_unique_traders:
+                        type: integer
+                        example: 42
+        400:
+          description: Bad request - Invalid chain parameter
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  error:
+                    type: string
+        404:
+          description: Daily new unique traders data not found
+        500:
+          description: Server error
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  error:
+                    type: string
+
+  /perp-account-stats/daily-new-unique-traders/summary/{chain}:
+    get:
+      summary: Get summary statistics for daily new unique traders
+      tags:
+        - Perp Account Stats
+      parameters:
+        - in: path
+          name: chain
+          schema:
+            type: string
+          required: true
+          description: The chain to get the summary statistics for
+      responses:
+        200:
+          description: Summary statistics for daily new unique traders
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  current:
+                    type: integer
+                    example: 42
+                  delta_24h:
+                    type: number
+                    format: float
+                    example: 5.5
+                  delta_7d:
+                    type: number
+                    format: float
+                    example: -2.3
+                  delta_28d:
+                    type: number
+                    format: float
+                    example: 10.1
+                  delta_ytd:
+                    type: number
+                    format: float
+                    example: 15.7
+                  ath:
+                    type: integer
+                    example: 100
+                  atl:
+                    type: integer
+                    example: 5
+                  ath_percentage:
+                    type: number
+                    format: float
+                    example: 42.0
+                  atl_percentage:
+                    type: number
+                    format: float
+                    example: 840.0
+                  standard_deviation:
+                    type: number
+                    format: float
+                    example: 12.3
+        400:
+          description: Bad request - Invalid or missing chain parameter
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  error:
+                    type: string
+        404:
+          description: No data found for the specified chain
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  error:
+                    type: string
+        500:
+          description: Server error
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  error:
+                    type: string
+              
   /perp-stats/latest/{chain}:
       get:
         summary: Get the latest perp stats data

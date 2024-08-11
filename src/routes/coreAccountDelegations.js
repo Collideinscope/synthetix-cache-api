@@ -133,13 +133,17 @@ router.get('/daily-new-unique-stakers/:chain', async (req, res) => {
 router.get('/daily-new-unique-stakers/summary/:chain', async (req, res) => {
   try {
     const { chain } = req.params;
+
     if (!chain) {
       return res.status(400).json({ error: "Chain parameter is required" });
     }
+
     if (!CHAINS.includes(chain)) {
       return res.status(400).json({ error: "Invalid chain parameter" });
     }
+
     const stats = await getDailyNewUniqueStakersSummary(chain);
+    
     res.json(stats);
   } catch (error) {
     console.error('Error in /daily-new-unique-stakers/summary route:', error);

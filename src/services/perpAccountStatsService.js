@@ -246,10 +246,131 @@ const getCumulativeUniqueTraders = async (chain) => {
   }
 };
 
+const getDailyNewUniqueTraders = async (chain) => {
+  try {
+    const fetchDailyData = async (chain) => {
+      const result = await knex.raw(`
+        WITH daily_traders AS (
+          SELECT 
+            DATE_TRUNC('day', ts) AS date,
+            ARRAY_AGG(DISTINCT account_id) AS traders
+          FROM 
+            perp_account_stats
+          WHERE 
+            chain = ?
+          GROUP BY 
+            DATE_TRUNC('day', ts)
+          ORDER BY 
+            date
+        ),
+        new_traders AS (
+          SELECT 
+            date,
+            traders,
+            LAG(traders) OVER (ORDER BY date) AS prev_traders
+          FROM 
+            daily_traders
+        )
+        SELECT 
+          date,
+          COALESCE(
+            ARRAY_LENGTH(
+              ARRAY(
+                SELECT UNNEST(traders)
+                EXCEPT
+                SELECT UNNEST(prev_traders)
+              ),
+              1
+            ),
+            ARRAY_LENGTH(traders, 1)
+          ) AS daily_new_unique_traders
+        FROM 
+          new_traders
+        ORDER BY 
+          date;
+      `, [chain]);
+
+      return result.rows.map(row => ({
+        ts: row.date,
+        daily_new_unique_traders: row.daily_new_unique_traders,
+      }));
+    };
+
+    if (chain && CHAINS.includes(chain)) {
+      const data = await fetchDailyData(chain);
+      return { [chain]: data };
+    }
+
+    const results = await Promise.all(
+      CHAINS.map(async (chain) => {
+        const data = await fetchDailyData(chain);
+        return { [chain]: data };
+      })
+    );
+
+    return results.reduce((acc, curr) => ({ ...acc, ...curr }), {});
+  } catch (error) {
+    throw new Error('Error fetching daily new unique traders: ' + error.message);
+  }
+};
+
+const getDailyNewUniqueTradersSummary = async (chain) => {
+  try {
+    if (!chain || !CHAINS.includes(chain)) {
+      throw new Error('Invalid chain parameter');
+    }
+
+    const dailyData = await getDailyNewUniqueTraders(chain);
+
+    if (!dailyData[chain] || dailyData[chain].length === 0) {
+      throw new Error('No data found for the specified chain');
+    }
+
+    const data = dailyData[chain];
+    const latestData = data[data.length - 1];
+    const latestDate = new Date(latestData.ts);
+
+    const getDataFromLatest = (days) => {
+      const targetDate = new Date(latestDate.getTime() - days * 24 * 60 * 60 * 1000);
+      return data.find(item => new Date(item.ts) <= targetDate);
+    };
+
+    const value24h = getDataFromLatest(1);
+    const value7d = getDataFromLatest(7);
+    const value28d = getDataFromLatest(28);
+
+    const valueYtd = data.find(item => new Date(item.ts).getFullYear() === latestDate.getFullYear());
+
+    const allValues = data.map(item => item.daily_new_unique_traders);
+    const standardDeviation = calculateStandardDeviation(allValues);
+
+    const current = latestData.daily_new_unique_traders;
+    const ath = Math.max(...allValues);
+    const atl = Math.min(...allValues);
+
+    return {
+      current,
+      delta_24h: calculateDelta(current, value24h ? value24h.daily_new_unique_traders : null),
+      delta_7d: calculateDelta(current, value7d ? value7d.daily_new_unique_traders : null),
+      delta_28d: calculateDelta(current, value28d ? value28d.daily_new_unique_traders : null),
+      delta_ytd: calculateDelta(current, valueYtd ? valueYtd.daily_new_unique_traders : null),
+      ath,
+      atl,
+      ath_percentage: calculatePercentage(current, ath),
+      atl_percentage: atl === 0 ? 100 : calculatePercentage(current, atl),
+      standard_deviation: standardDeviation
+    };
+  } catch (error) {
+    throw new Error('Error fetching Daily New Unique Traders summary stats: ' + error.message);
+  }
+};
+
 module.exports = {
   getAllPerpAccountStatsData,
   fetchAndInsertAllPerpAccountStatsData,
   fetchAndUpdateLatestPerpAccountStatsData,
   getUniqueTradersSummaryStats,
   getCumulativeUniqueTraders,
+  getDailyNewUniqueTraders,
+  getDailyNewUniqueTradersSummary,
 };
