@@ -295,71 +295,220 @@ const getCumulativeCollectedFeesData = async (chain) => {
   }
 };
 
+const fetchDailyVolumeData = async (chain) => {
+  const result = await knex.raw(`
+    WITH daily_data AS (
+      SELECT 
+        DATE_TRUNC('day', ts) AS date,
+        cumulative_volume,
+        LAG(cumulative_volume) OVER (ORDER BY ts) AS prev_cumulative_volume
+      FROM 
+        perp_stats
+      WHERE
+        chain = ?
+      ORDER BY 
+        ts
+    )
+    SELECT 
+      date,
+      COALESCE(cumulative_volume - prev_cumulative_volume, cumulative_volume) AS daily_volume
+    FROM 
+      daily_data
+    WHERE
+      prev_cumulative_volume IS NOT NULL OR date = (SELECT MIN(date) FROM daily_data)
+    ORDER BY 
+      date;
+  `, [chain]);
+
+  return result.rows.map(row => ({
+    ts: row.date,
+    daily_volume: row.daily_volume,
+  }));
+};
+
 const getDailyVolumeData = async (chain) => {
   try {
-    const result = await knex.raw(`
-      WITH daily_data AS (
-        SELECT 
-          DATE_TRUNC('day', ts) AS date,
-          cumulative_volume,
-          LAG(cumulative_volume) OVER (ORDER BY ts) AS prev_cumulative_volume
-        FROM 
-          perp_stats
-        WHERE
-          chain = ?
-        ORDER BY 
-          ts
-      )
-      SELECT 
-        date,
-        COALESCE(cumulative_volume - prev_cumulative_volume, cumulative_volume) AS daily_volume
-      FROM 
-        daily_data
-      WHERE
-        prev_cumulative_volume IS NOT NULL OR date = (SELECT MIN(date) FROM daily_data)
-      ORDER BY 
-        date;
-    `, [chain]);
+    if (chain && CHAINS.includes(chain)) {
+      const data = await fetchDailyVolumeData(chain);
+      return { [chain]: data };
+    }
 
-    return result.rows;
+    const results = await Promise.all(
+      CHAINS.map(async (chain) => {
+        const data = await fetchDailyVolumeData(chain);
+        return { [chain]: data };
+      })
+    );
+
+    return results.reduce((acc, curr) => ({ ...acc, ...curr }), {});
   } catch (error) {
     throw new Error('Error fetching daily volume data: ' + error.message);
   }
 };
 
-const getDailyFeesData = async (chain) => {
-  try {
-    const result = await knex.raw(`
-      WITH daily_data AS (
-        SELECT 
-          DATE_TRUNC('day', ts) AS date,
-          cumulative_exchange_fees,
-          cumulative_collected_fees,
-          LAG(cumulative_exchange_fees) OVER (ORDER BY ts) AS prev_cumulative_exchange_fees,
-          LAG(cumulative_collected_fees) OVER (ORDER BY ts) AS prev_cumulative_collected_fees
-        FROM 
-          perp_stats
-        WHERE
-          chain = ?
-        ORDER BY 
-          ts
-      )
-      SELECT 
-        date,
-        COALESCE(cumulative_exchange_fees - prev_cumulative_exchange_fees, cumulative_exchange_fees) AS daily_exchange_fees,
-        COALESCE(cumulative_collected_fees - prev_cumulative_collected_fees, cumulative_collected_fees) AS daily_collected_fees
-      FROM 
-        daily_data
-      WHERE
-        prev_cumulative_exchange_fees IS NOT NULL OR date = (SELECT MIN(date) FROM daily_data)
-      ORDER BY 
-        date;
-    `, [chain]);
 
-    return result.rows;
+const fetchDailyExchangeFeesData = async (chain) => {
+  const result = await knex.raw(`
+    WITH daily_data AS (
+      SELECT 
+        DATE_TRUNC('day', ts) AS date,
+        cumulative_exchange_fees,
+        LAG(cumulative_exchange_fees) OVER (ORDER BY ts) AS prev_cumulative_exchange_fees
+      FROM 
+        perp_stats
+      WHERE
+        chain = ?
+      ORDER BY 
+        ts
+    )
+    SELECT 
+      date,
+      COALESCE(cumulative_exchange_fees - prev_cumulative_exchange_fees, cumulative_exchange_fees) AS daily_exchange_fees
+    FROM 
+      daily_data
+    WHERE
+      prev_cumulative_exchange_fees IS NOT NULL OR date = (SELECT MIN(date) FROM daily_data)
+    ORDER BY 
+      date;
+  `, [chain]);
+
+  return result.rows.map(row => ({
+    ts: row.date,
+    daily_exchange_fees: row.daily_exchange_fees,
+  }));
+};
+
+const fetchDailyCollectedFeesData = async (chain) => {
+  const result = await knex.raw(`
+    WITH daily_data AS (
+      SELECT 
+        DATE_TRUNC('day', ts) AS date,
+        cumulative_collected_fees,
+        LAG(cumulative_collected_fees) OVER (ORDER BY ts) AS prev_cumulative_collected_fees
+      FROM 
+        perp_stats
+      WHERE
+        chain = ?
+      ORDER BY 
+        ts
+    )
+    SELECT 
+      date,
+      COALESCE(cumulative_collected_fees - prev_cumulative_collected_fees, cumulative_collected_fees) AS daily_collected_fees
+    FROM 
+      daily_data
+    WHERE
+      prev_cumulative_collected_fees IS NOT NULL OR date = (SELECT MIN(date) FROM daily_data)
+    ORDER BY 
+      date;
+  `, [chain]);
+
+  return result.rows.map(row => ({
+    ts: row.date,
+    daily_collected_fees: row.daily_collected_fees,
+  }));
+};
+
+const getDailyExchangeFeesData = async (chain) => {
+  try {
+    if (chain && CHAINS.includes(chain)) {
+      const data = await fetchDailyExchangeFeesData(chain);
+      return { [chain]: data };
+    }
+
+    const results = await Promise.all(
+      CHAINS.map(async (chain) => {
+        const data = await fetchDailyExchangeFeesData(chain);
+        return { [chain]: data };
+      })
+    );
+
+    return results.reduce((acc, curr) => ({ ...acc, ...curr }), {});
   } catch (error) {
-    throw new Error('Error fetching daily fees data: ' + error.message);
+    throw new Error('Error fetching daily exchange fees data: ' + error.message);
   }
+};
+
+const getDailyCollectedFeesData = async (chain) => {
+  try {
+    if (chain && CHAINS.includes(chain)) {
+      const data = await fetchDailyCollectedFeesData(chain);
+      return { [chain]: data };
+    }
+
+    const results = await Promise.all(
+      CHAINS.map(async (chain) => {
+        const data = await fetchDailyCollectedFeesData(chain);
+        return { [chain]: data };
+      })
+    );
+
+    return results.reduce((acc, curr) => ({ ...acc, ...curr }), {});
+  } catch (error) {
+    throw new Error('Error fetching daily collected fees data: ' + error.message);
+  }
+};
+
+const getDailySummaryStats = async (chain, dataFetchFunction, columnName) => {
+  try {
+    const data = await dataFetchFunction(chain);
+    const dailyValues = data[chain].map(item => parseFloat(item[columnName]));
+
+    if (dailyValues.length === 0) {
+      throw new Error('No data found for the specified chain');
+    }
+
+    const smoothedData = smoothData(data[chain], columnName);
+    const reversedSmoothedData = [...smoothedData].reverse();
+
+    const latestData = reversedSmoothedData[0];
+    const latestTs = new Date(latestData.ts);
+
+    const getDateFromLatest = (days) => new Date(latestTs.getTime() - days * 24 * 60 * 60 * 1000);
+
+    const value24h = reversedSmoothedData.find(item => new Date(item.ts) <= getDateFromLatest(1));
+    const value7d = reversedSmoothedData.find(item => new Date(item.ts) <= getDateFromLatest(7));
+    const value28d = reversedSmoothedData.find(item => new Date(item.ts) <= getDateFromLatest(28));
+
+    let valueYtd = smoothedData.find(item => new Date(item.ts) >= new Date(latestTs.getFullYear(), 0, 1));
+
+    if (!valueYtd) {
+      valueYtd = reversedSmoothedData[reversedSmoothedData.length - 1];
+    }
+
+    const standardDeviation = calculateStandardDeviation(dailyValues);
+
+    const current = parseFloat(latestData[columnName]);
+    const ath = Math.max(...dailyValues);
+    const atl = Math.min(...dailyValues);
+
+    return {
+      current,
+      delta_24h: calculateDelta(current, value24h ? parseFloat(value24h[columnName]) : null),
+      delta_7d: calculateDelta(current, value7d ? parseFloat(value7d[columnName]) : null),
+      delta_28d: calculateDelta(current, value28d ? parseFloat(value28d[columnName]) : null),
+      delta_ytd: calculateDelta(current, valueYtd ? parseFloat(valueYtd[columnName]) : null),
+      ath,
+      atl,
+      ath_percentage: calculatePercentage(current, ath),
+      atl_percentage: atl === 0 ? 100 : calculatePercentage(current, atl),
+      standard_deviation: standardDeviation
+    };
+  } catch (error) {
+    throw new Error(`Error fetching daily ${columnName} summary stats: ` + error.message);
+  }
+};
+
+const getDailyVolumeSummaryStats = async (chain) => {
+  return getDailySummaryStats(chain, getDailyVolumeData, 'daily_volume');
+};
+
+const getDailyExchangeFeesSummaryStats = async (chain) => {
+  return getDailySummaryStats(chain, getDailyExchangeFeesData, 'daily_exchange_fees');
+};
+
+const getDailyCollectedFeesSummaryStats = async (chain) => {
+  return getDailySummaryStats(chain, getDailyCollectedFeesData, 'daily_collected_fees');
 };
 
 module.exports = {
@@ -374,5 +523,9 @@ module.exports = {
   getCumulativeExchangeFeesData,
   getCumulativeCollectedFeesData,
   getDailyVolumeData,
-  getDailyFeesData,
+  getDailyCollectedFeesData,
+  getDailyExchangeFeesData,
+  getDailyVolumeSummaryStats,
+  getDailyExchangeFeesSummaryStats,
+  getDailyCollectedFeesSummaryStats,
 };

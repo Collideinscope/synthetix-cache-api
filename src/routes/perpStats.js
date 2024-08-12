@@ -10,7 +10,11 @@ const {
   getCumulativeExchangeFeesData,
   getCumulativeCollectedFeesData,
   getDailyVolumeData,
-  getDailyFeesData,
+  getDailyCollectedFeesData,
+  getDailyExchangeFeesData,
+  getDailyVolumeSummaryStats,
+  getDailyExchangeFeesSummaryStats,
+  getDailyCollectedFeesSummaryStats,
 } = require('../services/perpStatsService');
 const { CHAINS } = require('../helpers');
 
@@ -193,7 +197,7 @@ router.get('/daily-volume/:chain?', async (req, res) => {
   }
 });
 
-router.get('/daily-fees/:chain?', async (req, res) => {
+router.get('/daily-exchange-fees/:chain?', async (req, res) => {
   try {
     const { chain } = req.params;
 
@@ -205,11 +209,96 @@ router.get('/daily-fees/:chain?', async (req, res) => {
       return res.status(400).json({ error: "Invalid chain parameter" });
     }
 
-    const data = await getDailyFeesData(chain);
+    const data = await getDailyExchangeFeesData(chain);
 
     res.json(data);
   } catch (error) {
-    console.error('Error in /perp-stats/daily-fees route:', error);
+    console.error('Error in /perp-stats/daily-exchange-fees route:', error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
+router.get('/daily-collected-fees/:chain?', async (req, res) => {
+  try {
+    const { chain } = req.params;
+
+    if (!chain) {
+      return res.status(400).json({ error: "Chain parameter is required" });
+    }
+
+    if (!CHAINS.includes(chain)) {
+      return res.status(400).json({ error: "Invalid chain parameter" });
+    }
+
+    const data = await getDailyCollectedFeesData(chain);
+
+    res.json(data);
+  } catch (error) {
+    console.error('Error in /perp-stats/daily-collected-fees route:', error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
+
+router.get('/daily-volume/summary/:chain?', async (req, res) => {
+  try {
+    const { chain } = req.params;
+
+    if (!chain) {
+      return res.status(400).json({ error: "Chain parameter is required" });
+    }
+
+    if (!CHAINS.includes(chain)) {
+      return res.status(400).json({ error: "Invalid chain parameter" });
+    }
+
+    const stats = await getDailyVolumeSummaryStats(chain);
+
+    res.json(stats);
+  } catch (error) {
+    console.error('Error in /perp-stats/daily-volume/summary route:', error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
+router.get('/daily-exchange-fees/summary/:chain?', async (req, res) => {
+  try {
+    const { chain } = req.params;
+
+    if (!chain) {
+      return res.status(400).json({ error: "Chain parameter is required" });
+    }
+
+    if (!CHAINS.includes(chain)) {
+      return res.status(400).json({ error: "Invalid chain parameter" });
+    }
+
+    const stats = await getDailyExchangeFeesSummaryStats(chain);
+
+    res.json(stats);
+  } catch (error) {
+    console.error('Error in /perp-stats/daily-exchange-fees/summary route:', error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
+router.get('/daily-collected-fees/summary/:chain?', async (req, res) => {
+  try {
+    const { chain } = req.params;
+
+    if (!chain) {
+      return res.status(400).json({ error: "Chain parameter is required" });
+    }
+
+    if (!CHAINS.includes(chain)) {
+      return res.status(400).json({ error: "Invalid chain parameter" });
+    }
+
+    const stats = await getDailyCollectedFeesSummaryStats(chain);
+
+    res.json(stats);
+  } catch (error) {
+    console.error('Error in /perp-stats/daily-collected-fees/summary route:', error);
     res.status(500).json({ error: error.message });
   }
 });

@@ -2057,7 +2057,7 @@ paths:
           description: Bad request (invalid or missing chain parameter)
         500:
           description: Server error
-
+  
   /perp-stats/daily-volume/{chain}:
     get:
       summary: Get daily volume data
@@ -2068,34 +2068,152 @@ paths:
           name: chain
           schema:
             type: string
-          required: true
-          description: The chain to get the daily volume data for
+          required: false
+          description: The chain to get the daily volume data for. If not provided, returns data for all chains.
       responses:
         200:
           description: The daily volume data
           content:
             application/json:
               schema:
-                type: array
-                items:
-                  type: object
-                  properties:
-                    date:
-                      type: string
-                      format: date
-                      example: '2024-06-27'
-                    daily_volume:
-                      type: number
-                      format: double
-                      example: 1000000.50
+                type: object
+                additionalProperties:
+                  type: array
+                  items:
+                    type: object
+                    properties:
+                      ts:
+                        type: string
+                        format: date-time
+                        example: '2024-06-27T00:00:00Z'
+                      daily_volume:
+                        type: number
+                        format: double
+                        example: 1000000.50
         400:
-          description: Bad request (invalid or missing chain parameter)
+          description: Bad request - Invalid chain parameter
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  error:
+                    type: string
         500:
           description: Server error
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  error:
+                    type: string
 
-  /perp-stats/daily-fees/{chain}:
+  /perp-stats/daily-exchange-fees/{chain}:
     get:
-      summary: Get daily fees data
+      summary: Get daily exchange fees data
+      tags:
+        - Perp Stats
+      parameters:
+        - in: path
+          name: chain
+          schema:
+            type: string
+          required: false
+          description: The chain to get the daily exchange fees data for. If not provided, returns data for all chains.
+      responses:
+        200:
+          description: The daily exchange fees data
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties:
+                  type: array
+                  items:
+                    type: object
+                    properties:
+                      ts:
+                        type: string
+                        format: date-time
+                        example: '2024-06-27T00:00:00Z'
+                      daily_exchange_fees:
+                        type: number
+                        format: double
+                        example: 5000.75
+        400:
+          description: Bad request - Invalid chain parameter
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  error:
+                    type: string
+        500:
+          description: Server error
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  error:
+                    type: string
+
+  /perp-stats/daily-collected-fees/{chain}:
+    get:
+      summary: Get daily collected fees data
+      tags:
+        - Perp Stats
+      parameters:
+        - in: path
+          name: chain
+          schema:
+            type: string
+          required: false
+          description: The chain to get the daily collected fees data for. If not provided, returns data for all chains.
+      responses:
+        200:
+          description: The daily collected fees data
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties:
+                  type: array
+                  items:
+                    type: object
+                    properties:
+                      ts:
+                        type: string
+                        format: date-time
+                        example: '2024-06-27T00:00:00Z'
+                      daily_collected_fees:
+                        type: number
+                        format: double
+                        example: 3000.25
+        400:
+          description: Bad request - Invalid chain parameter
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  error:
+                    type: string
+        500:
+          description: Server error
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  error:
+                    type: string
+
+  /perp-stats/daily-volume/summary/{chain}:
+    get:
+      summary: Get daily volume summary statistics
       tags:
         - Perp Stats
       parameters:
@@ -2104,33 +2222,231 @@ paths:
           schema:
             type: string
           required: true
-          description: The chain to get the daily fees data for
+          description: The chain to get the daily volume summary statistics for.
       responses:
         200:
-          description: The daily fees data
+          description: The daily volume summary statistics
           content:
             application/json:
               schema:
-                type: array
-                items:
-                  type: object
-                  properties:
-                    date:
-                      type: string
-                      format: date
-                      example: '2024-06-27'
-                    daily_exchange_fees:
-                      type: number
-                      format: double
-                      example: 5000.75
-                    daily_collected_fees:
-                      type: number
-                      format: double
-                      example: 4500.25
+                type: object
+                properties:
+                  current:
+                    type: number
+                    format: double
+                    example: 1000000.50
+                  delta_24h:
+                    type: number
+                    format: double
+                    example: 50000.25
+                  delta_7d:
+                    type: number
+                    format: double
+                    example: 200000.75
+                  delta_28d:
+                    type: number
+                    format: double
+                    example: 500000.00
+                  delta_ytd:
+                    type: number
+                    format: double
+                    example: 2000000.00
+                  ath:
+                    type: number
+                    format: double
+                    example: 1500000.00
+                  atl:
+                    type: number
+                    format: double
+                    example: 500000.00
+                  ath_percentage:
+                    type: number
+                    format: double
+                    example: 66.67
+                  atl_percentage:
+                    type: number
+                    format: double
+                    example: 200.00
+                  standard_deviation:
+                    type: number
+                    format: double
+                    example: 100000.00
         400:
-          description: Bad request (invalid or missing chain parameter)
+          description: Bad request - Invalid chain parameter
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  error:
+                    type: string
         500:
           description: Server error
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  error:
+                    type: string
+
+  /perp-stats/daily-exchange-fees/summary/{chain}:
+    get:
+      summary: Get daily exchange fees summary statistics
+      tags:
+        - Perp Stats
+      parameters:
+        - in: path
+          name: chain
+          schema:
+            type: string
+          required: true
+          description: The chain to get the daily exchange fees summary statistics for.
+      responses:
+        200:
+          description: The daily exchange fees summary statistics
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  current:
+                    type: number
+                    format: double
+                    example: 5000.75
+                  delta_24h:
+                    type: number
+                    format: double
+                    example: 250.25
+                  delta_7d:
+                    type: number
+                    format: double
+                    example: 1000.75
+                  delta_28d:
+                    type: number
+                    format: double
+                    example: 2500.00
+                  delta_ytd:
+                    type: number
+                    format: double
+                    example: 10000.00
+                  ath:
+                    type: number
+                    format: double
+                    example: 7500.00
+                  atl:
+                    type: number
+                    format: double
+                    example: 2500.00
+                  ath_percentage:
+                    type: number
+                    format: double
+                    example: 66.67
+                  atl_percentage:
+                    type: number
+                    format: double
+                    example: 200.00
+                  standard_deviation:
+                    type: number
+                    format: double
+                    example: 500.00
+        400:
+          description: Bad request - Invalid chain parameter
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  error:
+                    type: string
+        500:
+          description: Server error
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  error:
+                    type: string
+
+  /perp-stats/daily-collected-fees/summary/{chain}:
+    get:
+      summary: Get daily collected fees summary statistics
+      tags:
+        - Perp Stats
+      parameters:
+        - in: path
+          name: chain
+          schema:
+            type: string
+          required: true
+          description: The chain to get the daily collected fees summary statistics for.
+      responses:
+        200:
+          description: The daily collected fees summary statistics
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  current:
+                    type: number
+                    format: double
+                    example: 3000.25
+                  delta_24h:
+                    type: number
+                    format: double
+                    example: 150.25
+                  delta_7d:
+                    type: number
+                    format: double
+                    example: 600.75
+                  delta_28d:
+                    type: number
+                    format: double
+                    example: 1500.00
+                  delta_ytd:
+                    type: number
+                    format: double
+                    example: 6000.00
+                  ath:
+                    type: number
+                    format: double
+                    example: 4500.00
+                  atl:
+                    type: number
+                    format: double
+                    example: 1500.00
+                  ath_percentage:
+                    type: number
+                    format: double
+                    example: 66.67
+                  atl_percentage:
+                    type: number
+                    format: double
+                    example: 200.00
+                  standard_deviation:
+                    type: number
+                    format: double
+                    example: 300.00
+        400:
+          description: Bad request - Invalid chain parameter
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  error:
+                    type: string
+        500:
+          description: Server error
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  error:
+                    type: string
 
   /perp-market-history/all/{chain}:
     get:
