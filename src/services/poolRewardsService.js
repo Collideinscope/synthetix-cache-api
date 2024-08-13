@@ -244,10 +244,106 @@ const fetchAndUpdateLatestPoolRewardsData = async (chain) => {
   }
 };
 
+const fetchDailyPoolRewardsData = async (chain) => {
+  const result = await knex.raw(`
+    WITH daily_data AS (
+      SELECT
+        DATE_TRUNC('day', ts) AS date,
+        SUM(rewards_usd) AS daily_rewards
+      FROM pool_rewards
+      WHERE chain = ?
+      GROUP BY DATE_TRUNC('day', ts)
+      ORDER BY DATE_TRUNC('day', ts)
+    )
+    SELECT
+      date,
+      daily_rewards
+    FROM daily_data
+    ORDER BY date;
+  `, [chain]);
+
+  return result.rows.map(row => ({
+    ts: row.date,
+    daily_rewards: parseFloat(row.daily_rewards)
+  }));
+};
+
+const getDailyPoolRewardsData = async (chain) => {
+  try {
+    if (chain && CHAINS.includes(chain)) {
+      const data = await fetchDailyPoolRewardsData(chain);
+      return { [chain]: data };
+    }
+
+    const results = await Promise.all(
+      CHAINS.map(async (chain) => {
+        const data = await fetchDailyPoolRewardsData(chain);
+        return { [chain]: data };
+      })
+    );
+
+    return results.reduce((acc, curr) => ({ ...acc, ...curr }), {});
+  } catch (error) {
+    throw new Error('Error fetching daily pool rewards data: ' + error.message);
+  }
+};
+
+const getDailyPoolRewardsSummaryStats = async (chain) => {
+  try {
+    const data = await getDailyPoolRewardsData(chain);
+    const dailyValues = data[chain].map(item => item.daily_rewards);
+
+    if (dailyValues.length === 0) {
+      throw new Error('No data found for the specified chain');
+    }
+
+    const smoothedData = smoothData(data[chain], 'daily_rewards');
+    const reversedSmoothedData = [...smoothedData].reverse();
+
+    const latestData = reversedSmoothedData[0];
+    const latestTs = new Date(latestData.ts);
+
+    const getDateFromLatest = (days) => new Date(latestTs.getTime() - days * 24 * 60 * 60 * 1000);
+
+    const value24h = reversedSmoothedData.find(item => new Date(item.ts) <= getDateFromLatest(1));
+    const value7d = reversedSmoothedData.find(item => new Date(item.ts) <= getDateFromLatest(7));
+    const value28d = reversedSmoothedData.find(item => new Date(item.ts) <= getDateFromLatest(28));
+
+    let valueYtd = smoothedData.find(item => new Date(item.ts) >= new Date(latestTs.getFullYear(), 0, 1));
+
+    if (!valueYtd) {
+      valueYtd = reversedSmoothedData[reversedSmoothedData.length - 1];
+    }
+
+    const standardDeviation = calculateStandardDeviation(dailyValues);
+
+    const current = latestData.daily_rewards;
+    const ath = Math.max(...dailyValues);
+    const atl = Math.min(...dailyValues);
+
+    return {
+      current,
+      delta_24h: calculateDelta(current, value24h ? value24h.daily_rewards : null),
+      delta_7d: calculateDelta(current, value7d ? value7d.daily_rewards : null),
+      delta_28d: calculateDelta(current, value28d ? value28d.daily_rewards : null),
+      delta_ytd: calculateDelta(current, valueYtd ? valueYtd.daily_rewards : null),
+      ath,
+      atl,
+      ath_percentage: calculatePercentage(current, ath),
+      atl_percentage: atl === 0 ? 100 : calculatePercentage(current, atl),
+      standard_deviation: standardDeviation
+    };
+  } catch (error) {
+    throw new Error('Error fetching daily pool rewards summary stats: ' + error.message);
+  }
+};
+
 module.exports = {
   getLatestPoolRewardsData,
   getAllPoolRewardsData,
   fetchAndInsertAllPoolRewardsData,
   fetchAndUpdateLatestPoolRewardsData,
   getPoolRewardsSummaryStats,
+  getDailyPoolRewardsData,
+  getDailyPoolRewardsSummaryStats,
 };
