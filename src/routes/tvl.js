@@ -13,12 +13,16 @@ router.get('/latest/:chain?', async (req, res) => {
   try {
     const { chain } = req.params;
     const result = await getLatestTVLData(chain);
-
-    if (!result.length) {
-      return res.status(404).send('TVL data not found');
+    if (chain) {
+      if (!result[chain] || result[chain].length === 0) {
+        return res.status(404).send('TVL data not found for the specified chain');
+      }
+    } else {
+      if (Object.values(result).every(data => data.length === 0)) {
+        return res.status(404).send('TVL data not found');
+      }
     }
-
-    return res.json(result); 
+    return res.json(result);
   } catch (error) {
     console.error(error);
     return res.status(500).send('Server error');
@@ -29,11 +33,15 @@ router.get('/all/:chain?', async (req, res) => {
   try {
     const { chain } = req.params;
     const result = await getAllTVLData(chain);
-
-    if (!result.length) {
-      return res.status(404).send('TVL data not found');
+    if (chain) {
+      if (!result[chain] || result[chain].length === 0) {
+        return res.status(404).send('TVL data not found for the specified chain');
+      }
+    } else {
+      if (Object.values(result).every(data => data.length === 0)) {
+        return res.status(404).send('TVL data not found');
+      }
     }
-
     return res.json(result);
   } catch (error) {
     console.error(error);
@@ -80,7 +88,7 @@ router.get('/summary/:chain?', async (req, res) => {
   }
 });
 
-router.get('/daily/:chain?', async (req, res) => {
+router.get('/daily/:chain', async (req, res) => {
   try {
     const { chain } = req.params;
     if (!chain) {
@@ -90,6 +98,9 @@ router.get('/daily/:chain?', async (req, res) => {
       return res.status(400).json({ error: "Invalid chain parameter" });
     }
     const data = await getDailyTVLData(chain);
+    if (!data[chain] || data[chain].length === 0) {
+      return res.status(404).send('Daily TVL data not found for the specified chain');
+    }
     res.json(data);
   } catch (error) {
     console.error('Error in /tvl/daily route:', error);

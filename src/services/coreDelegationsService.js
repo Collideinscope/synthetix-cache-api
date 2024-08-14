@@ -11,16 +11,14 @@ const {
 const getLatestCoreDelegationsData = async (chain) => {
   try {
     if (chain && CHAINS.includes(chain)) {
-      // Fetch the latest value for the specific chain
       const result = await knex('core_delegations')
         .where('chain', chain)
         .orderBy('ts', 'desc')
         .limit(1);
 
-      return result;
+      return { [chain]: result };
     }
 
-    // Fetch the latest value for each chain otherwise
     const results = await Promise.all(
       CHAINS.map(async (chain) => {
         const result = await knex('core_delegations')
@@ -28,11 +26,11 @@ const getLatestCoreDelegationsData = async (chain) => {
           .orderBy('ts', 'desc')
           .limit(1);
 
-        return result[0];
+        return { [chain]: result };
       })
     );
 
-    return results.filter(Boolean); // Filter out any undefined results
+    return results.reduce((acc, curr) => ({ ...acc, ...curr }), {});
   } catch (error) {
     throw new Error('Error fetching latest core delegations data: ' + error.message);
   }
@@ -40,15 +38,25 @@ const getLatestCoreDelegationsData = async (chain) => {
 
 const getAllCoreDelegationsData = async (chain) => {
   try {
-    let query = knex('core_delegations').orderBy('ts', 'asc');
-
     if (chain && CHAINS.includes(chain)) {
-      query = query.where('chain', chain);
+      const result = await knex('core_delegations')
+        .where('chain', chain)
+        .orderBy('ts', 'asc');
+
+      return { [chain]: result };
     }
 
-    const result = await query;
+    const results = await Promise.all(
+      CHAINS.map(async (chain) => {
+        const result = await knex('core_delegations')
+          .where('chain', chain)
+          .orderBy('ts', 'asc');
 
-    return result;
+        return { [chain]: result };
+      })
+    );
+
+    return results.reduce((acc, curr) => ({ ...acc, ...curr }), {});
   } catch (error) {
     throw new Error('Error fetching all core delegations data: ' + error.message);
   }

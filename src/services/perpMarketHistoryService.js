@@ -176,59 +176,149 @@ const getAllPerpMarketHistoryData = async (chain) => {
 
 const getOpenInterestData = async (chain) => {
   try {
-    // Calculate daily average OI per market and then sum them up to get daily OI
-    const result = await knex.raw(`
-      WITH daily_market_oi AS (
+    const fetchDataForChain = async (chain) => {
+      const result = await knex.raw(`
+        WITH daily_market_oi AS (
+          SELECT
+            date_trunc('day', ts) AS day,
+            market_symbol,
+            AVG(size * price) AS daily_market_oi,
+            chain
+          FROM
+            perp_market_history
+          WHERE
+            chain = ?
+          GROUP BY
+            date_trunc('day', ts),
+            market_symbol,
+            chain
+        ),
+        daily_oi AS (
+          SELECT
+            day,
+            SUM(daily_market_oi) AS daily_oi,
+            chain
+          FROM
+            daily_market_oi
+          GROUP BY
+            day,
+            chain
+        )
         SELECT
-          date_trunc('day', ts) AS day,
-          market_symbol,
-          AVG(size * price) AS daily_market_oi,
-          chain
-        FROM 
-          perp_market_history
-        WHERE
-          chain = ?
-        GROUP BY 
-          date_trunc('day', ts),
-          market_symbol,
-          chain
-      ),
-      daily_oi AS (
-        SELECT
-          day,
-          SUM(daily_market_oi) AS daily_oi,
+          day AS ts,
+          daily_oi,
           chain
         FROM
-          daily_market_oi
-        GROUP BY
-          day,
-          chain
-      )
-      SELECT 
-        day AS ts,
-        daily_oi,
-        chain
-      FROM 
-        daily_oi
-      ORDER BY 
-        ts ASC;
-    `, [chain]);    
+          daily_oi
+        ORDER BY
+          ts ASC;
+      `, [chain]);
 
-    return result.rows;
+      return result.rows.map(row => ({
+        ts: row.ts,
+        daily_oi: parseFloat(row.daily_oi),
+      }));
+    };
+
+    if (chain && CHAINS.includes(chain)) {
+      const data = await fetchDataForChain(chain);
+      return { [chain]: data };
+    }
+
+    const results = await Promise.all(
+      CHAINS.map(async (chain) => {
+        const data = await fetchDataForChain(chain);
+        return { [chain]: data };
+      })
+    );
+
+    return results.reduce((acc, curr) => ({ ...acc, ...curr }), {});
   } catch (error) {
     throw new Error('Error fetching daily OI data: ' + error.message);
   }
 };
 
+const getDailyOpenInterestStatsData = async (chain) => {
+  try {
+    const fetchDataForChain = async (chain) => {
+      const result = await knex.raw(`
+        WITH daily_market_oi AS (
+          SELECT
+            date_trunc('day', ts) AS day,
+            market_symbol,
+            MIN(size * price) AS min_market_oi,
+            AVG(size * price) AS avg_market_oi,
+            MAX(size * price) AS max_market_oi,
+            chain
+          FROM
+            perp_market_history
+          WHERE
+            chain = ?
+          GROUP BY
+            date_trunc('day', ts),
+            market_symbol,
+            chain
+        ),
+        daily_oi_stats AS (
+          SELECT
+            day,
+            SUM(min_market_oi) AS min_daily_oi,
+            SUM(avg_market_oi) AS avg_daily_oi,
+            SUM(max_market_oi) AS max_daily_oi,
+            chain
+          FROM
+            daily_market_oi
+          GROUP BY
+            day,
+            chain
+        )
+        SELECT
+          day AS ts,
+          min_daily_oi,
+          avg_daily_oi,
+          max_daily_oi,
+          chain
+        FROM
+          daily_oi_stats
+        ORDER BY
+          ts ASC;
+      `, [chain]);
+
+      return result.rows.map(row => ({
+        ts: row.ts,
+        min_daily_oi: parseFloat(row.min_daily_oi),
+        avg_daily_oi: parseFloat(row.avg_daily_oi),
+        max_daily_oi: parseFloat(row.max_daily_oi),
+      }));
+    };
+
+    if (chain && CHAINS.includes(chain)) {
+      const data = await fetchDataForChain(chain);
+      return { [chain]: data };
+    }
+
+    const results = await Promise.all(
+      CHAINS.map(async (chain) => {
+        const data = await fetchDataForChain(chain);
+        return { [chain]: data };
+      })
+    );
+
+    return results.reduce((acc, curr) => ({ ...acc, ...curr }), {});
+  } catch (error) {
+    throw new Error('Error fetching daily open interest stats data: ' + error.message);
+  }
+};
+
 const getOpenInterestSummaryStats = async (chain) => {
   try {
-    const allData = await getOpenInterestData(chain);
+    const data = await getOpenInterestData(chain);
 
-    if (allData.length === 0) {
+    if (data.length === 0) {
       throw new Error('No data found');
     }
 
-    const smoothedData = smoothData(allData, 'daily_oi');
+    const smoothedData = smoothData(data[chain], 'daily_oi');
     const reversedSmoothedData = [...smoothedData].reverse();
 
     const latestData = reversedSmoothedData[0];
@@ -250,7 +340,7 @@ const getOpenInterestSummaryStats = async (chain) => {
     const oiValues = smoothedData.map(item => parseFloat(item.daily_oi));
     const standardDeviation = calculateStandardDeviation(oiValues);
 
-    const current = parseFloat(allData[allData.length -1].daily_oi);
+    const current = parseFloat(data[chain][data[chain].length -1].daily_oi);
     const ath = Math.max(...oiValues, current);
     const atl = Math.min(...oiValues, current);
 
@@ -276,5 +366,6 @@ module.exports = {
   fetchAndUpdateLatestPerpMarketHistoryData,
   getAllPerpMarketHistoryData,
   getOpenInterestData,
+  getDailyOpenInterestStatsData,
   getOpenInterestSummaryStats,
 };

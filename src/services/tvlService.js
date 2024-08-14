@@ -17,7 +17,7 @@ const getLatestTVLData = async (chain) => {
         .orderBy('ts', 'desc')
         .limit(1);
 
-      return result;
+      return { [chain]: result };
     }
 
     // Fetch the latest value for each chain otherwise
@@ -28,11 +28,11 @@ const getLatestTVLData = async (chain) => {
           .orderBy('ts', 'desc')
           .limit(1);
 
-        return result[0];
+        return { [chain]: result };
       })
     );
 
-    return results.filter(Boolean); // Filter out any undefined results
+    return results.reduce((acc, curr) => ({ ...acc, ...curr }), {});
   } catch (error) {
     throw new Error('Error fetching latest TVL data: ' + error.message);
   }
@@ -40,15 +40,25 @@ const getLatestTVLData = async (chain) => {
 
 const getAllTVLData = async (chain) => {
   try {
-    let query = knex('tvl').orderBy('ts', 'asc');
-
     if (chain && CHAINS.includes(chain)) {
-      query = query.where('chain', chain);
+      const result = await knex('tvl')
+        .where('chain', chain)
+        .orderBy('ts', 'asc');
+
+      return { [chain]: result };
     }
 
-    const result = await query;
+    const results = await Promise.all(
+      CHAINS.map(async (chain) => {
+        const result = await knex('tvl')
+          .where('chain', chain)
+          .orderBy('ts', 'asc');
 
-    return result;
+        return { [chain]: result };
+      })
+    );
+
+    return results.reduce((acc, curr) => ({ ...acc, ...curr }), {});
   } catch (error) {
     throw new Error('Error fetching all TVL data: ' + error.message);
   }
@@ -226,37 +236,6 @@ const fetchAndUpdateLatestTVLData = async (chain) => {
   } catch (error) {
     console.error(`Error updating TVL data for ${chain} chain:`, error);
   }
-};
-
-const fetchDailyVolumeData = async (chain) => {
-  const result = await knex.raw(`
-    WITH daily_data AS (
-      SELECT 
-        DATE_TRUNC('day', ts) AS date,
-        cumulative_volume,
-        LAG(cumulative_volume) OVER (ORDER BY ts) AS prev_cumulative_volume
-      FROM 
-        perp_stats
-      WHERE
-        chain = ?
-      ORDER BY 
-        ts
-    )
-    SELECT 
-      date,
-      COALESCE(cumulative_volume - prev_cumulative_volume, cumulative_volume) AS daily_volume
-    FROM 
-      daily_data
-    WHERE
-      prev_cumulative_volume IS NOT NULL OR date = (SELECT MIN(date) FROM daily_data)
-    ORDER BY 
-      date;
-  `, [chain]);
-
-  return result.rows.map(row => ({
-    ts: row.date,
-    daily_volume: row.daily_volume,
-  }));
 };
 
 const fetchDailyTVLData = async (chain) => {

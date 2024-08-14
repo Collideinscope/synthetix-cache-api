@@ -346,7 +346,6 @@ const getDailyVolumeData = async (chain) => {
   }
 };
 
-
 const fetchDailyExchangeFeesData = async (chain) => {
   const result = await knex.raw(`
     WITH daily_data AS (

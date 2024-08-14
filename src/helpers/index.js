@@ -43,11 +43,14 @@ const calculateStandardDeviation = (values) => {
 
 // moving average, default 7d
 const smoothData = (data, property, windowSize = 168) => {
+  console.log(data)
   return data.map((obj, idx, array) => {
+    console.log(obj, idx)
     if (idx < windowSize - 1) {
-      // Not enough previous data objs, return original
+      // insufficient data points, preserve original value
       return obj;
     }
+
     const window = array.slice(idx - windowSize + 1, idx + 1);
     const sum = window.reduce((acc, curr) => acc + parseFloat(curr[property]), 0);
 

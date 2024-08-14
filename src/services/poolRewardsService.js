@@ -11,16 +11,14 @@ const {
 const getLatestPoolRewardsData = async (chain) => {
   try {
     if (chain && CHAINS.includes(chain)) {
-      // Fetch the latest value for the specific chain
       const result = await knex('pool_rewards')
         .where('chain', chain)
         .orderBy('ts', 'desc')
         .limit(1);
 
-      return result;
+      return { [chain]: result };
     }
 
-    // Fetch the latest value for each chain otherwise
     const results = await Promise.all(
       CHAINS.map(async (chain) => {
         const result = await knex('pool_rewards')
@@ -28,11 +26,11 @@ const getLatestPoolRewardsData = async (chain) => {
           .orderBy('ts', 'desc')
           .limit(1);
 
-        return result[0];
+        return { [chain]: result };
       })
     );
 
-    return results.filter(Boolean); // Filter out any undefined results
+    return results.reduce((acc, curr) => ({ ...acc, ...curr }), {});
   } catch (error) {
     throw new Error('Error fetching latest pool rewards data: ' + error.message);
   }
@@ -65,8 +63,7 @@ const getAllPoolRewardsData = async (chain) => {
 
     if (chain && CHAINS.includes(chain)) {
       const processedResult = calculateCumulativeRewards(result);
-
-      return processedResult;
+      return { [chain]: processedResult };
     } else {
       const independentResults = {};
 

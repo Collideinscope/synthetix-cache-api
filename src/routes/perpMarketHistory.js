@@ -4,6 +4,7 @@ const {
   getAllPerpMarketHistoryData, 
   getOpenInterestData,
   getOpenInterestSummaryStats,
+  getDailyOpenInterestStatsData,
 } = require('../services/perpMarketHistoryService');
 const { CHAINS } = require('../helpers');
 
@@ -23,32 +24,38 @@ router.get('/all/:chain?', async (req, res) => {
   }
 });
 
-router.get('/open-interest/:chain?', async (req, res) => {
+router.get('/open-interest/daily-avg/:chain?', async (req, res) => {
   try {
     const { chain } = req.params;
 
-    if (!chain) {
-      return res.status(400).json({ error: "Chain parameter is required" });
-    }
-
-    if (!CHAINS.includes(chain)) {
+    if (chain && !CHAINS.includes(chain)) {
       return res.status(400).json({ error: "Invalid chain parameter" });
     }
 
     const data = await getOpenInterestData(chain);
-
-    if (!data.length) {
-      return res.status(404).send('Open interest data not found');
-    }
-
+    console.log(data)
     res.json(data);
   } catch (error) {
-    console.error('Error in /perp-market-history/open-interest route:', error);
+    console.error('Error in /open-interest/daily route:', error);
     res.status(500).json({ error: error.message });
   }
 });
 
-router.get('/open-interest/summary/:chain?', async (req, res) => {
+router.get('/open-interest/daily-stats/:chain?', async (req, res) => {
+  try {
+    const { chain } = req.params;
+    if (chain && !CHAINS.includes(chain)) {
+      return res.status(400).json({ error: "Invalid chain parameter" });
+    }
+    const data = await getDailyOpenInterestStatsData(chain);
+    res.json(data);
+  } catch (error) {
+    console.error('Error in /open-interest/daily-stats route:', error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
+router.get('/open-interest/daily-avg/summary/:chain?', async (req, res) => {
   try {
     const { chain } = req.params;
 
