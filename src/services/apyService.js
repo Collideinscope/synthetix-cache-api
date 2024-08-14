@@ -40,15 +40,25 @@ const getLatestAPYData = async (chain) => {
 
 const getAllAPYData = async (chain) => {
   try {
-    let query = knex('apy').orderBy('ts', 'asc');
-
     if (chain && CHAINS.includes(chain)) {
-      query = query.where('chain', chain);
+      const result = await knex('apy')
+        .where('chain', chain)
+        .orderBy('ts', 'asc');
+      
+      return { [chain]: result };
     }
 
-    const result = await query;
+    const results = await Promise.all(
+      CHAINS.map(async (chain) => {
+        const result = await knex('apy')
+          .where('chain', chain)
+          .orderBy('ts', 'asc');
+        
+        return { [chain]: result };
+      })
+    );
 
-    return result;
+    return results.reduce((acc, curr) => ({ ...acc, ...curr }), {});
   } catch (error) {
     throw new Error('Error fetching all APY data: ' + error.message);
   }
@@ -195,10 +205,111 @@ const fetchAndUpdateLatestAPYData = async (chain) => {
   }
 };
 
+const fetchDailyAggregatedAPYData = async (chain) => {
+  const result = await knex.raw(`
+    WITH daily_data AS (
+      SELECT
+        DATE_TRUNC('day', ts) AS date,
+        FIRST_VALUE(apy_28d) OVER (PARTITION BY DATE_TRUNC('day', ts) ORDER BY ts) AS day_start_apy,
+        LAST_VALUE(apy_28d) OVER (PARTITION BY DATE_TRUNC('day', ts) ORDER BY ts
+          RANGE BETWEEN UNBOUNDED PRECEDING AND UNBOUNDED FOLLOWING) AS day_end_apy
+      FROM apy
+      WHERE chain = ?
+    )
+    SELECT DISTINCT
+      date as ts,
+      CASE 
+        WHEN day_start_apy = 0 THEN NULL
+        ELSE ((day_end_apy / day_start_apy) - 1)
+      END as daily_apy_percentage_delta
+    FROM daily_data
+    ORDER BY date;
+  `, [chain]);
+
+  return result.rows.map(row => ({
+    ts: row.ts,
+    daily_apy_percentage_delta: row.daily_apy_percentage_delta !== null ? parseFloat(row.daily_apy_percentage_delta) : null
+  }));
+};
+
+const getDailyAggregatedAPYData = async (chain) => {
+  try {
+    if (chain && CHAINS.includes(chain)) {
+      const data = await fetchDailyAggregatedAPYData(chain);
+      return { [chain]: data };
+    }
+
+    const results = await Promise.all(
+      CHAINS.map(async (chain) => {
+        const data = await fetchDailyAggregatedAPYData(chain);
+        return { [chain]: data };
+      })
+    );
+
+    return results.reduce((acc, curr) => ({ ...acc, ...curr }), {});
+  } catch (error) {
+    throw new Error('Error fetching daily aggregated APY data: ' + error.message);
+  }
+};
+
+const getDailyAPYSummaryStats = async (chain) => {
+  try {
+    const data = await getDailyAggregatedAPYData(chain);
+    const dailyValues = data[chain]
+      .map(item => item.daily_apy_percentage_delta)
+      .filter(value => value !== null);
+
+    if (dailyValues.length === 0) {
+      throw new Error('No valid data found for the specified chain');
+    }
+
+    const smoothedData = smoothData(data[chain], 'daily_apy_percentage_delta');
+    const reversedSmoothedData = [...smoothedData].reverse();
+
+    const latestData = reversedSmoothedData[0];
+    const latestTs = new Date(latestData.ts);
+
+    const getDateFromLatest = (days) => new Date(latestTs.getTime() - days * 24 * 60 * 60 * 1000);
+
+    const value24h = reversedSmoothedData.find(item => new Date(item.ts) <= getDateFromLatest(1));
+    const value7d = reversedSmoothedData.find(item => new Date(item.ts) <= getDateFromLatest(7));
+    const value28d = reversedSmoothedData.find(item => new Date(item.ts) <= getDateFromLatest(28));
+
+    let valueYtd = smoothedData.find(item => new Date(item.ts) >= new Date(latestTs.getFullYear(), 0, 1));
+
+    if (!valueYtd) {
+      valueYtd = reversedSmoothedData[reversedSmoothedData.length - 1];
+    }
+
+    const standardDeviation = calculateStandardDeviation(dailyValues);
+
+    const current = latestData.daily_apy_percentage_delta;
+    const ath = Math.max(...dailyValues);
+    const atl = Math.min(...dailyValues);
+
+    return {
+      current,
+      delta_24h: calculateDelta(current, value24h ? value24h.daily_apy_percentage_delta : null),
+      delta_7d: calculateDelta(current, value7d ? value7d.daily_apy_percentage_delta : null),
+      delta_28d: calculateDelta(current, value28d ? value28d.daily_apy_percentage_delta : null),
+      delta_ytd: calculateDelta(current, valueYtd ? valueYtd.daily_apy_percentage_delta : null),
+      ath,
+      atl,
+      ath_percentage: calculatePercentage(current, ath),
+      atl_percentage: atl === 0 ? 100 : calculatePercentage(current, atl),
+      standard_deviation: standardDeviation
+    };
+  } catch (error) {
+    throw new Error('Error fetching daily APY summary stats: ' + error.message);
+  }
+};
+
 module.exports = {
   getLatestAPYData,
   getAllAPYData,
   fetchAndInsertAllAPYData,
   fetchAndUpdateLatestAPYData,
   getAPYSummaryStats,
+  getDailyAggregatedAPYData,
+  getDailyAPYSummaryStats,
 };

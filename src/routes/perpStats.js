@@ -239,7 +239,6 @@ router.get('/daily-collected-fees/:chain?', async (req, res) => {
   }
 });
 
-
 router.get('/daily-volume/summary/:chain?', async (req, res) => {
   try {
     const { chain } = req.params;

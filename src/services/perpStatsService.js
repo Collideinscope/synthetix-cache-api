@@ -10,8 +10,6 @@ const {
 // base only for now 
 const CHAINS = ['base'];
 
-
-
 const getLatestPerpStatsData = async (chain) => {
   try {
     if (chain && CHAINS.includes(chain)) {
