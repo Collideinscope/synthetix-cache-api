@@ -40,20 +40,22 @@ const getLatestTVLData = async (chain) => {
 
 const getAllTVLData = async (chain) => {
   try {
-    if (chain && CHAINS.includes(chain)) {
-      const result = await knex('tvl')
-        .where('chain', chain)
-        .orderBy('ts', 'asc');
+    const baseQuery = (chain) => knex('tvl')
+      .where({
+        chain: chain,
+        pool_id: 1,
+        collateral_type: '0xc74ea762cf06c9151ce074e6a569a5945b6302e7'
+      })
+      .orderBy('ts', 'asc');
 
+    if (chain && CHAINS.includes(chain)) {
+      const result = await baseQuery(chain);
       return { [chain]: result };
     }
 
     const results = await Promise.all(
       CHAINS.map(async (chain) => {
-        const result = await knex('tvl')
-          .where('chain', chain)
-          .orderBy('ts', 'asc');
-
+        const result = await baseQuery(chain);
         return { [chain]: result };
       })
     );
@@ -66,14 +68,19 @@ const getAllTVLData = async (chain) => {
 
 const getTVLSummaryStats = async (chain) => {
   try {
-    const baseQuery = () => knex('tvl').where('chain', chain);
+    const baseQuery = () => knex('tvl')
+      .where({
+        chain: chain,
+        pool_id: 1,
+        collateral_type: '0xc74ea762cf06c9151ce074e6a569a5945b6302e7'
+      });
 
     const allData = await baseQuery().orderBy('ts', 'asc');
     if (allData.length === 0) {
       throw new Error('No data found for the specified chain');
     }
 
-    const smoothedData = smoothData(allData, 'collateral_value');  // Smooth TVL data
+    const smoothedData = smoothData(allData, 'collateral_value');
     const reversedSmoothedData = [...smoothedData].reverse();
 
     const latestData = reversedSmoothedData[0];
@@ -243,18 +250,18 @@ const fetchDailyTVLData = async (chain) => {
     WITH daily_data AS (
       SELECT
         DATE_TRUNC('day', ts) AS date,
-        SUM(collateral_value) AS total_collateral_value,
-        LAG(SUM(collateral_value)) OVER (ORDER BY DATE_TRUNC('day', ts)) AS prev_total_collateral_value
+        FIRST_VALUE(SUM(collateral_value)) OVER (PARTITION BY DATE_TRUNC('day', ts) ORDER BY ts ASC) AS start_of_day_tvl,
+        LAST_VALUE(SUM(collateral_value)) OVER (PARTITION BY DATE_TRUNC('day', ts) ORDER BY ts ASC ROWS BETWEEN UNBOUNDED PRECEDING AND UNBOUNDED FOLLOWING) AS end_of_day_tvl
       FROM tvl
       WHERE chain = ?
-      GROUP BY DATE_TRUNC('day', ts)
-      ORDER BY DATE_TRUNC('day', ts)
+        AND pool_id = 1
+        AND collateral_type = '0xc74ea762cf06c9151ce074e6a569a5945b6302e7'
+      GROUP BY DATE_TRUNC('day', ts), ts
     )
-    SELECT
+    SELECT DISTINCT
       date,
-      COALESCE(total_collateral_value - prev_total_collateral_value, total_collateral_value) AS daily_tvl_change
+      end_of_day_tvl - start_of_day_tvl AS daily_tvl_change
     FROM daily_data
-    WHERE prev_total_collateral_value IS NOT NULL OR date = (SELECT MIN(date) FROM daily_data)
     ORDER BY date;
   `, [chain]);
 
