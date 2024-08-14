@@ -246,9 +246,7 @@ const getDailyOpenInterestStatsData = async (chain) => {
           SELECT
             date_trunc('day', ts) AS day,
             market_symbol,
-            MIN(size * price) AS min_market_oi,
-            AVG(size * price) AS avg_market_oi,
-            MAX(size * price) AS max_market_oi,
+            AVG(size * price) AS daily_market_oi,
             chain
           FROM
             perp_market_history
@@ -259,36 +257,42 @@ const getDailyOpenInterestStatsData = async (chain) => {
             market_symbol,
             chain
         ),
-        daily_oi_stats AS (
+        daily_oi AS (
           SELECT
             day,
-            SUM(min_market_oi) AS min_daily_oi,
-            SUM(avg_market_oi) AS avg_daily_oi,
-            SUM(max_market_oi) AS max_daily_oi,
+            SUM(daily_market_oi) AS daily_oi,
             chain
           FROM
             daily_market_oi
           GROUP BY
             day,
             chain
+        ),
+        daily_oi_change AS (
+          SELECT
+            day AS ts,
+            daily_oi,
+            daily_oi - LAG(daily_oi) OVER (ORDER BY day) AS daily_oi_change,
+            chain
+          FROM
+            daily_oi
         )
         SELECT
-          day AS ts,
-          min_daily_oi,
-          avg_daily_oi,
-          max_daily_oi,
+          ts,
+          daily_oi,
+          daily_oi_change,
           chain
         FROM
-          daily_oi_stats
+          daily_oi_change
+        WHERE
+          daily_oi_change IS NOT NULL
         ORDER BY
           ts ASC;
       `, [chain]);
 
       return result.rows.map(row => ({
         ts: row.ts,
-        min_daily_oi: parseFloat(row.min_daily_oi),
-        avg_daily_oi: parseFloat(row.avg_daily_oi),
-        max_daily_oi: parseFloat(row.max_daily_oi),
+        daily_oi_change: parseFloat(row.daily_oi_change)
       }));
     };
 

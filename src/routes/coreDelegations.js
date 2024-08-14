@@ -77,6 +77,7 @@ router.get('/daily/:chain', async (req, res) => {
       return res.status(400).json({ error: "Invalid chain parameter" });
     }
     const data = await getDailyCoreDelegationsData(chain);
+    console.log(data)
     if (!data[chain] || data[chain].length === 0) {
       return res.status(404).send('Daily core delegations data not found for the specified chain');
     }

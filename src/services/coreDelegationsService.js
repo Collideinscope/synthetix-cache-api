@@ -247,18 +247,18 @@ const fetchDailyCoreDelegationsData = async (chain) => {
     WITH daily_data AS (
       SELECT
         DATE_TRUNC('day', ts) AS date,
-        SUM(amount_delegated) AS total_amount_delegated,
-        LAG(SUM(amount_delegated)) OVER (ORDER BY DATE_TRUNC('day', ts)) AS prev_total_amount_delegated
+        FIRST_VALUE(SUM(amount_delegated)) OVER (PARTITION BY DATE_TRUNC('day', ts) ORDER BY ts ASC) AS start_of_day_delegations,
+        LAST_VALUE(SUM(amount_delegated)) OVER (PARTITION BY DATE_TRUNC('day', ts) ORDER BY ts ASC ROWS BETWEEN UNBOUNDED PRECEDING AND UNBOUNDED FOLLOWING) AS end_of_day_delegations
       FROM core_delegations
       WHERE chain = ?
-      GROUP BY DATE_TRUNC('day', ts)
-      ORDER BY DATE_TRUNC('day', ts)
+        AND pool_id = 1
+        AND collateral_type = '0xC74eA762cF06c9151cE074E6a569a5945b6302E7'
+      GROUP BY DATE_TRUNC('day', ts), ts
     )
-    SELECT
+    SELECT DISTINCT
       date,
-      COALESCE(total_amount_delegated - prev_total_amount_delegated, total_amount_delegated) AS daily_delegations_change
+      end_of_day_delegations - start_of_day_delegations AS daily_delegations_change
     FROM daily_data
-    WHERE prev_total_amount_delegated IS NOT NULL OR date = (SELECT MIN(date) FROM daily_data)
     ORDER BY date;
   `, [chain]);
 
