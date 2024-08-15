@@ -1,6 +1,6 @@
 const { fetchAndUpdateLatestPerpMarketHistoryData } = require('../services/perpMarketHistoryService');
 
-const cronUpdateTVL = async () => {
+const cronUpdatePerpMarketHistory = async () => {
   try {
     console.log('Running cron job to update Perp Market History data...');
 
@@ -14,4 +14,6 @@ const cronUpdateTVL = async () => {
   }
 }
 
-cronUpdateTVL();
+module.exports = cronUpdatePerpMarketHistory;
+
+cronUpdatePerpMarketHistory();

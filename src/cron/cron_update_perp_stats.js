@@ -1,6 +1,6 @@
 const { fetchAndUpdateLatestPerpStatsData } = require('../services/perpStatsService');
 
-const cronUpdateTVL = async () => {
+const cronUpdatePerpStats = async () => {
   try {
     console.log('Running cron job to update Perp Stats data...');
 
@@ -14,4 +14,6 @@ const cronUpdateTVL = async () => {
   }
 }
 
-cronUpdateTVL();
+module.exports = cronUpdatePerpStats;
+
+cronUpdatePerpStats();

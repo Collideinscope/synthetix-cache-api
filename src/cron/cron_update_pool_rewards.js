@@ -15,4 +15,6 @@ const cronUpdatePoolRewards = async () => {
   }
 }
 
+module.exports = cronUpdatePoolRewards;
+
 cronUpdatePoolRewards();

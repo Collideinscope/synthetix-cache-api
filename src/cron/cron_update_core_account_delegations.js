@@ -15,4 +15,6 @@ const cronUpdateCoreAccountDelegations = async () => {
   }
 }
 
+module.exports = cronUpdateCoreAccountDelegations;
+
 cronUpdateCoreAccountDelegations();

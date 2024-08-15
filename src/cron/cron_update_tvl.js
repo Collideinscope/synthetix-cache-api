@@ -16,3 +16,6 @@ const cronUpdateTVL = async () => {
 }
 
 cronUpdateTVL();
+
+module.exports = cronUpdateTVL;
+
