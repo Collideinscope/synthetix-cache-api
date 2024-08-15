@@ -100,6 +100,7 @@ const fetchAndUpdateLatestPerpMarketHistoryData = async (chain) => {
 
     const newRows = await troyDBKnex.raw(`
       SELECT 
+        DISTINCT ON (ts, market_id)
         ts, 
         block_number, 
         market_id, 
@@ -116,7 +117,7 @@ const fetchAndUpdateLatestPerpMarketHistoryData = async (chain) => {
         short_oi_pct
       FROM ${tableName}
       WHERE ts > ?
-      ORDER BY ts DESC;
+      ORDER BY ts DESC, market_id;
     `, [lastTimestamp]);
 
     if (newRows.rows.length === 0) {
@@ -129,30 +130,28 @@ const fetchAndUpdateLatestPerpMarketHistoryData = async (chain) => {
       chain,
     }));
 
-    if (dataToInsert.length > 0) {
-      const insertInChunks = async (data) => {
-        for (let i = 0; i < data.length; i += CHUNK_SIZE) {
-          const chunk = data.slice(i, i + CHUNK_SIZE);
-          await knex('perp_market_history')
-            .insert(chunk)
-            .onConflict(['chain', 'ts', 'market_id'])
-            .merge({
-              price: knex.raw('EXCLUDED.price'),
-              size: knex.raw('EXCLUDED.size'),
-              funding_rate: knex.raw('EXCLUDED.funding_rate'),
-              long_rate_apr: knex.raw('EXCLUDED.long_rate_apr'),
-              short_rate_apr: knex.raw('EXCLUDED.short_rate_apr'),
-              size_usd: knex.raw('EXCLUDED.size_usd'),
-              long_oi: knex.raw('EXCLUDED.long_oi'),
-              short_oi: knex.raw('EXCLUDED.short_oi'),
-              long_oi_pct: knex.raw('EXCLUDED.long_oi_pct'),
-              short_oi_pct: knex.raw('EXCLUDED.short_oi_pct')
-            });
-        }
-      };
+    const insertInChunks = async (data) => {
+      for (let i = 0; i < data.length; i += CHUNK_SIZE) {
+        const chunk = data.slice(i, i + CHUNK_SIZE);
+        await knex('perp_market_history')
+          .insert(chunk)
+          .onConflict(['chain', 'ts', 'market_id'])
+          .merge({
+            price: knex.raw('EXCLUDED.price'),
+            size: knex.raw('EXCLUDED.size'),
+            funding_rate: knex.raw('EXCLUDED.funding_rate'),
+            long_rate_apr: knex.raw('EXCLUDED.long_rate_apr'),
+            short_rate_apr: knex.raw('EXCLUDED.short_rate_apr'),
+            size_usd: knex.raw('EXCLUDED.size_usd'),
+            long_oi: knex.raw('EXCLUDED.long_oi'),
+            short_oi: knex.raw('EXCLUDED.short_oi'),
+            long_oi_pct: knex.raw('EXCLUDED.long_oi_pct'),
+            short_oi_pct: knex.raw('EXCLUDED.short_oi_pct')
+          });
+      }
+    };
 
-      await insertInChunks(dataToInsert);
-    }
+    await insertInChunks(dataToInsert);
 
     console.log(`Perp market history data updated successfully for ${chain} chain.`);
   } catch (error) {
