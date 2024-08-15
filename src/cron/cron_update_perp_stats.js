@@ -14,6 +14,4 @@ const cronUpdatePerpStats = async () => {
   }
 }
 
-module.exports = cronUpdatePerpStats;
-
 cronUpdatePerpStats();

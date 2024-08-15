@@ -15,6 +15,4 @@ const cronUpdateAPY = async () => {
   }
 }
 
-module.exports = cronUpdateAPY;
-
 cronUpdateAPY();

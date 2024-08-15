@@ -14,6 +14,4 @@ const cronUpdatePerpMarketHistory = async () => {
   }
 }
 
-module.exports = cronUpdatePerpMarketHistory;
-
 cronUpdatePerpMarketHistory();
