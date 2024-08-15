@@ -150,6 +150,8 @@ const fetchAndUpdateLatestPerpMarketHistoryData = async (chain) => {
             });
         }
       };
+
+      await insertInChunks(dataToInsert);
     }
 
     console.log(`Perp market history data updated successfully for ${chain} chain.`);
