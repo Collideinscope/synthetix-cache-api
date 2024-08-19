@@ -10,14 +10,20 @@ const {
 
 const CHUNK_SIZE = 1000; // large queries
 
-const getLatestAPYData = async (chain) => {
+const getLatestAPYData = async (chain, collateralType) => {
   try {
     if (chain && CHAINS.includes(chain)) {
       // Fetch the latest value for the specified chain
-      const result = await knex('apy')
+      const query = knex('apy')
         .where('chain', chain)
         .orderBy('ts', 'desc')
         .limit(1);
+
+      if (collateralType) {
+        query.where('collateral_type', collateralType);
+      }
+
+      const result = await query;
 
       return result;
     } 
@@ -25,10 +31,16 @@ const getLatestAPYData = async (chain) => {
     // Fetch the latest value for each chain otherwise
     const results = await Promise.all(
       CHAINS.map(async (chain) => {
-        const result = await knex('apy')
+        const query = knex('apy')
           .where('chain', chain)
           .orderBy('ts', 'desc')
           .limit(1);
+
+        if (collateralType) {
+          query.where('collateral_type', collateralType);
+        }
+
+        const result = await query;
 
         return result[0];
       })
@@ -40,21 +52,33 @@ const getLatestAPYData = async (chain) => {
   }
 };
 
-const getAllAPYData = async (chain) => {
+const getAllAPYData = async (chain, collateralType) => {
   try {
     if (chain && CHAINS.includes(chain)) {
-      const result = await knex('apy')
+      const query = knex('apy')
         .where('chain', chain)
         .orderBy('ts', 'asc');
+      
+      if (collateralType) {
+        query.where('collateral_type', collateralType);
+      }
+
+      const result = await query;
       
       return { [chain]: result };
     }
 
     const results = await Promise.all(
       CHAINS.map(async (chain) => {
-        const result = await knex('apy')
+        const query = knex('apy')
           .where('chain', chain)
           .orderBy('ts', 'asc');
+        
+        if (collateralType) {
+          query.where('collateral_type', collateralType);
+        }
+
+        const result = await query;
         
         return { [chain]: result };
       })
@@ -66,10 +90,16 @@ const getAllAPYData = async (chain) => {
   }
 };
 
-const getAPYSummaryStats = async (chain) => {
+const getAPYSummaryStats = async (chain, collateralType) => {
   try {
     const startDate = new Date('2024-05-01');
-    const baseQuery = () => knex('apy').where('chain', chain).andWhere('ts', '>=', startDate);
+    const baseQuery = () => {
+      let query = knex('apy').where('chain', chain).andWhere('ts', '>=', startDate);
+      if (collateralType) {
+        query = query.where('collateral_type', collateralType);
+      }
+      return query;
+    };
 
     const allData = await baseQuery().orderBy('ts', 'asc');
     if (allData.length === 0) {
@@ -214,8 +244,8 @@ const fetchAndUpdateLatestAPYData = async (chain) => {
   }
 };
 
-const fetchDailyAggregatedAPYData = async (chain) => {
-  const result = await knex.raw(`
+const fetchDailyAggregatedAPYData = async (chain, collateralType) => {
+  const query = knex.raw(`
     WITH daily_data AS (
       SELECT
         DATE_TRUNC('day', ts) AS date,
@@ -224,16 +254,19 @@ const fetchDailyAggregatedAPYData = async (chain) => {
           RANGE BETWEEN UNBOUNDED PRECEDING AND UNBOUNDED FOLLOWING) AS day_end_apy
       FROM apy
       WHERE chain = ?
+      ${collateralType ? 'AND collateral_type = ?' : ''}
     )
     SELECT DISTINCT
       date as ts,
       CASE 
-        WHEN day_start_apy = 0 THEN NULL
-        ELSE ((day_end_apy / day_start_apy) - 1)
+        WHEN day_start_apy = 0 OR day_end_apy = 0 THEN NULL
+        ELSE (day_end_apy - day_start_apy) / day_start_apy
       END as daily_apy_percentage_delta
     FROM daily_data
     ORDER BY date;
-  `, [chain]);
+  `, collateralType ? [chain, collateralType] : [chain]);
+
+  const result = await query;
 
   return result.rows.map(row => ({
     ts: row.ts,
@@ -241,16 +274,16 @@ const fetchDailyAggregatedAPYData = async (chain) => {
   }));
 };
 
-const getDailyAggregatedAPYData = async (chain) => {
+const getDailyAggregatedAPYData = async (chain, collateralType) => {
   try {
     if (chain && CHAINS.includes(chain)) {
-      const data = await fetchDailyAggregatedAPYData(chain);
+      const data = await fetchDailyAggregatedAPYData(chain, collateralType);
       return { [chain]: data };
     }
 
     const results = await Promise.all(
       CHAINS.map(async (chain) => {
-        const data = await fetchDailyAggregatedAPYData(chain);
+        const data = await fetchDailyAggregatedAPYData(chain, collateralType);
         return { [chain]: data };
       })
     );
@@ -261,9 +294,9 @@ const getDailyAggregatedAPYData = async (chain) => {
   }
 };
 
-const getDailyAPYSummaryStats = async (chain) => {
+const getDailyAPYSummaryStats = async (chain, collateralType) => {
   try {
-    const data = await getDailyAggregatedAPYData(chain);
+    const data = await getDailyAggregatedAPYData(chain, collateralType);
     const dailyValues = data[chain]
       .map(item => item.daily_apy_percentage_delta)
       .filter(value => value !== null);
