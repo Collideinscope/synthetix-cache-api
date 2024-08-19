@@ -245,54 +245,35 @@ const getCumulativeUniqueTraders = async (chain) => {
     throw new Error('Error fetching cumulative unique trader data: ' + error.message);
   }
 };
-
 const getDailyNewUniqueTraders = async (chain) => {
   try {
     const fetchDailyData = async (chain) => {
       const result = await knex.raw(`
-        WITH daily_traders AS (
-          SELECT 
-            DATE_TRUNC('day', ts) AS date,
-            ARRAY_AGG(DISTINCT account_id) AS traders
-          FROM 
+        WITH first_trading_day AS (
+          SELECT
+            account_id,
+            MIN(DATE_TRUNC('day', ts)) AS first_day
+          FROM
             perp_account_stats
-          WHERE 
+          WHERE
             chain = ?
-          GROUP BY 
-            DATE_TRUNC('day', ts)
-          ORDER BY 
-            date
-        ),
-        new_traders AS (
-          SELECT 
-            date,
-            traders,
-            LAG(traders) OVER (ORDER BY date) AS prev_traders
-          FROM 
-            daily_traders
+          GROUP BY
+            account_id
         )
-        SELECT 
-          date,
-          COALESCE(
-            ARRAY_LENGTH(
-              ARRAY(
-                SELECT UNNEST(traders)
-                EXCEPT
-                SELECT UNNEST(prev_traders)
-              ),
-              1
-            ),
-            ARRAY_LENGTH(traders, 1)
-          ) AS daily_new_unique_traders
-        FROM 
-          new_traders
-        ORDER BY 
-          date;
+        SELECT
+          first_day AS date,
+          COUNT(*) AS daily_new_unique_traders
+        FROM
+          first_trading_day
+        GROUP BY
+          first_day
+        ORDER BY
+          first_day;
       `, [chain]);
 
       return result.rows.map(row => ({
         ts: row.date,
-        daily_new_unique_traders: row.daily_new_unique_traders,
+        daily_new_unique_traders: parseInt(row.daily_new_unique_traders),
       }));
     };
 
