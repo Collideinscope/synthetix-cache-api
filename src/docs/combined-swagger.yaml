@@ -1029,7 +1029,8 @@ paths:
           description: Bad request (invalid or missing chain parameter)
         500:
           description: Server error
-  /core-account-delegations/staker-count/{chain}:
+
+  /core-account-delegations/staker-count/{chain}/{collateralType}:
     get:
       summary: Get the unique staker count
       tags:
@@ -1041,6 +1042,12 @@ paths:
             type: string
           required: false
           description: The chain to get the staker count for
+        - in: path
+          name: collateralType
+          schema:
+            type: string
+          required: false
+          description: The collateral type to filter by
       responses:
         200:
           description: The unique staker count
@@ -1054,7 +1061,7 @@ paths:
         500:
           description: Server error
 
-  /core-account-delegations/cumulative-unique-stakers/{chain}:
+  /core-account-delegations/cumulative-unique-stakers/{chain}/{collateralType}:
     get:
       summary: Get cumulative unique staker data
       tags: 
@@ -1066,6 +1073,12 @@ paths:
             type: string
           required: false
           description: The chain to get the cumulative unique staker data for
+        - in: path
+          name: collateralType
+          schema:
+            type: string
+          required: false
+          description: The collateral type to filter by
       responses:
         200:
           description: The cumulative unique staker data
@@ -1096,7 +1109,7 @@ paths:
         500:
           description: Server error
 
-  /core-account-delegations/all/{chain}:
+  /core-account-delegations/all/{chain}/{collateralType}:
     get:
       summary: Get all core account delegations data
       tags:
@@ -1108,6 +1121,12 @@ paths:
             type: string
           required: false
           description: The chain to get the data for
+        - in: path
+          name: collateralType
+          schema:
+            type: string
+          required: false
+          description: The collateral type to filter by
       responses:
         200:
           description: All core account delegations data
@@ -1212,7 +1231,7 @@ paths:
         500:
           description: Server error
 
-  /core-account-delegations/ordered-by-account/{chain}:
+  /core-account-delegations/ordered-by-account/{chain}/{collateralType}:
     get:
       summary: Get core account delegations data ordered by account
       tags:
@@ -1224,6 +1243,12 @@ paths:
             type: string
           required: false
           description: The chain to get the data for
+        - in: path
+          name: collateralType
+          schema:
+            type: string
+          required: false
+          description: The collateral type to filter by
       responses:
         200:
           description: Core account delegations data ordered by account
@@ -1270,7 +1295,7 @@ paths:
         500:
           description: Server error
 
-  /core-account-delegations/cumulative-unique-stakers/summary/{chain}:
+  /core-account-delegations/cumulative-unique-stakers/summary/{chain}/{collateralType}:
     get:
       summary: Get the cumulative unique stakers summary statistics
       tags:
@@ -1282,6 +1307,12 @@ paths:
             type: string
           required: true
           description: The chain to get the cumulative unique stakers summary statistics for
+        - in: path
+          name: collateralType
+          schema:
+            type: string
+          required: false
+          description: The collateral type to filter by
       responses:
         200:
           description: The cumulative unique stakers summary statistics
@@ -1335,7 +1366,7 @@ paths:
         500:
           description: Server error
 
-  /core-account-delegations/daily-new-unique-stakers/{chain}:
+  /core-account-delegations/daily-new-unique-stakers/{chain}/{collateralType}:
     get:
       summary: Get daily new unique stakers data
       tags:
@@ -1347,6 +1378,12 @@ paths:
             type: string
           required: true
           description: The chain to get the daily new unique stakers data for
+        - in: path
+          name: collateralType
+          schema:
+            type: string
+          required: false
+          description: The collateral type to filter by
       responses:
         200:
           description: Daily new unique stakers data
@@ -1373,7 +1410,7 @@ paths:
         500:
           description: Server error
 
-  /core-account-delegations/daily-new-unique-stakers/summary/{chain}:
+  /core-account-delegations/daily-new-unique-stakers/summary/{chain}/{collateralType}:
     get:
       summary: Get summary statistics for daily new unique stakers
       tags:
@@ -1385,6 +1422,12 @@ paths:
             type: string
           required: true
           description: The chain to get the summary statistics for
+        - in: path
+          name: collateralType
+          schema:
+            type: string
+          required: false
+          description: The collateral type to filter by
       responses:
         200:
           description: Summary statistics for daily new unique stakers

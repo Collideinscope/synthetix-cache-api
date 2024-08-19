@@ -8,13 +8,19 @@ const {
   smoothData
 } = require('../helpers');
 
-const getStakerCount = async (chain) => {
+const getStakerCount = async (chain, collateralType) => {
   try {
     if (chain && CHAINS.includes(chain)) {
       // Fetch the unique staker count for the specific chain
-      const result = await knex('core_account_delegations')
+      const query = knex('core_account_delegations')
         .where('chain', chain)
         .countDistinct('account_id as staker_count');
+
+      if (collateralType) {
+        query.where('collateral_type', collateralType);
+      }
+
+      const result = await query;
 
       return { [chain]: result[0].staker_count };
     }
@@ -22,9 +28,15 @@ const getStakerCount = async (chain) => {
     // Fetch the unique staker count for each chain
     const results = await Promise.all(
       CHAINS.map(async (chain) => {
-        const result = await knex('core_account_delegations')
+        const query = knex('core_account_delegations')
           .where('chain', chain)
           .countDistinct('account_id as staker_count');
+
+        if (collateralType) {
+          query.where('collateral_type', collateralType);
+        }
+
+        const result = await query;
 
         return { [chain]: result[0].staker_count };
       })
@@ -36,7 +48,9 @@ const getStakerCount = async (chain) => {
   }
 };
 
-const getCumulativeUniqueStakers = async (chain) => {
+const getCumulativeUniqueStakers = async (chain, collateralType) => {
+  const collateral_type = collateralType;
+
   try {
     const fetchCumulativeData = async (chain) => {
       const result = await knex.raw(`
@@ -51,6 +65,7 @@ const getCumulativeUniqueStakers = async (chain) => {
             core_account_delegations
           WHERE
             chain = ?
+            AND collateral_type = ?
         ),
         daily_cumulative_counts AS (
           SELECT
@@ -74,7 +89,7 @@ const getCumulativeUniqueStakers = async (chain) => {
           daily_cumulative_counts
         ORDER BY
           ts, pool_id, collateral_type;
-      `, [chain]);
+      `, [chain, collateral_type]);
 
       return result.rows.map(row => ({
         ts: row.ts,
@@ -102,15 +117,21 @@ const getCumulativeUniqueStakers = async (chain) => {
   }
 };
 
-const getLatestCoreAccountDelegationsDataOrderedByAccount = async (chain) => {
+const getLatestCoreAccountDelegationsDataOrderedByAccount = async (chain, collateralType) => {
   try {
     if (chain && CHAINS.includes(chain)) {
       // Fetch the latest value for each account 
-      const result = await knex('core_account_delegations')
+      const query = knex('core_account_delegations')
         .where('chain', chain)
         .distinctOn('account_id')
         .orderBy('account_id')
         .orderBy('ts', 'desc');
+
+      if (collateralType) {
+        query.where('collateral_type', collateralType);
+      }
+
+      const result = await query;
 
       return result;
     }
@@ -118,11 +139,17 @@ const getLatestCoreAccountDelegationsDataOrderedByAccount = async (chain) => {
     // Fetch the latest value for each account in each chain otherwise
     const results = await Promise.all(
       CHAINS.map(async (chain) => {
-        const result = await knex('core_account_delegations')
+        const query = knex('core_account_delegations')
           .where('chain', chain)
           .distinctOn('account_id')
           .orderBy('account_id')
           .orderBy('ts', 'desc');
+
+        if (collateralType) {
+          query.where('collateral_type', collateralType);
+        }
+
+        const result = await query;
 
         return result;
       })
@@ -148,12 +175,16 @@ const getCoreAccountDelegationsDataByAccount = async (accountId) => {
   }
 };
 
-const getAllCoreAccountDelegationsData = async (chain) => {
+const getAllCoreAccountDelegationsData = async (chain, collateralType) => {
   try {
     let query = knex('core_account_delegations').orderBy('ts', 'desc');
 
     if (chain && CHAINS.includes(chain)) {
       query = query.where('chain', chain);
+    }
+
+    if (collateralType) {
+      query = query.where('collateral_type', collateralType);
     }
 
     const result = await query;
@@ -164,9 +195,9 @@ const getAllCoreAccountDelegationsData = async (chain) => {
   }
 };
 
-const getUniqueStakersSummaryStats = async (chain) => {
+const getUniqueStakersSummaryStats = async (chain, collateralType) => {
   try {
-    const cumulativeData = await getCumulativeUniqueStakers(chain);
+    const cumulativeData = await getCumulativeUniqueStakers(chain, collateralType);
 
     const allData = cumulativeData[chain] || [];
     if (allData.length === 0) {
@@ -215,13 +246,13 @@ const getUniqueStakersSummaryStats = async (chain) => {
   }
 };
 
-const getDailyNewUniqueStakersSummary = async (chain) => {
+const getDailyNewUniqueStakersSummary = async (chain, collateralType) => {
   try {
     if (!chain || !CHAINS.includes(chain)) {
       throw new Error('Invalid chain parameter');
     }
 
-    const result = await getDailyNewUniqueStakers(chain);
+    const result = await getDailyNewUniqueStakers(chain, collateralType);
     const dailyData = result[chain];
 
     if (!dailyData || dailyData.length === 0) {
@@ -360,10 +391,10 @@ const fetchAndUpdateLatestCoreAccountDelegationsData = async (chain) => {
   }
 };
 
-const getDailyNewUniqueStakers = async (chain) => {
+const getDailyNewUniqueStakers = async (chain, collateralType) => {
   try {
-    const fetchDailyData = async (chain) => {
-      const result = await knex.raw(`
+    const fetchDailyData = async (chain, collateralType) => {
+      const query = knex.raw(`
         WITH first_staking_day AS (
           SELECT
             account_id,
@@ -372,6 +403,7 @@ const getDailyNewUniqueStakers = async (chain) => {
             core_account_delegations
           WHERE
             chain = ?
+            ${collateralType ? 'AND collateral_type = ?' : ''}
           GROUP BY
             account_id
         )
@@ -384,8 +416,9 @@ const getDailyNewUniqueStakers = async (chain) => {
           first_day
         ORDER BY
           first_day;
-      `, [chain]);
+      `, collateralType ? [chain, collateralType] : [chain]);
 
+      const result = await query;
       return result.rows.map(row => ({
         ts: row.date,
         daily_new_unique_stakers: parseInt(row.daily_new_unique_stakers),
@@ -393,13 +426,13 @@ const getDailyNewUniqueStakers = async (chain) => {
     };
 
     if (chain && CHAINS.includes(chain)) {
-      const data = await fetchDailyData(chain);
+      const data = await fetchDailyData(chain, collateralType);
       return { [chain]: data };
     }
 
     const results = await Promise.all(
       CHAINS.map(async (chain) => {
-        const data = await fetchDailyData(chain);
+        const data = await fetchDailyData(chain, collateralType);
         return { [chain]: data };
       })
     );

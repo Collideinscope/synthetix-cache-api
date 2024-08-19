@@ -12,10 +12,10 @@ const {
 } = require('../services/coreAccountDelegationsService');
 const { CHAINS } = require('../helpers');
 
-router.get('/staker-count/:chain?', async (req, res) => {
+router.get('/staker-count/:chain?/:collateralType?', async (req, res) => {
   try {
-    const { chain } = req.params;
-    const stakerCount = await getStakerCount(chain);
+    const { chain, collateralType } = req.params;
+    const stakerCount = await getStakerCount(chain, collateralType);
 
     return res.json(stakerCount);
   } catch (error) {
@@ -24,10 +24,10 @@ router.get('/staker-count/:chain?', async (req, res) => {
   }
 });
 
-router.get('/cumulative-unique-stakers/:chain?', async (req, res) => {
+router.get('/cumulative-unique-stakers/:chain?/:collateralType?', async (req, res) => {
   try {
-    const { chain } = req.params;
-    const result = await getCumulativeUniqueStakers(chain);
+    const { chain, collateralType } = req.params;
+    const result = await getCumulativeUniqueStakers(chain, collateralType);
 
     return res.json(result);
   } catch (error) {
@@ -36,10 +36,10 @@ router.get('/cumulative-unique-stakers/:chain?', async (req, res) => {
   }
 });
 
-router.get('/all/:chain?', async (req, res) => {
+router.get('/all/:chain?/:collateralType?', async (req, res) => {
   try {
-    const { chain } = req.params;
-    const result = await getAllCoreAccountDelegationsData(chain);
+    const { chain, collateralType } = req.params;
+    const result = await getAllCoreAccountDelegationsData(chain, collateralType);
 
     if (!result.length) {
       return res.status(404).send('Core account delegations data not found');
@@ -68,10 +68,10 @@ router.get('/account/:accountId', async (req, res) => {
   }
 });
 
-router.get('/ordered-by-account/:chain?', async (req, res) => {
+router.get('/ordered-by-account/:chain?/:collateralType?', async (req, res) => {
   try {
-    const { chain } = req.params;
-    const result = await getLatestCoreAccountDelegationsDataOrderedByAccount(chain);
+    const { chain, collateralType } = req.params;
+    const result = await getLatestCoreAccountDelegationsDataOrderedByAccount(chain, collateralType);
 
     if (!result.length) {
       return res.status(404).send('Core account delegations data not found');
@@ -84,9 +84,9 @@ router.get('/ordered-by-account/:chain?', async (req, res) => {
   }
 });
 
-router.get('/cumulative-unique-stakers/summary/:chain?', async (req, res) => {
+router.get('/cumulative-unique-stakers/summary/:chain?/:collateralType?', async (req, res) => {
   try {
-    const { chain } = req.params;
+    const { chain, collateralType } = req.params;
 
     if (!chain) {
       return res.status(400).json({ error: "Chain parameter is required" });
@@ -96,7 +96,7 @@ router.get('/cumulative-unique-stakers/summary/:chain?', async (req, res) => {
       return res.status(400).json({ error: "Invalid chain parameter" });
     }
 
-    const stats = await getUniqueStakersSummaryStats(chain);
+    const stats = await getUniqueStakersSummaryStats(chain, collateralType);
 
     res.json(stats);
   } catch (error) {
@@ -105,9 +105,9 @@ router.get('/cumulative-unique-stakers/summary/:chain?', async (req, res) => {
   }
 });
 
-router.get('/daily-new-unique-stakers/:chain', async (req, res) => {
+router.get('/daily-new-unique-stakers/:chain/:collateralType?', async (req, res) => {
   try {
-    const { chain } = req.params;
+    const { chain, collateralType } = req.params;
 
     if (!chain) {
       return res.status(400).json({ error: "Chain parameter is required" });
@@ -117,7 +117,7 @@ router.get('/daily-new-unique-stakers/:chain', async (req, res) => {
       return res.status(400).json({ error: "Invalid chain parameter" });
     }
 
-    const result = await getDailyNewUniqueStakers(chain);
+    const result = await getDailyNewUniqueStakers(chain, collateralType);
 
     if (!result[chain] || result[chain].length === 0) {
       return res.status(404).send('Daily new unique stakers data not found');
@@ -130,9 +130,9 @@ router.get('/daily-new-unique-stakers/:chain', async (req, res) => {
   }
 });
 
-router.get('/daily-new-unique-stakers/summary/:chain', async (req, res) => {
+router.get('/daily-new-unique-stakers/summary/:chain/:collateralType?', async (req, res) => {
   try {
-    const { chain } = req.params;
+    const { chain, collateralType } = req.params;
 
     if (!chain) {
       return res.status(400).json({ error: "Chain parameter is required" });
@@ -142,7 +142,7 @@ router.get('/daily-new-unique-stakers/summary/:chain', async (req, res) => {
       return res.status(400).json({ error: "Invalid chain parameter" });
     }
 
-    const stats = await getDailyNewUniqueStakersSummary(chain);
+    const stats = await getDailyNewUniqueStakersSummary(chain, collateralType);
     
     res.json(stats);
   } catch (error) {
