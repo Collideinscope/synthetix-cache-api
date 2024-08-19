@@ -8,6 +8,8 @@ const {
   smoothData
 } = require('../helpers');
 
+const CHUNK_SIZE = 1000; // large queries
+
 const getLatestAPYData = async (chain) => {
   try {
     if (chain && CHAINS.includes(chain)) {
@@ -118,39 +120,46 @@ const getAPYSummaryStats = async (chain) => {
   }
 };
 
-// initial seed
 const fetchAndInsertAllAPYData = async (chain) => {
   if (!chain) {
     console.error(`Chain must be provided for data updates.`);
-  };
+    return;
+  }
 
   try {
     const tableName = `prod_${chain}_mainnet.fct_core_apr_${chain}_mainnet`;
-
-    // Fetch initial 
+    
+    // Fetch initial data
     const rows = await troyDBKnex.raw(`
       SELECT ts, pool_id, collateral_type, collateral_value, apy_24h, apy_7d, apy_28d
       FROM ${tableName}
       ORDER BY ts DESC;
     `);
 
-    const dataWithChainAdded = rows.rows.map(row => {
-      row.chain = chain;
-      return row;
-    });
-    
-    // Insert and handle conflicts
-    await knex('apy')
-      .insert(dataWithChainAdded)
-      .onConflict(['ts', 'pool_id', 'collateral_type', 'chain'])
-      .merge({
-        collateral_value: knex.raw('excluded.collateral_value'),
-        apy_24h: knex.raw('excluded.apy_24h'),
-        apy_7d: knex.raw('excluded.apy_7d'),
-        apy_28d: knex.raw('excluded.apy_28d'),
-        ts: knex.raw('excluded.ts'), 
-      });
+    const dataWithChainAdded = rows.rows.map(row => ({
+      ...row,
+      chain,
+    }));
 
+    // Insert data in chunks
+    const insertInChunks = async (data) => {
+      for (let i = 0; i < data.length; i += CHUNK_SIZE) {
+        const chunk = data.slice(i, i + CHUNK_SIZE);
+        await knex('apy')
+          .insert(chunk)
+          .onConflict(['ts', 'pool_id', 'collateral_type', 'chain'])
+          .merge({
+            collateral_value: knex.raw('excluded.collateral_value'),
+            apy_24h: knex.raw('excluded.apy_24h'),
+            apy_7d: knex.raw('excluded.apy_7d'),
+            apy_28d: knex.raw('excluded.apy_28d'),
+            ts: knex.raw('excluded.ts'),
+          });
+        console.log(`Inserted chunk ${i/CHUNK_SIZE + 1} for ${chain}`);
+      }
+    };
+
+    await insertInChunks(dataWithChainAdded);
     console.log(`APY data seeded successfully for ${chain}.`);
   } catch (error) {
     console.error('Error seeding APY data:', error);
