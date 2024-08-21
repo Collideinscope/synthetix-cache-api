@@ -195,32 +195,32 @@ const getCumulativeUniqueTraders = async (chain) => {
   try {
     const fetchCumulativeData = async (chain) => {
       const result = await knex.raw(`
-        WITH daily_trader_counts AS (
-            SELECT 
-                date_trunc('day', ts) AS day,
-                COUNT(DISTINCT account_id) AS unique_trader_count
-            FROM 
-                perp_account_stats
-            WHERE
-                chain = ?
-            GROUP BY 
-                date_trunc('day', ts)
-            ORDER BY 
-                day
-        ),
-        cumulative_trader_counts AS (
-            SELECT
-                day AS ts,
-                SUM(unique_trader_count) OVER (ORDER BY day) AS cumulative_trader_count
-            FROM
-                daily_trader_counts
-        )
-        SELECT 
-            ts,
-            cumulative_trader_count
-        FROM 
-            cumulative_trader_counts;
-      `, [chain]);
+      WITH first_trade_day AS (
+        SELECT
+            account_id,
+            MIN(date_trunc('day', ts)) AS first_day
+        FROM
+            perp_account_stats
+        WHERE
+            chain = ?
+        GROUP BY
+            account_id
+      ),
+      cumulative_trader_counts AS (
+          SELECT
+              first_day AS ts,
+              COUNT(*) OVER (ORDER BY first_day) AS cumulative_trader_count
+          FROM
+              first_trade_day
+      )
+      SELECT
+          ts,
+          cumulative_trader_count
+      FROM
+          cumulative_trader_counts
+      ORDER BY
+          ts;
+        `, [chain]);
 
       return result.rows.map(row => ({
         ts: row.ts,
@@ -245,6 +245,7 @@ const getCumulativeUniqueTraders = async (chain) => {
     throw new Error('Error fetching cumulative unique trader data: ' + error.message);
   }
 };
+
 const getDailyNewUniqueTraders = async (chain) => {
   try {
     const fetchDailyData = async (chain) => {
