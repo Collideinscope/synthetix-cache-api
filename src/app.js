@@ -5,12 +5,6 @@ const YAML = require('yamljs');
 
 const app = express();
 
-app.use((req, res, next) => {
-  res.removeHeader('NEL');
-  res.removeHeader('Report-To');
-  next();
-});
-
 // Load the combined Swagger documentation file
 let swaggerDocument;
 try {
@@ -46,12 +40,6 @@ if (swaggerDocument) {
 } else {
   console.error('Swagger documentation is not available.');
 }
-
-app.use((req, res, next) => {
-  res.removeHeader('NEL');
-  res.removeHeader('Report-To');
-  next();
-});
 
 app.get('/', async (req, res) => {
   try {
