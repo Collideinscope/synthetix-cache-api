@@ -5,6 +5,12 @@ const YAML = require('yamljs');
 
 const app = express();
 
+app.use((req, res, next) => {
+  res.removeHeader('NEL');
+  res.removeHeader('Report-To');
+  next();
+});
+
 // Load the combined Swagger documentation file
 let swaggerDocument;
 try {
