@@ -134,7 +134,9 @@ const fetchAndInsertAllTVLData = async (chain) => {
   }
 
   try {
-    const tableName = `${chain}_mainnet.core_vault_collateral`;
+    const tableName = chain === 'base'
+      ? `prod_${chain}_mainnet.fct_core_vault_collateral_${chain}_mainnet`
+      : `${chain}_mainnet.core_vault_collateral`;
 
     const rows = await troyDBKnex.raw(`
       SELECT ts, block_number, pool_id, collateral_type, contract_address, amount, collateral_value
@@ -187,7 +189,9 @@ const fetchAndUpdateLatestTVLData = async (chain) => {
   }
 
   try {
-    const tableName = `${chain}_mainnet.core_vault_collateral`;
+    const tableName = chain === 'base'
+      ? `prod_${chain}_mainnet.fct_core_vault_collateral_${chain}_mainnet`
+      : `${chain}_mainnet.core_vault_collateral`;
 
     // Fetch the last timestamp from the cache
     const lastTimestampResult = await knex('tvl')
