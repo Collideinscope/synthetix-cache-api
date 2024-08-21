@@ -47,6 +47,12 @@ if (swaggerDocument) {
   console.error('Swagger documentation is not available.');
 }
 
+app.use((req, res, next) => {
+  res.removeHeader('NEL');
+  res.removeHeader('Report-To');
+  next();
+});
+
 app.get('/', async (req, res) => {
   try {
     return res.send('Synthetix V3 Cache API');
