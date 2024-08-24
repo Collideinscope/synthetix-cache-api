@@ -70,42 +70,40 @@ const getSummaryStats = async (chain, column) => {
   try {
     const baseQuery = () => knex('perp_stats').where('chain', chain);
 
-    const allData = await baseQuery().orderBy('ts', 'asc');
+    const allData = await baseQuery().orderBy('ts', 'desc');
+    
     if (allData.length === 0) {
       throw new Error('No data found for the specified chain');
     }
 
-    const smoothedData = smoothData(allData, column);  
-    const reversedSmoothedData = [...smoothedData].reverse();
-
-    const latestData = reversedSmoothedData[0];
+    const latestData = allData[0];
     const latestTs = new Date(latestData.ts);
 
-    const getDateFromLatest = (days) => new Date(latestTs.getTime() - days * 24 * 60 * 60 * 1000);
+    const getClosestDataPoint = (targetDate) => {
+      return allData.reduce((closest, current) => {
+        const currentDate = new Date(current.ts);
+        const closestDate = new Date(closest.ts);
+        return Math.abs(currentDate - targetDate) < Math.abs(closestDate - targetDate) ? current : closest;
+      });
+    };
 
-    const value24h = reversedSmoothedData.find(item => new Date(item.ts) <= getDateFromLatest(1));
-    const value7d = reversedSmoothedData.find(item => new Date(item.ts) <= getDateFromLatest(7));
-    const value28d = reversedSmoothedData.find(item => new Date(item.ts) <= getDateFromLatest(28));
+    const value24h = getClosestDataPoint(new Date(latestTs.getTime() - 24 * 60 * 60 * 1000));
+    const value7d = getClosestDataPoint(new Date(latestTs.getTime() - 7 * 24 * 60 * 60 * 1000));
+    const value28d = getClosestDataPoint(new Date(latestTs.getTime() - 28 * 24 * 60 * 60 * 1000));
+    const valueYtd = getClosestDataPoint(new Date(latestTs.getFullYear(), 0, 1));
 
-    let valueYtd = smoothedData.find(item => new Date(item.ts) >= new Date(latestTs.getFullYear(), 0, 1));
-
-    if (!valueYtd) {
-      valueYtd = reversedSmoothedData[reversedSmoothedData.length - 1];
-    }
-
-    const columnValues = smoothedData.map(item => parseFloat(item[column]));
+    const columnValues = allData.map(item => parseFloat(item[column]));
     const standardDeviation = calculateStandardDeviation(columnValues);
-
-    const current = parseFloat(allData[allData.length - 1][column]);
-    const ath = Math.max(...columnValues, current);
-    const atl = Math.min(...columnValues, current);
+    const current = parseFloat(latestData[column]);
+    const ath = Math.max(...columnValues);
+    const atl = Math.min(...columnValues);
 
     return {
       current,
-      delta_24h: calculateDelta(current, value24h ? parseFloat(value24h[column]) : null),
-      delta_7d: calculateDelta(current, value7d ? parseFloat(value7d[column]) : null),
-      delta_28d: calculateDelta(current, value28d ? parseFloat(value28d[column]) : null),
-      delta_ytd: calculateDelta(current, valueYtd ? parseFloat(valueYtd[column]) : null),
+      delta_24h: calculateDelta(current, parseFloat(value24h[column])),
+      delta_7d: calculateDelta(current, parseFloat(value7d[column])),
+      delta_28d: calculateDelta(current, parseFloat(value28d[column])),
+      delta_ytd: calculateDelta(current, parseFloat(valueYtd[column])),
       ath,
       atl,
       ath_percentage: calculatePercentage(current, ath),
