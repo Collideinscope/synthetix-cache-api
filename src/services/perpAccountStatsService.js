@@ -12,73 +12,6 @@ const CHAINS = ['base'];
 
 const CHUNK_SIZE = 1000; // large queries
 
-const getAllPerpAccountStatsData = async (chain) => {
-  try {
-    let query = knex('perp_account_stats').orderBy('ts', 'asc');
-
-    if (chain && CHAINS.includes(chain)) {
-      query = query.where('chain', chain);
-    }
-
-    const result = await query;
-
-    return result;
-  } catch (error) {
-    throw new Error('Error fetching all perp account stats data: ' + error.message);
-  }
-};
-
-const getUniqueTradersSummaryStats = async (chain) => {
-  try {
-    const cumulativeData = await getCumulativeUniqueTraders(chain);
-
-    const allData = cumulativeData[chain] || [];
-    if (allData.length === 0) {
-      throw new Error('No data found for the specified chain');
-    }
-
-    const smoothedData = smoothData(allData, 'cumulative_trader_count');  
-    const reversedSmoothedData = [...smoothedData].reverse();
-
-    const latestData = reversedSmoothedData[0];
-    const latestTs = new Date(latestData.ts);
-
-    const getDateFromLatest = (days) => new Date(latestTs.getTime() - days * 24 * 60 * 60 * 1000);
-
-    const value24h = reversedSmoothedData.find(item => new Date(item.ts) <= getDateFromLatest(1));
-    const value7d = reversedSmoothedData.find(item => new Date(item.ts) <= getDateFromLatest(7));
-    const value28d = reversedSmoothedData.find(item => new Date(item.ts) <= getDateFromLatest(28));
-
-    let valueYtd = smoothedData.find(item => new Date(item.ts) >= new Date(latestTs.getFullYear(), 0, 1));
-
-    if (!valueYtd) {
-      valueYtd = reversedSmoothedData[reversedSmoothedData.length - 1];
-    }
-
-    const volumeValues = smoothedData.map(item => parseFloat(item.cumulative_trader_count));
-    const standardDeviation = calculateStandardDeviation(volumeValues);
-
-    const current = parseFloat(allData[allData.length - 1].cumulative_trader_count);
-    const ath = Math.max(...volumeValues, current);
-    const atl = Math.min(...volumeValues, current);
-
-    return {
-      current,
-      delta_24h: calculateDelta(current, value24h ? parseFloat(value24h.cumulative_trader_count) : null),
-      delta_7d: calculateDelta(current, value7d ? parseFloat(value7d.cumulative_trader_count) : null),
-      delta_28d: calculateDelta(current, value28d ? parseFloat(value28d.cumulative_trader_count) : null),
-      delta_ytd: calculateDelta(current, valueYtd ? parseFloat(valueYtd.cumulative_trader_count) : null),
-      ath,
-      atl,
-      ath_percentage: calculatePercentage(current, ath),
-      atl_percentage: atl === 0 ? 100 : calculatePercentage(current, atl),
-      standard_deviation: standardDeviation
-    };
-  } catch (error) {
-    throw new Error('Error fetching perp account stats summary stats: ' + error.message);
-  }
-};
-
 const fetchAndInsertAllPerpAccountStatsData = async (chain) => {
   if (!chain) {
     console.error(`Chain must be provided for data updates.`);
@@ -191,9 +124,80 @@ const fetchAndUpdateLatestPerpAccountStatsData = async (chain) => {
   }
 };
 
+const getUniqueTradersSummaryStats = async (chain) => {
+  try {
+    if (chain && !CHAINS.includes(chain)) {
+      throw new Error('Invalid chain parameter');
+    }
+
+    const processChainData = async (chainToProcess) => {
+      const cumulativeData = await getCumulativeUniqueTraders(chainToProcess);
+      const allData = cumulativeData[chainToProcess] || [];
+      if (allData.length === 0) {
+        return null; // No data for this chain
+      }
+
+      const smoothedData = smoothData(allData, 'cumulative_trader_count');  
+      const reversedSmoothedData = [...smoothedData].reverse();
+
+      const latestData = reversedSmoothedData[0];
+      const latestTs = new Date(latestData.ts);
+
+      const getDateFromLatest = (days) => new Date(latestTs.getTime() - days * 24 * 60 * 60 * 1000);
+
+      const value24h = reversedSmoothedData.find(item => new Date(item.ts) <= getDateFromLatest(1));
+      const value7d = reversedSmoothedData.find(item => new Date(item.ts) <= getDateFromLatest(7));
+      const value28d = reversedSmoothedData.find(item => new Date(item.ts) <= getDateFromLatest(28));
+
+      let valueYtd = smoothedData.find(item => new Date(item.ts) >= new Date(latestTs.getFullYear(), 0, 1));
+
+      if (!valueYtd) {
+        valueYtd = reversedSmoothedData[reversedSmoothedData.length - 1];
+      }
+
+      const volumeValues = smoothedData.map(item => parseFloat(item.cumulative_trader_count));
+      const standardDeviation = calculateStandardDeviation(volumeValues);
+
+      const current = parseFloat(allData[allData.length - 1].cumulative_trader_count);
+      const ath = Math.max(...volumeValues, current);
+      const atl = Math.min(...volumeValues, current);
+
+      return {
+        current,
+        delta_24h: calculateDelta(current, value24h ? parseFloat(value24h.cumulative_trader_count) : null),
+        delta_7d: calculateDelta(current, value7d ? parseFloat(value7d.cumulative_trader_count) : null),
+        delta_28d: calculateDelta(current, value28d ? parseFloat(value28d.cumulative_trader_count) : null),
+        delta_ytd: calculateDelta(current, valueYtd ? parseFloat(valueYtd.cumulative_trader_count) : null),
+        ath,
+        atl,
+        ath_percentage: calculatePercentage(current, ath),
+        atl_percentage: atl === 0 ? 100 : calculatePercentage(current, atl),
+        standard_deviation: standardDeviation
+      };
+    };
+
+    if (chain) {
+      const result = await processChainData(chain);
+      return result ? { [chain]: result } : {};
+    } else {
+      const results = await Promise.all(CHAINS.map(processChainData));
+      return CHAINS.reduce((acc, chain, index) => {
+        acc[chain] = results[index] || {};
+        return acc;
+      }, {});
+    }
+  } catch (error) {
+    throw new Error('Error fetching perp account stats summary stats: ' + error.message);
+  }
+};
+
 const getCumulativeUniqueTraders = async (chain) => {
   try {
-    const fetchCumulativeData = async (chain) => {
+    if (chain && !CHAINS.includes(chain)) {
+      throw new Error('Invalid chain parameter');
+    }
+
+    const fetchCumulativeData = async (chainToFetch) => {
       const result = await knex.raw(`
       WITH first_trade_day AS (
         SELECT
@@ -220,7 +224,7 @@ const getCumulativeUniqueTraders = async (chain) => {
           cumulative_trader_counts
       ORDER BY
           ts;
-        `, [chain]);
+        `, [chainToFetch]);
 
       return result.rows.map(row => ({
         ts: row.ts,
@@ -228,18 +232,12 @@ const getCumulativeUniqueTraders = async (chain) => {
       }));
     };
 
-    if (chain && CHAINS.includes(chain)) {
+    if (chain) {
       const data = await fetchCumulativeData(chain);
       return { [chain]: data };
     }
 
-    const results = await Promise.all(
-      CHAINS.map(async (chain) => {
-        const data = await fetchCumulativeData(chain);
-        return { [chain]: data };
-      })
-    );
-
+    const results = await Promise.all(CHAINS.map(fetchCumulativeData));
     return results.reduce((acc, curr) => ({ ...acc, ...curr }), {});
   } catch (error) {
     throw new Error('Error fetching cumulative unique trader data: ' + error.message);
@@ -248,7 +246,11 @@ const getCumulativeUniqueTraders = async (chain) => {
 
 const getDailyNewUniqueTraders = async (chain) => {
   try {
-    const fetchDailyData = async (chain) => {
+    if (chain && !CHAINS.includes(chain)) {
+      throw new Error('Invalid chain parameter');
+    }
+
+    const fetchDailyData = async (chainToFetch) => {
       const result = await knex.raw(`
         WITH first_trading_day AS (
           SELECT
@@ -270,7 +272,7 @@ const getDailyNewUniqueTraders = async (chain) => {
           first_day
         ORDER BY
           first_day;
-      `, [chain]);
+      `, [chainToFetch]);
 
       return result.rows.map(row => ({
         ts: row.date,
@@ -278,81 +280,22 @@ const getDailyNewUniqueTraders = async (chain) => {
       }));
     };
 
-    if (chain && CHAINS.includes(chain)) {
+    if (chain) {
       const data = await fetchDailyData(chain);
       return { [chain]: data };
     }
 
-    const results = await Promise.all(
-      CHAINS.map(async (chain) => {
-        const data = await fetchDailyData(chain);
-        return { [chain]: data };
-      })
-    );
-
+    const results = await Promise.all(CHAINS.map(fetchDailyData));
     return results.reduce((acc, curr) => ({ ...acc, ...curr }), {});
   } catch (error) {
     throw new Error('Error fetching daily new unique traders: ' + error.message);
   }
 };
 
-const getDailyNewUniqueTradersSummary = async (chain) => {
-  try {
-    if (!chain || !CHAINS.includes(chain)) {
-      throw new Error('Invalid chain parameter');
-    }
-
-    const dailyData = await getDailyNewUniqueTraders(chain);
-
-    if (!dailyData[chain] || dailyData[chain].length === 0) {
-      throw new Error('No data found for the specified chain');
-    }
-
-    const data = dailyData[chain];
-    const latestData = data[data.length - 1];
-    const latestDate = new Date(latestData.ts);
-
-    const getDataFromLatest = (days) => {
-      const targetDate = new Date(latestDate.getTime() - days * 24 * 60 * 60 * 1000);
-      return data.find(item => new Date(item.ts) <= targetDate);
-    };
-
-    const value24h = getDataFromLatest(1);
-    const value7d = getDataFromLatest(7);
-    const value28d = getDataFromLatest(28);
-
-    const valueYtd = data.find(item => new Date(item.ts).getFullYear() === latestDate.getFullYear());
-
-    const allValues = data.map(item => item.daily_new_unique_traders);
-    const standardDeviation = calculateStandardDeviation(allValues);
-
-    const current = latestData.daily_new_unique_traders;
-    const ath = Math.max(...allValues);
-    const atl = Math.min(...allValues);
-
-    return {
-      current,
-      delta_24h: calculateDelta(current, value24h ? value24h.daily_new_unique_traders : null),
-      delta_7d: calculateDelta(current, value7d ? value7d.daily_new_unique_traders : null),
-      delta_28d: calculateDelta(current, value28d ? value28d.daily_new_unique_traders : null),
-      delta_ytd: calculateDelta(current, valueYtd ? valueYtd.daily_new_unique_traders : null),
-      ath,
-      atl,
-      ath_percentage: calculatePercentage(current, ath),
-      atl_percentage: atl === 0 ? 100 : calculatePercentage(current, atl),
-      standard_deviation: standardDeviation
-    };
-  } catch (error) {
-    throw new Error('Error fetching Daily New Unique Traders summary stats: ' + error.message);
-  }
-};
-
 module.exports = {
-  getAllPerpAccountStatsData,
   fetchAndInsertAllPerpAccountStatsData,
   fetchAndUpdateLatestPerpAccountStatsData,
   getUniqueTradersSummaryStats,
   getCumulativeUniqueTraders,
   getDailyNewUniqueTraders,
-  getDailyNewUniqueTradersSummary,
 };

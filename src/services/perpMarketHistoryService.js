@@ -159,25 +159,13 @@ const fetchAndUpdateLatestPerpMarketHistoryData = async (chain) => {
   }
 };
 
-const getAllPerpMarketHistoryData = async (chain) => {
-  try {
-    let query = knex('perp_market_history').orderBy('ts', 'asc');
-
-    if (chain && CHAINS.includes(chain)) {
-      query = query.where('chain', chain);
-    }
-
-    const result = await query;
-
-    return result;
-  } catch (error) {
-    throw new Error('Error fetching all perp market history data: ' + error.message);
-  }
-};
-
 const getOpenInterestData = async (chain) => {
   try {
-    const fetchDataForChain = async (chain) => {
+    if (chain && !CHAINS.includes(chain)) {
+      throw new Error('Invalid chain parameter');
+    }
+
+    const fetchDataForChain = async (chainToFetch) => {
       const result = await knex.raw(`
         WITH daily_market_oi AS (
           SELECT
@@ -213,7 +201,7 @@ const getOpenInterestData = async (chain) => {
           daily_oi
         ORDER BY
           ts ASC;
-      `, [chain]);
+      `, [chainToFetch]);
 
       return result.rows.map(row => ({
         ts: row.ts,
@@ -221,27 +209,28 @@ const getOpenInterestData = async (chain) => {
       }));
     };
 
-    if (chain && CHAINS.includes(chain)) {
+    if (chain) {
       const data = await fetchDataForChain(chain);
       return { [chain]: data };
     }
 
-    const results = await Promise.all(
-      CHAINS.map(async (chain) => {
-        const data = await fetchDataForChain(chain);
-        return { [chain]: data };
-      })
-    );
-
-    return results.reduce((acc, curr) => ({ ...acc, ...curr }), {});
+    const results = await Promise.all(CHAINS.map(fetchDataForChain));
+    return CHAINS.reduce((acc, chain, index) => {
+      acc[chain] = results[index] || [];
+      return acc;
+    }, {});
   } catch (error) {
     throw new Error('Error fetching daily OI data: ' + error.message);
   }
 };
 
-const getDailyOpenInterestStatsData = async (chain) => {
+const getDailyOpenInterestChangeData = async (chain) => {
   try {
-    const fetchDataForChain = async (chain) => {
+    if (chain && !CHAINS.includes(chain)) {
+      throw new Error('Invalid chain parameter');
+    }
+
+    const fetchDataForChain = async (chainToFetch) => {
       const result = await knex.raw(`
         WITH daily_market_oi AS (
           SELECT
@@ -289,7 +278,7 @@ const getDailyOpenInterestStatsData = async (chain) => {
           daily_oi_change IS NOT NULL
         ORDER BY
           ts ASC;
-      `, [chain]);
+      `, [chainToFetch]);
 
       return result.rows.map(row => ({
         ts: row.ts,
@@ -297,70 +286,83 @@ const getDailyOpenInterestStatsData = async (chain) => {
       }));
     };
 
-    if (chain && CHAINS.includes(chain)) {
+    if (chain) {
       const data = await fetchDataForChain(chain);
       return { [chain]: data };
     }
 
-    const results = await Promise.all(
-      CHAINS.map(async (chain) => {
-        const data = await fetchDataForChain(chain);
-        return { [chain]: data };
-      })
-    );
-
-    return results.reduce((acc, curr) => ({ ...acc, ...curr }), {});
+    const results = await Promise.all(CHAINS.map(fetchDataForChain));
+    return CHAINS.reduce((acc, chain, index) => {
+      acc[chain] = results[index] || [];
+      return acc;
+    }, {});
   } catch (error) {
-    throw new Error('Error fetching daily open interest stats data: ' + error.message);
+    throw new Error('Error fetching daily open interest change data: ' + error.message);
   }
 };
 
 const getOpenInterestSummaryStats = async (chain) => {
   try {
-    const data = await getOpenInterestData(chain);
-
-    if (data.length === 0) {
-      throw new Error('No data found');
+    if (chain && !CHAINS.includes(chain)) {
+      throw new Error('Invalid chain parameter');
     }
 
-    const smoothedData = smoothData(data[chain], 'daily_oi');
-    const reversedSmoothedData = [...smoothedData].reverse();
+    const processChainData = async (chainToProcess) => {
+      const data = await getOpenInterestData(chainToProcess);
+      const chainData = data[chainToProcess];
 
-    const latestData = reversedSmoothedData[0];
-    const latestTs = new Date(latestData.ts);
+      if (chainData.length === 0) {
+        return null; // No data for this chain
+      }
 
-    const getDateFromLatest = (days) => new Date(latestTs.getTime() - days * 24 * 60 * 60 * 1000);
+      const smoothedData = smoothData(chainData, 'daily_oi');
+      const reversedSmoothedData = [...smoothedData].reverse();
 
-    const value24h = reversedSmoothedData.find(item => {
-      return new Date(item.ts) <= getDateFromLatest(1)
-    });
-    const value7d = reversedSmoothedData.find(item => new Date(item.ts) <= getDateFromLatest(7));
-    const value28d = reversedSmoothedData.find(item => new Date(item.ts) <= getDateFromLatest(28));
-    let valueYtd = smoothedData.find(item => new Date(item.ts) >= new Date(latestTs.getFullYear(), 0, 1));
+      const latestData = reversedSmoothedData[0];
+      const latestTs = new Date(latestData.ts);
 
-    if (!valueYtd) {
-      valueYtd = reversedSmoothedData[reversedSmoothedData.length - 1];
-    }
+      const getDateFromLatest = (days) => new Date(latestTs.getTime() - days * 24 * 60 * 60 * 1000);
 
-    const oiValues = smoothedData.map(item => parseFloat(item.daily_oi));
-    const standardDeviation = calculateStandardDeviation(oiValues);
+      const value24h = reversedSmoothedData.find(item => new Date(item.ts) <= getDateFromLatest(1));
+      const value7d = reversedSmoothedData.find(item => new Date(item.ts) <= getDateFromLatest(7));
+      const value28d = reversedSmoothedData.find(item => new Date(item.ts) <= getDateFromLatest(28));
+      let valueYtd = smoothedData.find(item => new Date(item.ts) >= new Date(latestTs.getFullYear(), 0, 1));
 
-    const current = parseFloat(data[chain][data[chain].length -1].daily_oi);
-    const ath = Math.max(...oiValues, current);
-    const atl = Math.min(...oiValues, current);
+      if (!valueYtd) {
+        valueYtd = reversedSmoothedData[reversedSmoothedData.length - 1];
+      }
 
-    return {
-      current,
-      delta_24h: calculateDelta(current, value24h ? parseFloat(value24h.daily_oi) : null),
-      delta_7d: calculateDelta(current, value7d ? parseFloat(value7d.daily_oi) : null),
-      delta_28d: calculateDelta(current, value28d ? parseFloat(value28d.daily_oi) : null),
-      delta_ytd: calculateDelta(current, valueYtd ? parseFloat(valueYtd.daily_oi) : null),
-      ath,
-      atl,
-      ath_percentage: calculatePercentage(current, ath),
-      atl_percentage: atl === 0 ? 100 : calculatePercentage(current, atl),
-      standard_deviation: standardDeviation
+      const oiValues = smoothedData.map(item => parseFloat(item.daily_oi));
+      const standardDeviation = calculateStandardDeviation(oiValues);
+
+      const current = parseFloat(chainData[chainData.length - 1].daily_oi);
+      const ath = Math.max(...oiValues, current);
+      const atl = Math.min(...oiValues, current);
+
+      return {
+        current,
+        delta_24h: calculateDelta(current, value24h ? parseFloat(value24h.daily_oi) : null),
+        delta_7d: calculateDelta(current, value7d ? parseFloat(value7d.daily_oi) : null),
+        delta_28d: calculateDelta(current, value28d ? parseFloat(value28d.daily_oi) : null),
+        delta_ytd: calculateDelta(current, valueYtd ? parseFloat(valueYtd.daily_oi) : null),
+        ath,
+        atl,
+        ath_percentage: calculatePercentage(current, ath),
+        atl_percentage: atl === 0 ? 100 : calculatePercentage(current, atl),
+        standard_deviation: standardDeviation
+      };
     };
+
+    if (chain) {
+      const result = await processChainData(chain);
+      return result ? { [chain]: result } : {};
+    } else {
+      const results = await Promise.all(CHAINS.map(processChainData));
+      return CHAINS.reduce((acc, chain, index) => {
+        acc[chain] = results[index] || {};
+        return acc;
+      }, {});
+    }
   } catch (error) {
     throw new Error('Error fetching daily OI summary stats: ' + error.message);
   }
@@ -369,8 +371,7 @@ const getOpenInterestSummaryStats = async (chain) => {
 module.exports = {
   fetchAndInsertAllPerpMarketHistoryData,
   fetchAndUpdateLatestPerpMarketHistoryData,
-  getAllPerpMarketHistoryData,
   getOpenInterestData,
-  getDailyOpenInterestStatsData,
+  getDailyOpenInterestChangeData,
   getOpenInterestSummaryStats,
 };

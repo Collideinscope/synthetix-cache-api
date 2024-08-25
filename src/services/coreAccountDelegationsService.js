@@ -10,49 +10,38 @@ const {
 
 const getStakerCount = async (chain, collateralType) => {
   try {
-    if (chain && CHAINS.includes(chain)) {
-      // Fetch the unique staker count for the specific chain
-      const query = knex('core_account_delegations')
-        .where('chain', chain)
-        .countDistinct('account_id as staker_count');
-
-      if (collateralType) {
-        query.where('collateral_type', collateralType);
-      }
-
-      const result = await query;
-
-      return { [chain]: result[0].staker_count };
+    if (!collateralType) {
+      throw new Error('collateralType is required');
     }
 
-    // Fetch the unique staker count for each chain
-    const results = await Promise.all(
-      CHAINS.map(async (chain) => {
-        const query = knex('core_account_delegations')
-          .where('chain', chain)
-          .countDistinct('account_id as staker_count');
+    const fetchCount = async (chainToFetch) => {
+      const result = await knex('core_account_delegations')
+        .where('chain', chainToFetch)
+        .where('collateral_type', collateralType)
+        .countDistinct('account_id as staker_count')
+        .first();
 
-        if (collateralType) {
-          query.where('collateral_type', collateralType);
-        }
+      return { [chainToFetch]: parseInt(result.staker_count) };
+    };
 
-        const result = await query;
-
-        return { [chain]: result[0].staker_count };
-      })
-    );
-
-    return results.reduce((acc, curr) => ({ ...acc, ...curr }), {});
+    if (chain) {
+      return await fetchCount(chain);
+    } else {
+      const results = await Promise.all(CHAINS.map(fetchCount));
+      return results.reduce((acc, curr) => ({ ...acc, ...curr }), {});
+    }
   } catch (error) {
     throw new Error('Error fetching staker count: ' + error.message);
   }
 };
 
 const getCumulativeUniqueStakers = async (chain, collateralType) => {
-  const collateral_type = collateralType;
-
   try {
-    const fetchCumulativeData = async (chain) => {
+    if (!collateralType) {
+      throw new Error('collateralType is required');
+    }
+
+    const fetchCumulativeData = async (chainToFetch) => {
       const result = await knex.raw(`
         WITH daily_new_stakers AS (
           SELECT
@@ -89,85 +78,32 @@ const getCumulativeUniqueStakers = async (chain, collateralType) => {
           daily_cumulative_counts
         ORDER BY
           ts, pool_id, collateral_type;
-      `, [chain, collateral_type]);
+      `, [chainToFetch, collateralType]);
 
-      return result.rows.map(row => ({
+      return { [chainToFetch]: result.rows.map(row => ({
         ts: row.ts,
         cumulative_staker_count: parseInt(row.cumulative_staker_count),
         pool_id: row.pool_id,
         collateral_type: row.collateral_type,
-      }));
+      })) };
     };
 
-    if (chain && CHAINS.includes(chain)) {
-      const data = await fetchCumulativeData(chain);
-      return { [chain]: data };
+    if (chain) {
+      return await fetchCumulativeData(chain);
+    } else {
+      const results = await Promise.all(CHAINS.map(fetchCumulativeData));
+      return results.reduce((acc, curr) => ({ ...acc, ...curr }), {});
     }
-
-    const results = await Promise.all(
-      CHAINS.map(async (chain) => {
-        const data = await fetchCumulativeData(chain);
-        return { [chain]: data };
-      })
-    );
-
-    return results.reduce((acc, curr) => ({ ...acc, ...curr }), {});
   } catch (error) {
     throw new Error('Error fetching cumulative unique staker data: ' + error.message);
   }
 };
 
-const getLatestCoreAccountDelegationsDataOrderedByAccount = async (chain, collateralType) => {
-  try {
-    if (chain && CHAINS.includes(chain)) {
-      // Fetch the latest value for each account 
-      const query = knex('core_account_delegations')
-        .where('chain', chain)
-        .distinctOn('account_id')
-        .orderBy('account_id')
-        .orderBy('ts', 'desc');
-
-      if (collateralType) {
-        query.where('collateral_type', collateralType);
-      }
-
-      const result = await query;
-
-      return result;
-    }
-
-    // Fetch the latest value for each account in each chain otherwise
-    const results = await Promise.all(
-      CHAINS.map(async (chain) => {
-        const query = knex('core_account_delegations')
-          .where('chain', chain)
-          .distinctOn('account_id')
-          .orderBy('account_id')
-          .orderBy('ts', 'desc');
-
-        if (collateralType) {
-          query.where('collateral_type', collateralType);
-        }
-
-        const result = await query;
-
-        return result;
-      })
-    );
-
-    return results.flat().filter(Boolean); 
-  } catch (error) {
-    throw new Error('Error fetching latest core account delegations data: ' + error.message);
-  }
-};
-
 const getCoreAccountDelegationsDataByAccount = async (accountId) => {
   try {
-    let query = knex('core_account_delegations')
+    const result = await knex('core_account_delegations')
       .where('account_id', accountId)
       .orderBy('ts', 'desc');
-
-    const result = await query;
 
     return result;
   } catch (error) {
@@ -175,125 +111,118 @@ const getCoreAccountDelegationsDataByAccount = async (accountId) => {
   }
 };
 
-const getAllCoreAccountDelegationsData = async (chain, collateralType) => {
-  try {
-    let query = knex('core_account_delegations').orderBy('ts', 'desc');
-
-    if (chain && CHAINS.includes(chain)) {
-      query = query.where('chain', chain);
-    }
-
-    if (collateralType) {
-      query = query.where('collateral_type', collateralType);
-    }
-
-    const result = await query;
-
-    return result;
-  } catch (error) {
-    throw new Error('Error fetching all core account delegations data: ' + error.message);
-  }
-};
-
 const getUniqueStakersSummaryStats = async (chain, collateralType) => {
   try {
-    const cumulativeData = await getCumulativeUniqueStakers(chain, collateralType);
-
-    const allData = cumulativeData[chain] || [];
-    if (allData.length === 0) {
-      throw new Error('No data found for the specified chain');
+    if (!collateralType) {
+      throw new Error('collateralType is required');
     }
 
-    const smoothedData = smoothData(allData, 'cumulative_staker_count');  // Smooth unique stakers data
-    const reversedSmoothedData = [...smoothedData].reverse();
+    const processChainData = async (chainToProcess) => {
+      const cumulativeData = await getCumulativeUniqueStakers(chainToProcess, collateralType);
+      const allData = cumulativeData[chainToProcess] || [];
+      if (allData.length === 0) {
+        return null;
+      }
 
-    const latestData = reversedSmoothedData[0];
-    const latestTs = new Date(latestData.ts);
+      const smoothedData = smoothData(allData, 'cumulative_staker_count');
+      const reversedSmoothedData = [...smoothedData].reverse();
 
-    const getDateFromLatest = (days) => new Date(latestTs.getTime() - days * 24 * 60 * 60 * 1000);
+      const latestData = reversedSmoothedData[0];
+      const latestTs = new Date(latestData.ts);
 
-    const value24h = reversedSmoothedData.find(item => new Date(item.ts) <= getDateFromLatest(1));
-    const value7d = reversedSmoothedData.find(item => new Date(item.ts) <= getDateFromLatest(7));
-    const value28d = reversedSmoothedData.find(item => new Date(item.ts) <= getDateFromLatest(28));
+      const getDateFromLatest = (days) => new Date(latestTs.getTime() - days * 24 * 60 * 60 * 1000);
 
-    let valueYtd = smoothedData.find(item => new Date(item.ts) >= new Date(latestTs.getFullYear(), 0, 1));
+      const value24h = reversedSmoothedData.find(item => new Date(item.ts) <= getDateFromLatest(1));
+      const value7d = reversedSmoothedData.find(item => new Date(item.ts) <= getDateFromLatest(7));
+      const value28d = reversedSmoothedData.find(item => new Date(item.ts) <= getDateFromLatest(28));
 
-    if (!valueYtd) {
-      valueYtd = reversedSmoothedData[reversedSmoothedData.length - 1];
-    }
+      let valueYtd = smoothedData.find(item => new Date(item.ts) >= new Date(latestTs.getFullYear(), 0, 1));
 
-    const stakerValues = smoothedData.map(item => parseFloat(item.cumulative_staker_count));
-    const standardDeviation = calculateStandardDeviation(stakerValues);
+      if (!valueYtd) {
+        valueYtd = reversedSmoothedData[reversedSmoothedData.length - 1];
+      }
 
-    const current = parseFloat(allData[allData.length - 1].cumulative_staker_count);
-    const ath = Math.max(...stakerValues, current);
-    const atl = Math.min(...stakerValues, current);
+      const stakerValues = smoothedData.map(item => parseFloat(item.cumulative_staker_count));
+      const standardDeviation = calculateStandardDeviation(stakerValues);
 
-    return {
-      current,
-      delta_24h: calculateDelta(current, value24h ? parseFloat(value24h.cumulative_staker_count) : null),
-      delta_7d: calculateDelta(current, value7d ? parseFloat(value7d.cumulative_staker_count) : null),
-      delta_28d: calculateDelta(current, value28d ? parseFloat(value28d.cumulative_staker_count) : null),
-      delta_ytd: calculateDelta(current, valueYtd ? parseFloat(valueYtd.cumulative_staker_count) : null),
-      ath,
-      atl,
-      ath_percentage: calculatePercentage(current, ath),
-      atl_percentage: atl === 0 ? 100 : calculatePercentage(current, atl),
-      standard_deviation: standardDeviation
+      const current = parseFloat(allData[allData.length - 1].cumulative_staker_count);
+      const ath = Math.max(...stakerValues, current);
+      const atl = Math.min(...stakerValues, current);
+
+      return {
+        current,
+        delta_24h: calculateDelta(current, value24h ? parseFloat(value24h.cumulative_staker_count) : null),
+        delta_7d: calculateDelta(current, value7d ? parseFloat(value7d.cumulative_staker_count) : null),
+        delta_28d: calculateDelta(current, value28d ? parseFloat(value28d.cumulative_staker_count) : null),
+        delta_ytd: calculateDelta(current, valueYtd ? parseFloat(valueYtd.cumulative_staker_count) : null),
+        ath,
+        atl,
+        ath_percentage: calculatePercentage(current, ath),
+        atl_percentage: atl === 0 ? 100 : calculatePercentage(current, atl),
+        standard_deviation: standardDeviation
+      };
     };
+
+    if (chain) {
+      const result = await processChainData(chain);
+      return result ? { [chain]: result } : {};
+    } else {
+      const results = await Promise.all(CHAINS.map(processChainData));
+      return CHAINS.reduce((acc, chain, index) => {
+        acc[chain] = results[index] || {};
+        return acc;
+      }, {});
+    }
   } catch (error) {
     throw new Error('Error fetching Unique Stakers summary stats: ' + error.message);
   }
 };
 
-const getDailyNewUniqueStakersSummary = async (chain, collateralType) => {
+const getDailyNewUniqueStakers = async (chain, collateralType) => {
   try {
-    if (!chain || !CHAINS.includes(chain)) {
-      throw new Error('Invalid chain parameter');
+    if (!collateralType) {
+      throw new Error('collateralType is required');
     }
 
-    const result = await getDailyNewUniqueStakers(chain, collateralType);
-    const dailyData = result[chain];
+    const fetchDailyData = async (chainToFetch) => {
+      const result = await knex.raw(`
+        WITH first_staking_day AS (
+          SELECT
+            account_id,
+            MIN(DATE_TRUNC('day', ts)) AS first_day
+          FROM
+            core_account_delegations
+          WHERE
+            chain = ?
+            AND collateral_type = ?
+          GROUP BY
+            account_id
+        )
+        SELECT
+          first_day AS date,
+          COUNT(*) AS daily_new_unique_stakers
+        FROM
+          first_staking_day
+        GROUP BY
+          first_day
+        ORDER BY
+          first_day;
+      `, [chainToFetch, collateralType]);
 
-    if (!dailyData || dailyData.length === 0) {
-      throw new Error('No data found for the specified chain');
+      return { [chainToFetch]: result.rows.map(row => ({
+        ts: row.date,
+        daily_new_unique_stakers: parseInt(row.daily_new_unique_stakers),
+      })) };
+    };
+
+    if (chain) {
+      return await fetchDailyData(chain);
+    } else {
+      const results = await Promise.all(CHAINS.map(chainToFetch => fetchDailyData(chainToFetch)));
+      return results.reduce((acc, curr) => ({ ...acc, ...curr }), {});
     }
-
-    const latestData = dailyData[dailyData.length - 1];
-    const latestDate = new Date(latestData.ts);
-
-    const getDataFromLatest = (days) => {
-      const targetDate = new Date(latestDate.getTime() - days * 24 * 60 * 60 * 1000);
-      return dailyData.find(item => new Date(item.ts) <= targetDate);
-    };
-
-    const value24h = getDataFromLatest(1);
-    const value7d = getDataFromLatest(7);
-    const value28d = getDataFromLatest(28);
-
-    const valueYtd = dailyData.find(item => new Date(item.ts).getFullYear() === latestDate.getFullYear());
-
-    const allValues = dailyData.map(item => item.daily_new_unique_stakers);
-    const standardDeviation = calculateStandardDeviation(allValues);
-
-    const current = latestData.daily_new_unique_stakers;
-    const ath = Math.max(...allValues);
-    const atl = Math.min(...allValues);
-
-    return {
-      current,
-      delta_24h: calculateDelta(current, value24h ? value24h.daily_new_unique_stakers : null),
-      delta_7d: calculateDelta(current, value7d ? value7d.daily_new_unique_stakers : null),
-      delta_28d: calculateDelta(current, value28d ? value28d.daily_new_unique_stakers : null),
-      delta_ytd: calculateDelta(current, valueYtd ? valueYtd.daily_new_unique_stakers : null),
-      ath,
-      atl,
-      ath_percentage: calculatePercentage(current, ath),
-      atl_percentage: atl === 0 ? 100 : calculatePercentage(current, atl),
-      standard_deviation: standardDeviation
-    };
   } catch (error) {
-    throw new Error('Error fetching Daily New Unique Stakers summary stats: ' + error.message);
+    throw new Error('Error fetching daily new unique stakers: ' + error.message);
   }
 };
 
@@ -391,67 +320,12 @@ const fetchAndUpdateLatestCoreAccountDelegationsData = async (chain) => {
   }
 };
 
-const getDailyNewUniqueStakers = async (chain, collateralType) => {
-  try {
-    const fetchDailyData = async (chain, collateralType) => {
-      const query = knex.raw(`
-        WITH first_staking_day AS (
-          SELECT
-            account_id,
-            MIN(DATE_TRUNC('day', ts)) AS first_day
-          FROM
-            core_account_delegations
-          WHERE
-            chain = ?
-            ${collateralType ? 'AND collateral_type = ?' : ''}
-          GROUP BY
-            account_id
-        )
-        SELECT
-          first_day AS date,
-          COUNT(*) AS daily_new_unique_stakers
-        FROM
-          first_staking_day
-        GROUP BY
-          first_day
-        ORDER BY
-          first_day;
-      `, collateralType ? [chain, collateralType] : [chain]);
-
-      const result = await query;
-      return result.rows.map(row => ({
-        ts: row.date,
-        daily_new_unique_stakers: parseInt(row.daily_new_unique_stakers),
-      }));
-    };
-
-    if (chain && CHAINS.includes(chain)) {
-      const data = await fetchDailyData(chain, collateralType);
-      return { [chain]: data };
-    }
-
-    const results = await Promise.all(
-      CHAINS.map(async (chain) => {
-        const data = await fetchDailyData(chain, collateralType);
-        return { [chain]: data };
-      })
-    );
-
-    return results.reduce((acc, curr) => ({ ...acc, ...curr }), {});
-  } catch (error) {
-    throw new Error('Error fetching daily new unique stakers: ' + error.message);
-  }
-};
-
 module.exports = {
   getStakerCount,
-  getLatestCoreAccountDelegationsDataOrderedByAccount,
   getCoreAccountDelegationsDataByAccount,
-  getAllCoreAccountDelegationsData,
   fetchAndInsertAllCoreAccountDelegationsData,
   fetchAndUpdateLatestCoreAccountDelegationsData,
   getCumulativeUniqueStakers,
   getUniqueStakersSummaryStats,
   getDailyNewUniqueStakers,
-  getDailyNewUniqueStakersSummary,
 };
