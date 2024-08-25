@@ -126,9 +126,7 @@ const getAPYSummaryStats = async (chain, collateralType) => {
     } else {
       const results = await Promise.all(CHAINS.map(processChainData));
       return CHAINS.reduce((acc, chain, index) => {
-        if (results[index]) {
-          acc[chain] = results[index];
-        }
+        acc[chain] = results[index] || {};
         return acc;
       }, {});
     }

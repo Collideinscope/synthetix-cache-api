@@ -2,303 +2,105 @@ const express = require('express');
 const router = express.Router();
 const {
   getLatestPerpStatsData,
-  getAllPerpStatsData,
   getCumulativeVolumeSummaryStats,
   getCumulativeExchangeFeesSummaryStats,
-  getCumulativeCollectedFeesSummaryStats,
   getCumulativeVolumeData,
   getCumulativeExchangeFeesData,
-  getCumulativeCollectedFeesData,
   getDailyVolumeData,
-  getDailyCollectedFeesData,
   getDailyExchangeFeesData,
-  getDailyVolumeSummaryStats,
-  getDailyExchangeFeesSummaryStats,
-  getDailyCollectedFeesSummaryStats,
 } = require('../services/perpStatsService');
 const { CHAINS } = require('../helpers');
 
-router.get('/latest/:chain?', async (req, res) => {
+const validateOptionalChain = (chain) => {
+  if (chain && !CHAINS.includes(chain)) {
+    throw new Error("Invalid chain parameter");
+  }
+};
+
+router.get('/latest', async (req, res) => {
   try {
-    const { chain } = req.params;
+    const { chain } = req.query;
+    validateOptionalChain(chain);
     const result = await getLatestPerpStatsData(chain);
-
-    if (!result.length) {
+    if (!result || result.length === 0) {
       return res.status(404).send('Perp stats data not found');
     }
-
     return res.json(result);
   } catch (error) {
-    console.error(error);
-    return res.status(500).send('Server error');
+    console.error('Error in /perp-stats/latest route:', error);
+    return res.status(400).json({ error: error.message });
   }
 });
 
-router.get('/all/:chain?', async (req, res) => {
+router.get('/volume/cumulative', async (req, res) => {
   try {
-    const { chain } = req.params;
-    const result = await getAllPerpStatsData(chain);
-
-    if (!result.length) {
-      return res.status(404).send('Perp stats data not found');
-    }
-
-    return res.json(result);
-  } catch (error) {
-    console.error(error);
-    return res.status(500).send('Server error');
-  }
-});
-
-router.get('/cumulative-volume/summary/:chain?', async (req, res) => {
-  try {
-    const { chain } = req.params;
-
-    if (!chain) {
-      return res.status(400).json({ error: "Chain parameter is required" });
-    }
-
-    if (!CHAINS.includes(chain)) {
-      return res.status(400).json({ error: "Invalid chain parameter" });
-    }
-
-    const stats = await getCumulativeVolumeSummaryStats(chain);
-
-    res.json(stats);
-  } catch (error) {
-    console.error('Error in /perp-stats/cumulative-volume/summary route:', error);
-    res.status(500).json({ error: error.message });
-  }
-});
-
-router.get('/cumulative-exchange-fees/summary/:chain?', async (req, res) => {
-  try {
-    const { chain } = req.params;
-
-    if (!chain) {
-      return res.status(400).json({ error: "Chain parameter is required" });
-    }
-
-    if (!CHAINS.includes(chain)) {
-      return res.status(400).json({ error: "Invalid chain parameter" });
-    }
-
-    const stats = await getCumulativeExchangeFeesSummaryStats(chain);
-
-    res.json(stats);
-  } catch (error) {
-    console.error('Error in /perp-stats/cumulative-exchange-fees/summary route:', error);
-    res.status(500).json({ error: error.message });
-  }
-});
-
-router.get('/cumulative-collected-fees/summary/:chain?', async (req, res) => {
-  try {
-    const { chain } = req.params;
-
-    if (!chain) {
-      return res.status(400).json({ error: "Chain parameter is required" });
-    }
-
-    if (!CHAINS.includes(chain)) {
-      return res.status(400).json({ error: "Invalid chain parameter" });
-    }
-
-    const stats = await getCumulativeCollectedFeesSummaryStats(chain);
-
-    res.json(stats);
-  } catch (error) {
-    console.error('Error in /perp-stats/cumulative-collected-fees/summary route:', error);
-    res.status(500).json({ error: error.message });
-  }
-});
-
-router.get('/cumulative-volume/:chain?', async (req, res) => {
-  try {
-    const { chain } = req.params;
-
-    if (!chain) {
-      return res.status(400).json({ error: "Chain parameter is required" });
-    }
-
-    if (!CHAINS.includes(chain)) {
-      return res.status(400).json({ error: "Invalid chain parameter" });
-    }
-
+    const { chain } = req.query;
+    validateOptionalChain(chain);
     const data = await getCumulativeVolumeData(chain);
-
     res.json(data);
   } catch (error) {
-    console.error('Error in /perp-stats/cumulative-volume route:', error);
-    res.status(500).json({ error: error.message });
+    console.error('Error in /perp-stats/volume/cumulative route:', error);
+    res.status(400).json({ error: error.message });
   }
 });
 
-router.get('/cumulative-exchange-fees/:chain?', async (req, res) => {
+router.get('/volume/summary', async (req, res) => {
   try {
-    const { chain } = req.params;
-
-    if (!chain) {
-      return res.status(400).json({ error: "Chain parameter is required" });
-    }
-
-    if (!CHAINS.includes(chain)) {
-      return res.status(400).json({ error: "Invalid chain parameter" });
-    }
-
-    const data = await getCumulativeExchangeFeesData(chain);
-
-    res.json(data);
+    const { chain } = req.query;
+    validateOptionalChain(chain);
+    const stats = await getCumulativeVolumeSummaryStats(chain);
+    res.json(stats);
   } catch (error) {
-    console.error('Error in /perp-stats/cumulative-exchange-fees route:', error);
-    res.status(500).json({ error: error.message });
+    console.error('Error in /perp-stats/volume/cumulative/summary route:', error);
+    res.status(400).json({ error: error.message });
   }
 });
 
-router.get('/cumulative-collected-fees/:chain?', async (req, res) => {
+router.get('/volume/daily', async (req, res) => {
   try {
-    const { chain } = req.params;
-
-    if (!chain) {
-      return res.status(400).json({ error: "Chain parameter is required" });
-    }
-
-    if (!CHAINS.includes(chain)) {
-      return res.status(400).json({ error: "Invalid chain parameter" });
-    }
-
-    const data = await getCumulativeCollectedFeesData(chain);
-
-    res.json(data);
-  } catch (error) {
-    console.error('Error in /perp-stats/cumulative-collected-fees route:', error);
-    res.status(500).json({ error: error.message });
-  }
-});
-
-router.get('/daily-volume/:chain?', async (req, res) => {
-  try {
-    const { chain } = req.params;
-
-    if (!chain) {
-      return res.status(400).json({ error: "Chain parameter is required" });
-    }
-
-    if (!CHAINS.includes(chain)) {
-      return res.status(400).json({ error: "Invalid chain parameter" });
-    }
-
+    const { chain } = req.query;
+    validateOptionalChain(chain);
     const data = await getDailyVolumeData(chain);
-
     res.json(data);
   } catch (error) {
-    console.error('Error in /perp-stats/daily-volume route:', error);
-    res.status(500).json({ error: error.message });
+    console.error('Error in /perp-stats/volume/daily route:', error);
+    res.status(400).json({ error: error.message });
   }
 });
 
-router.get('/daily-exchange-fees/:chain?', async (req, res) => {
+router.get('/exchange-fees/cumulative', async (req, res) => {
   try {
-    const { chain } = req.params;
+    const { chain } = req.query;
+    validateOptionalChain(chain);
+    const data = await getCumulativeExchangeFeesData(chain);
+    res.json(data);
+  } catch (error) {
+    console.error('Error in /perp-stats/exchange-fees/cumulative route:', error);
+    res.status(400).json({ error: error.message });
+  }
+});
 
-    if (!chain) {
-      return res.status(400).json({ error: "Chain parameter is required" });
-    }
+router.get('/exchange-fees/summary', async (req, res) => {
+  try {
+    const { chain } = req.query;
+    validateOptionalChain(chain);
+    const stats = await getCumulativeExchangeFeesSummaryStats(chain);
+    res.json(stats);
+  } catch (error) {
+    console.error('Error in /perp-stats/exchange-fees/cumulative/summary route:', error);
+    res.status(400).json({ error: error.message });
+  }
+});
 
-    if (!CHAINS.includes(chain)) {
-      return res.status(400).json({ error: "Invalid chain parameter" });
-    }
-
+router.get('/exchange-fees/daily', async (req, res) => {
+  try {
+    const { chain } = req.query;
+    validateOptionalChain(chain);
     const data = await getDailyExchangeFeesData(chain);
-
     res.json(data);
   } catch (error) {
-    console.error('Error in /perp-stats/daily-exchange-fees route:', error);
-    res.status(500).json({ error: error.message });
-  }
-});
-
-router.get('/daily-collected-fees/:chain?', async (req, res) => {
-  try {
-    const { chain } = req.params;
-
-    if (!chain) {
-      return res.status(400).json({ error: "Chain parameter is required" });
-    }
-
-    if (!CHAINS.includes(chain)) {
-      return res.status(400).json({ error: "Invalid chain parameter" });
-    }
-
-    const data = await getDailyCollectedFeesData(chain);
-
-    res.json(data);
-  } catch (error) {
-    console.error('Error in /perp-stats/daily-collected-fees route:', error);
-    res.status(500).json({ error: error.message });
-  }
-});
-
-router.get('/daily-volume/summary/:chain?', async (req, res) => {
-  try {
-    const { chain } = req.params;
-
-    if (!chain) {
-      return res.status(400).json({ error: "Chain parameter is required" });
-    }
-
-    if (!CHAINS.includes(chain)) {
-      return res.status(400).json({ error: "Invalid chain parameter" });
-    }
-
-    const stats = await getDailyVolumeSummaryStats(chain);
-
-    res.json(stats);
-  } catch (error) {
-    console.error('Error in /perp-stats/daily-volume/summary route:', error);
-    res.status(500).json({ error: error.message });
-  }
-});
-
-router.get('/daily-exchange-fees/summary/:chain?', async (req, res) => {
-  try {
-    const { chain } = req.params;
-
-    if (!chain) {
-      return res.status(400).json({ error: "Chain parameter is required" });
-    }
-
-    if (!CHAINS.includes(chain)) {
-      return res.status(400).json({ error: "Invalid chain parameter" });
-    }
-
-    const stats = await getDailyExchangeFeesSummaryStats(chain);
-
-    res.json(stats);
-  } catch (error) {
-    console.error('Error in /perp-stats/daily-exchange-fees/summary route:', error);
-    res.status(500).json({ error: error.message });
-  }
-});
-
-router.get('/daily-collected-fees/summary/:chain?', async (req, res) => {
-  try {
-    const { chain } = req.params;
-
-    if (!chain) {
-      return res.status(400).json({ error: "Chain parameter is required" });
-    }
-
-    if (!CHAINS.includes(chain)) {
-      return res.status(400).json({ error: "Invalid chain parameter" });
-    }
-
-    const stats = await getDailyCollectedFeesSummaryStats(chain);
-
-    res.json(stats);
-  } catch (error) {
-    console.error('Error in /perp-stats/daily-collected-fees/summary route:', error);
-    res.status(500).json({ error: error.message });
+    console.error('Error in /perp-stats/exchange-fees/daily route:', error);
+    res.status(400).json({ error: error.message });
   }
 });
 
