@@ -10,109 +10,124 @@ const {
 
 const getLatestCoreDelegationsData = async (chain) => {
   try {
-    if (chain && CHAINS.includes(chain)) {
+    if (chain && !CHAINS.includes(chain)) {
+      throw new Error('Invalid chain parameter');
+    }
+
+    const fetchLatest = async (chainToFetch) => {
       const result = await knex('core_delegations')
-        .where('chain', chain)
+        .where('chain', chainToFetch)
         .orderBy('ts', 'desc')
         .limit(1);
 
-      return { [chain]: result };
+      return { [chainToFetch]: result };
+    };
+
+    if (chain) {
+      return await fetchLatest(chain);
+    } else {
+      const results = await Promise.all(CHAINS.map(fetchLatest));
+      return results.reduce((acc, curr) => ({ ...acc, ...curr }), {});
     }
-
-    const results = await Promise.all(
-      CHAINS.map(async (chain) => {
-        const result = await knex('core_delegations')
-          .where('chain', chain)
-          .orderBy('ts', 'desc')
-          .limit(1);
-
-        return { [chain]: result };
-      })
-    );
-
-    return results.reduce((acc, curr) => ({ ...acc, ...curr }), {});
   } catch (error) {
     throw new Error('Error fetching latest core delegations data: ' + error.message);
   }
 };
 
-const getAllCoreDelegationsData = async (chain) => {
+const getCumulativeCoreDelegationsData = async (chain) => {
   try {
-    if (chain && CHAINS.includes(chain)) {
-      const result = await knex('core_delegations')
-        .where('chain', chain)
-        .orderBy('ts', 'asc');
-
-      return { [chain]: result };
+    if (chain && !CHAINS.includes(chain)) {
+      throw new Error('Invalid chain parameter');
     }
 
-    const results = await Promise.all(
-      CHAINS.map(async (chain) => {
-        const result = await knex('core_delegations')
-          .where('chain', chain)
-          .orderBy('ts', 'asc');
+    const fetchCumulative = async (chainToFetch) => {
+      const result = await knex('core_delegations')
+        .where('chain', chainToFetch)
+        .orderBy('ts', 'asc');
 
-        return { [chain]: result };
-      })
-    );
+      return { [chainToFetch]: result };
+    };
 
-    return results.reduce((acc, curr) => ({ ...acc, ...curr }), {});
+    if (chain) {
+      return await fetchCumulative(chain);
+    } else {
+      const results = await Promise.all(CHAINS.map(fetchCumulative));
+      return results.reduce((acc, curr) => ({ ...acc, ...curr }), {});
+    }
   } catch (error) {
-    throw new Error('Error fetching all core delegations data: ' + error.message);
+    throw new Error('Error fetching cumulative core delegations data: ' + error.message);
   }
 };
 
 const getCoreDelegationsSummaryStats = async (chain) => {
   try {
-    const baseQuery = () => knex('core_delegations').where('chain', chain);
-
-    const allData = await baseQuery().orderBy('ts', 'asc');
-    if (allData.length === 0) {
-      throw new Error('No data found for the specified chain');
+    if (chain && !CHAINS.includes(chain)) {
+      throw new Error('Invalid chain parameter');
     }
 
-    const smoothedData = smoothData(allData, 'amount_delegated'); 
-    const reversedSmoothedData = [...smoothedData].reverse();
+    const processChainData = async (chainToProcess) => {
+      const baseQuery = () => knex('core_delegations').where('chain', chainToProcess);
 
-    const latestData = reversedSmoothedData[0];
-    const latestTs = new Date(latestData.ts);
+      const allData = await baseQuery().orderBy('ts', 'asc');
+      if (allData.length === 0) {
+        return null; // No data for this chain
+      }
 
-    const getDateFromLatest = (days) => new Date(latestTs.getTime() - days * 24 * 60 * 60 * 1000);
+      const smoothedData = smoothData(allData, 'amount_delegated'); 
+      const reversedSmoothedData = [...smoothedData].reverse();
 
-    const value24h = reversedSmoothedData.find(item => new Date(item.ts) <= getDateFromLatest(1));
-    const value7d = reversedSmoothedData.find(item => new Date(item.ts) <= getDateFromLatest(7));
-    const value28d = reversedSmoothedData.find(item => new Date(item.ts) <= getDateFromLatest(28));
+      const latestData = reversedSmoothedData[0];
+      const latestTs = new Date(latestData.ts);
 
-    let valueYtd = smoothedData.find(item => new Date(item.ts) >= new Date(latestTs.getFullYear(), 0, 1));
+      const getDateFromLatest = (days) => new Date(latestTs.getTime() - days * 24 * 60 * 60 * 1000);
 
-    if (!valueYtd) {
-      valueYtd = reversedSmoothedData[reversedSmoothedData.length - 1];
+      const value24h = reversedSmoothedData.find(item => new Date(item.ts) <= getDateFromLatest(1));
+      const value7d = reversedSmoothedData.find(item => new Date(item.ts) <= getDateFromLatest(7));
+      const value28d = reversedSmoothedData.find(item => new Date(item.ts) <= getDateFromLatest(28));
+
+      let valueYtd = smoothedData.find(item => new Date(item.ts) >= new Date(latestTs.getFullYear(), 0, 1));
+
+      if (!valueYtd) {
+        valueYtd = reversedSmoothedData[reversedSmoothedData.length - 1];
+      }
+
+      const delegationsValues = smoothedData.map(item => parseFloat(item.amount_delegated));
+      const standardDeviation = calculateStandardDeviation(delegationsValues);
+
+      const current = parseFloat(allData[allData.length - 1].amount_delegated);
+      const ath = Math.max(...delegationsValues, current);
+      const atl = Math.min(...delegationsValues, current);
+
+      return {
+        current,
+        delta_24h: calculateDelta(current, value24h ? parseFloat(value24h.amount_delegated) : null),
+        delta_7d: calculateDelta(current, value7d ? parseFloat(value7d.amount_delegated) : null),
+        delta_28d: calculateDelta(current, value28d ? parseFloat(value28d.amount_delegated) : null),
+        delta_ytd: calculateDelta(current, valueYtd ? parseFloat(valueYtd.amount_delegated) : null),
+        ath,
+        atl,
+        ath_percentage: calculatePercentage(current, ath),
+        atl_percentage: atl === 0 ? 100 : calculatePercentage(current, atl),
+        standard_deviation: standardDeviation
+      };
     }
 
-    const delegationsValues = smoothedData.map(item => parseFloat(item.amount_delegated));
-    const standardDeviation = calculateStandardDeviation(delegationsValues);
-
-    const current = parseFloat(allData[allData.length - 1].amount_delegated);
-    const ath = Math.max(...delegationsValues, current);
-    const atl = Math.min(...delegationsValues, current);
-
-    return {
-      current,
-      delta_24h: calculateDelta(current, value24h ? parseFloat(value24h.amount_delegated) : null),
-      delta_7d: calculateDelta(current, value7d ? parseFloat(value7d.amount_delegated) : null),
-      delta_28d: calculateDelta(current, value28d ? parseFloat(value28d.amount_delegated) : null),
-      delta_ytd: calculateDelta(current, valueYtd ? parseFloat(valueYtd.amount_delegated) : null),
-      ath,
-      atl,
-      ath_percentage: calculatePercentage(current, ath),
-      atl_percentage: atl === 0 ? 100 : calculatePercentage(current, atl),
-      standard_deviation: standardDeviation
-    };
+    if (chain) {
+      const result = await processChainData(chain);
+      return result ? { [chain]: result } : {};
+    } else {
+      const results = await Promise.all(CHAINS.map(processChainData));
+      return CHAINS.reduce((acc, chain, index) => {
+        if (results[index]) {
+          acc[chain] = results[index];
+        }
+        return acc;
+      }, {});
+    }
   } catch (error) {
     throw new Error('Error fetching Core Delegations summary stats: ' + error.message);
   }
 };
-
 
 // Initial seed
 const fetchAndInsertAllCoreDelegationsData = async (chain) => {
@@ -242,108 +257,54 @@ const fetchAndUpdateLatestCoreDelegationsData = async (chain) => {
   }
 };
 
-const fetchDailyCoreDelegationsData = async (chain) => {
-  const result = await knex.raw(`
-    WITH daily_data AS (
-      SELECT
-        DATE_TRUNC('day', ts) AS date,
-        FIRST_VALUE(SUM(amount_delegated)) OVER (PARTITION BY DATE_TRUNC('day', ts) ORDER BY ts ASC) AS start_of_day_delegations,
-        LAST_VALUE(SUM(amount_delegated)) OVER (PARTITION BY DATE_TRUNC('day', ts) ORDER BY ts ASC ROWS BETWEEN UNBOUNDED PRECEDING AND UNBOUNDED FOLLOWING) AS end_of_day_delegations
-      FROM core_delegations
-      WHERE chain = ?
-        AND pool_id = 1
-        AND collateral_type = '0xC74eA762cF06c9151cE074E6a569a5945b6302E7'
-      GROUP BY DATE_TRUNC('day', ts), ts
-    )
-    SELECT DISTINCT
-      date,
-      end_of_day_delegations - start_of_day_delegations AS daily_delegations_change
-    FROM daily_data
-    ORDER BY date;
-  `, [chain]);
-
-  return result.rows.map(row => ({
-    ts: row.date,
-    daily_delegations_change: parseFloat(row.daily_delegations_change)
-  }));
-};
-
 const getDailyCoreDelegationsData = async (chain) => {
   try {
-    if (chain && CHAINS.includes(chain)) {
-      const data = await fetchDailyCoreDelegationsData(chain);
-      return { [chain]: data };
+    if (chain && !CHAINS.includes(chain)) {
+      throw new Error('Invalid chain parameter');
     }
 
-    const results = await Promise.all(
-      CHAINS.map(async (chain) => {
-        const data = await fetchDailyCoreDelegationsData(chain);
-        return { [chain]: data };
-      })
-    );
+    const fetchDaily = async (chainToFetch) => {
+      const result = await knex.raw(`
+        WITH daily_data AS (
+          SELECT
+            DATE_TRUNC('day', ts) AS date,
+            FIRST_VALUE(SUM(amount_delegated)) OVER (PARTITION BY DATE_TRUNC('day', ts) ORDER BY ts ASC) AS start_of_day_delegations,
+            LAST_VALUE(SUM(amount_delegated)) OVER (PARTITION BY DATE_TRUNC('day', ts) ORDER BY ts ASC ROWS BETWEEN UNBOUNDED PRECEDING AND UNBOUNDED FOLLOWING) AS end_of_day_delegations
+          FROM core_delegations
+          WHERE chain = ?
+            AND pool_id = 1
+            AND collateral_type = '0xC74eA762cF06c9151cE074E6a569a5945b6302E7'
+          GROUP BY DATE_TRUNC('day', ts), ts
+        )
+        SELECT DISTINCT
+          date,
+          end_of_day_delegations - start_of_day_delegations AS daily_delegations_change
+        FROM daily_data
+        ORDER BY date;
+      `, [chainToFetch]);
 
-    return results.reduce((acc, curr) => ({ ...acc, ...curr }), {});
+      return { [chainToFetch]: result.rows.map(row => ({
+        ts: row.date,
+        daily_delegations_change: parseFloat(row.daily_delegations_change)
+      })) };
+    };
+
+    if (chain) {
+      return await fetchDaily(chain);
+    } else {
+      const results = await Promise.all(CHAINS.map(fetchDaily));
+      return results.reduce((acc, curr) => ({ ...acc, ...curr }), {});
+    }
   } catch (error) {
     throw new Error('Error fetching daily core delegations data: ' + error.message);
   }
 };
 
-const getDailyCoreDelegationsSummaryStats = async (chain) => {
-  try {
-    const data = await getDailyCoreDelegationsData(chain);
-    const dailyValues = data[chain].map(item => item.daily_delegations_change);
-
-    if (dailyValues.length === 0) {
-      throw new Error('No data found for the specified chain');
-    }
-
-    const smoothedData = smoothData(data[chain], 'daily_delegations_change');
-    const reversedSmoothedData = [...smoothedData].reverse();
-
-    const latestData = reversedSmoothedData[0];
-    const latestTs = new Date(latestData.ts);
-
-    const getDateFromLatest = (days) => new Date(latestTs.getTime() - days * 24 * 60 * 60 * 1000);
-
-    const value24h = reversedSmoothedData.find(item => new Date(item.ts) <= getDateFromLatest(1));
-    const value7d = reversedSmoothedData.find(item => new Date(item.ts) <= getDateFromLatest(7));
-    const value28d = reversedSmoothedData.find(item => new Date(item.ts) <= getDateFromLatest(28));
-
-    let valueYtd = smoothedData.find(item => new Date(item.ts) >= new Date(latestTs.getFullYear(), 0, 1));
-
-    if (!valueYtd) {
-      valueYtd = reversedSmoothedData[reversedSmoothedData.length - 1];
-    }
-
-    const standardDeviation = calculateStandardDeviation(dailyValues);
-
-    const current = latestData.daily_delegations_change;
-    const ath = Math.max(...dailyValues);
-    const atl = Math.min(...dailyValues);
-
-    return {
-      current,
-      delta_24h: calculateDelta(current, value24h ? value24h.daily_delegations_change : null),
-      delta_7d: calculateDelta(current, value7d ? value7d.daily_delegations_change : null),
-      delta_28d: calculateDelta(current, value28d ? value28d.daily_delegations_change : null),
-      delta_ytd: calculateDelta(current, valueYtd ? valueYtd.daily_delegations_change : null),
-      ath,
-      atl,
-      ath_percentage: calculatePercentage(current, ath),
-      atl_percentage: atl === 0 ? 100 : calculatePercentage(current, atl),
-      standard_deviation: standardDeviation
-    };
-  } catch (error) {
-    throw new Error('Error fetching daily core delegations summary stats: ' + error.message);
-  }
-};
-
 module.exports = {
   getLatestCoreDelegationsData,
-  getAllCoreDelegationsData,
+  getCumulativeCoreDelegationsData,
   fetchAndInsertAllCoreDelegationsData,
   fetchAndUpdateLatestCoreDelegationsData,
   getCoreDelegationsSummaryStats,
   getDailyCoreDelegationsData,
-  getDailyCoreDelegationsSummaryStats,
 };

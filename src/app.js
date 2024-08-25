@@ -14,6 +14,8 @@ try {
   console.error('Error loading Swagger documentation:', error);
 }
 
+const apiRouter = express.Router();
+
 const apyRoutes = require('./routes/apy');
 const tvlRoutes = require('./routes/tvl');
 const coreDelegationsRoutes = require('./routes/coreDelegations');
@@ -25,14 +27,16 @@ const perpMarketHistoryRoutes = require('./routes/perpMarketHistory');
 
 app.use(cors());
 
-app.use('/apy', apyRoutes);
-app.use('/tvl', tvlRoutes);
-app.use('/core-delegations', coreDelegationsRoutes);
-app.use('/pool-rewards', poolRewardsRoutes);
-app.use('/core-account-delegations', coreAccountDelegationsRoutes);
-app.use('/perp-stats', perpStatsRoutes);
-app.use('/perp-account-stats', perpAccountStatsRoutes);
-app.use('/perp-market-history', perpMarketHistoryRoutes);
+app.use('/api/v1', apiRouter);
+
+apiRouter.use('/apy', apyRoutes);
+apiRouter.use('/tvl', tvlRoutes);
+apiRouter.use('/core-delegations', coreDelegationsRoutes);
+apiRouter.use('/pool-rewards', poolRewardsRoutes);
+apiRouter.use('/core-account-delegations', coreAccountDelegationsRoutes);
+apiRouter.use('/perp-stats', perpStatsRoutes);
+apiRouter.use('/perp-account-stats', perpAccountStatsRoutes);
+apiRouter.use('/perp-market-history', perpMarketHistoryRoutes);
 
 // Setup Swagger UI with the combined document
 if (swaggerDocument) {

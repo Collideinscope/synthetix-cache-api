@@ -2,106 +2,93 @@ const express = require('express');
 const router = express.Router();
 const {
   getLatestCoreDelegationsData,
-  getAllCoreDelegationsData,
+  getCumulativeCoreDelegationsData,
   getCoreDelegationsSummaryStats,
   getDailyCoreDelegationsData,
-  getDailyCoreDelegationsSummaryStats,
 } = require('../services/coreDelegationsService');
+const { CHAINS } = require('../helpers');
 
-const { CHAINS } = require('../helpers')
+const validateOptionalChain = (chain) => {
+  if (chain && !CHAINS.includes(chain)) {
+    throw new Error("Invalid chain parameter");
+  }
+};
 
-router.get('/latest/:chain?', async (req, res) => {
+router.get('/latest', async (req, res) => {
   try {
-    const { chain } = req.params;
+    const { chain } = req.query;
+    validateOptionalChain(chain);
     const result = await getLatestCoreDelegationsData(chain);
-    if (chain) {
-      if (!result[chain] || result[chain].length === 0) {
-        return res.status(404).send('Core delegations data not found for the specified chain');
-      }
-    } else {
-      if (Object.values(result).every(data => data.length === 0)) {
-        return res.status(404).send('Core delegations data not found');
-      }
+    if (chain && (!result[chain] || result[chain].length === 0)) {
+      return res.status(404).send('Core delegations data not found for the specified chain');
+    }
+    if (!chain && Object.values(result).every(data => data.length === 0)) {
+      return res.status(404).send('Core delegations data not found');
     }
     return res.json(result);
   } catch (error) {
-    console.error(error);
-    return res.status(500).send('Server error');
+    console.error('Error in /core-delegations/latest route:', error);
+    return res.status(400).json({ error: error.message });
   }
 });
 
-router.get('/all/:chain?', async (req, res) => {
+router.get('/cumulative', async (req, res) => {
   try {
-    const { chain } = req.params;
-    const result = await getAllCoreDelegationsData(chain);
-    if (chain) {
-      if (!result[chain] || result[chain].length === 0) {
-        return res.status(404).send('Core delegations data not found for the specified chain');
-      }
-    } else {
-      if (Object.values(result).every(data => data.length === 0)) {
-        return res.status(404).send('Core delegations data not found');
-      }
+    const { chain } = req.query;
+    validateOptionalChain(chain);
+    const result = await getCumulativeCoreDelegationsData(chain);
+    if (chain && (!result[chain] || result[chain].length === 0)) {
+      return res.status(404).send('Core delegations data not found for the specified chain');
+    }
+    if (!chain && Object.values(result).every(data => data.length === 0)) {
+      return res.status(404).send('Core delegations data not found');
     }
     return res.json(result);
   } catch (error) {
-    console.error(error);
-    return res.status(500).send('Server error');
+    console.error('Error in /core-delegations/cumulative route:', error);
+    return res.status(400).json({ error: error.message });
   }
 });
 
-router.get('/summary/:chain', async (req, res) => {
+router.get('/summary', async (req, res) => {
   try {
-    const { chain } = req.params;
-    if (!chain) {
-      return res.status(400).json({ error: "Chain parameter is required" });
-    }
-    if (!CHAINS.includes(chain)) {
-      return res.status(400).json({ error: "Invalid chain parameter" });
-    }
+    const { chain } = req.query;
+    validateOptionalChain(chain);
     const stats = await getCoreDelegationsSummaryStats(chain);
     res.json(stats);
   } catch (error) {
     console.error('Error in /core-delegations/summary route:', error);
-    res.status(500).json({ error: error.message });
+    res.status(400).json({ error: error.message });
   }
 });
 
-router.get('/daily/:chain', async (req, res) => {
+router.get('/daily', async (req, res) => {
   try {
-    const { chain } = req.params;
-    if (!chain) {
-      return res.status(400).json({ error: "Chain parameter is required" });
-    }
-    if (!CHAINS.includes(chain)) {
-      return res.status(400).json({ error: "Invalid chain parameter" });
-    }
+    const { chain } = req.query;
+    validateOptionalChain(chain);
     const data = await getDailyCoreDelegationsData(chain);
-    console.log(data)
-    if (!data[chain] || data[chain].length === 0) {
+    if (chain && (!data[chain] || data[chain].length === 0)) {
       return res.status(404).send('Daily core delegations data not found for the specified chain');
+    }
+    if (!chain && Object.values(data).every(chainData => chainData.length === 0)) {
+      return res.status(404).send('Daily core delegations data not found');
     }
     res.json(data);
   } catch (error) {
     console.error('Error in /core-delegations/daily route:', error);
-    res.status(500).json({ error: error.message });
+    res.status(400).json({ error: error.message });
   }
 });
 
-router.get('/daily/summary/:chain', async (req, res) => {
+router.get('/daily/summary', async (req, res) => {
   try {
-    const { chain } = req.params;
-    if (!chain) {
-      return res.status(400).json({ error: "Chain parameter is required" });
-    }
-    if (!CHAINS.includes(chain)) {
-      return res.status(400).json({ error: "Invalid chain parameter" });
-    }
+    const { chain } = req.query;
+    validateOptionalChain(chain);
     const stats = await getDailyCoreDelegationsSummaryStats(chain);
     res.json(stats);
   } catch (error) {
     console.error('Error in /core-delegations/daily/summary route:', error);
-    res.status(500).json({ error: error.message });
+    res.status(400).json({ error: error.message });
   }
 });
 

@@ -1,5 +1,5 @@
 const { fetchAndInsertAllAPYData } = require('../services/apyService');
-const { fetchAndInsertAllTVLData } = require('../services/tvlService');
+const { fetchAndInsertTVLData } = require('../services/tvlService');
 const { fetchAndInsertAllCoreDelegationsData } = require('../services/coreDelegationsService');
 const { fetchAndInsertAllPoolRewardsData } = require('../services/poolRewardsService');
 const { fetchAndInsertAllCoreAccountDelegationsData } = require('../services/coreAccountDelegationsService');
@@ -20,8 +20,8 @@ const seedAllData = async () => {
   /* TVL Seeding */
   console.log('Seeding TVL data...');
 
-  await fetchAndInsertAllTVLData('base');
-  await fetchAndInsertAllTVLData('arbitrum');
+  await fetchAndInsertTVLData('base');
+  await fetchAndInsertTVLData('arbitrum');
 
   console.log('Seeding TVL data completed.');
 
