@@ -1,4 +1,4 @@
-const { knex } = require('../config/db');
+const { knex, troyDBKnex } = require('../config/db');
 const { CHAINS } = require('../helpers');
 const {
   calculateDelta,
@@ -257,6 +257,89 @@ const getDailyExchangeFeesData = async (chain) => {
   }
 };
 
+const fetchAndInsertAllPerpStatsData = async (chain) => {
+  if (!chain) {
+    console.error(`Chain must be provided for data updates.`);
+  }
+
+  try {
+    const tableName = `prod_${chain}_mainnet.fct_perp_stats_daily_${chain}_mainnet`;
+
+    const rows = await troyDBKnex.raw(`
+      SELECT ts, cumulative_volume, cumulative_collected_fees, cumulative_exchange_fees
+      FROM ${tableName}
+      ORDER BY ts DESC;
+    `);
+
+    const dataToInsert = rows.rows.map(row => ({
+      ...row,
+      chain,
+    }));
+
+    await knex('perp_stats')
+      .insert(dataToInsert)
+      .onConflict(['chain', 'ts'])
+      .merge({
+        cumulative_volume: knex.raw('GREATEST(perp_stats.cumulative_volume, excluded.cumulative_volume)'),
+        cumulative_collected_fees: knex.raw('EXCLUDED.cumulative_collected_fees'),
+        cumulative_exchange_fees: knex.raw('EXCLUDED.cumulative_exchange_fees')
+      });
+
+    console.log(`Perp stats data seeded successfully for ${chain} chain.`);
+  } catch (error) {
+    console.error(`Error seeding perp stats data for ${chain} chain:`, error);
+  }
+};
+
+const fetchAndUpdateLatestPerpStatsData = async (chain) => {
+  if (!chain) {
+    console.error(`Chain must be provided for data updates.`);
+    return;
+  }
+
+  try {
+    const tableName = `prod_${chain}_mainnet.fct_perp_stats_daily_${chain}_mainnet`;
+
+    const lastTimestampResult = await knex('perp_stats')
+      .where('chain', chain)
+      .orderBy('ts', 'desc')
+      .first();
+
+    const lastTimestamp = lastTimestampResult.ts;
+
+    const newRows = await troyDBKnex.raw(`
+      SELECT ts, cumulative_volume, cumulative_collected_fees, cumulative_exchange_fees
+      FROM ${tableName}
+      WHERE ts > ?
+      ORDER BY ts DESC;
+    `, [lastTimestamp]);
+
+    if (newRows.rows.length === 0) {
+      console.log(`No new perp stats data to update for ${chain} chain.`);
+      return;
+    }
+
+    const dataToInsert = newRows.rows.map(row => ({
+      ...row,
+      chain,
+    }));
+
+    if (dataToInsert.length > 0) {
+      await knex('perp_stats')
+        .insert(dataToInsert)
+        .onConflict(['chain', 'ts'])
+        .merge({
+          cumulative_volume: knex.raw('EXCLUDED.cumulative_volume'),
+          cumulative_collected_fees: knex.raw('EXCLUDED.cumulative_collected_fees'),
+          cumulative_exchange_fees: knex.raw('EXCLUDED.cumulative_exchange_fees')        });
+    }
+
+    console.log(`Perp stats data updated successfully for ${chain} chain.`);
+  } catch (error) {
+    console.error(`Error updating perp stats data for ${chain} chain:`, error);
+  }
+};
+
 module.exports = {
   getLatestPerpStatsData,
   getCumulativeVolumeSummaryStats,
@@ -265,4 +348,6 @@ module.exports = {
   getCumulativeExchangeFeesData,
   getDailyVolumeData,
   getDailyExchangeFeesData,
+  fetchAndInsertAllPerpStatsData,
+  fetchAndUpdateLatestPerpStatsData,
 };
