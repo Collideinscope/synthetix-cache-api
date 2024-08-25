@@ -6,275 +6,298 @@ info:
 servers:
   - url: https://synthetix-cache-api-f7db01015ec1.herokuapp.com
 paths:
-  /apy/latest/{chain}:
+  /apy/latest:
     get:
       summary: Get the latest APY data
       tags:
         - APY
       parameters:
-        - in: path
+        - in: query
           name: chain
           schema:
             type: string
           required: false
           description: The chain to get the APY data for
+        - in: query
+          name: collateralType
+          schema:
+            type: string
+          required: true
+          description: The collateral type to get the APY data for
       responses:
         200:
           description: The latest APY data
           content:
             application/json:
               schema:
-                type: array
-                items:
-                  type: object
-                  properties:
-                    id:
-                      type: integer
-                      example: 1
-                    created_at:
-                      type: string
-                      format: date-time
-                      example: '2023-06-24T12:34:56Z'
-                    updated_at:
-                      type: string
-                      format: date-time
-                      example: '2023-06-24T12:34:56Z'
-                    ts:
-                      type: string
-                      format: date-time
-                      example: '2023-06-24T12:34:56Z'
-                    chain:
-                      type: string
-                      example: 'mainnet'
-                    pool_id:
-                      type: integer
-                      example: 1
-                    collateral_type:
-                      type: string
-                      example: '0x1234567890abcdef'
-                    collateral_value:
-                      type: number
-                      format: double
-                      example: 1000.0
-                    apys:
-                      type: object
-                      properties:
-                        apy_24h:
-                          type: object
-                          properties:
-                            minute:
-                              type: number
-                              format: double
-                              example: 0.00000011
-                            hour:
-                              type: number
-                              format: double
-                              example: 0.00000640
-                            week:
-                              type: number
-                              format: double
-                              example: 0.00107918
-                            month:
-                              type: number
-                              format: double
-                              example: 0.00468485
-                            year:
-                              type: number
-                              format: double
-                              example: 0.05768958
-                        apy_7d:
-                          type: object
-                          properties:
-                            minute:
-                              type: number
-                              format: double
-                              example: 0.00000026
-                            hour:
-                              type: number
-                              format: double
-                              example: 0.00001536
-                            week:
-                              type: number
-                              format: double
-                              example: 0.00259109
-                            month:
-                              type: number
-                              format: double
-                              example: 0.01127665
-                            year:
-                              type: number
-                              format: double
-                              example: 0.14403616
-                        apy_28d:
-                          type: object
-                          properties:
-                            minute:
-                              type: number
-                              format: double
-                              example: 0.00000043
-                            hour:
-                              type: number
-                              format: double
-                              example: 0.00002573
-                            week:
-                              type: number
-                              format: double
-                              example: 0.00434311
-                            month:
-                              type: number
-                              format: double
-                              example: 0.01895681
-                            year:
-                              type: number
-                              format: double
-                              example: 0.25276421
+                type: object
+                additionalProperties:
+                  type: array
+                  items:
+                    type: object
+                    properties:
+                      id:
+                        type: integer
+                        example: 1
+                      created_at:
+                        type: string
+                        format: date-time
+                        example: '2023-06-24T12:34:56Z'
+                      updated_at:
+                        type: string
+                        format: date-time
+                        example: '2023-06-24T12:34:56Z'
+                      ts:
+                        type: string
+                        format: date-time
+                        example: '2023-06-24T12:34:56Z'
+                      chain:
+                        type: string
+                        example: 'mainnet'
+                      pool_id:
+                        type: integer
+                        example: 1
+                      collateral_type:
+                        type: string
+                        example: '0x1234567890abcdef'
+                      collateral_value:
+                        type: number
+                        format: double
+                        example: 1000.0
+                      apys:
+                        type: object
+                        properties:
+                          apy_24h:
+                            type: object
+                            properties:
+                              minute:
+                                type: number
+                                format: double
+                                example: 0.00000011
+                              hour:
+                                type: number
+                                format: double
+                                example: 0.00000640
+                              week:
+                                type: number
+                                format: double
+                                example: 0.00107918
+                              month:
+                                type: number
+                                format: double
+                                example: 0.00468485
+                              year:
+                                type: number
+                                format: double
+                                example: 0.05768958
+                          apy_7d:
+                            type: object
+                            properties:
+                              minute:
+                                type: number
+                                format: double
+                                example: 0.00000026
+                              hour:
+                                type: number
+                                format: double
+                                example: 0.00001536
+                              week:
+                                type: number
+                                format: double
+                                example: 0.00259109
+                              month:
+                                type: number
+                                format: double
+                                example: 0.01127665
+                              year:
+                                type: number
+                                format: double
+                                example: 0.14403616
+                          apy_28d:
+                            type: object
+                            properties:
+                              minute:
+                                type: number
+                                format: double
+                                example: 0.00000043
+                              hour:
+                                type: number
+                                format: double
+                                example: 0.00002573
+                              week:
+                                type: number
+                                format: double
+                                example: 0.00434311
+                              month:
+                                type: number
+                                format: double
+                                example: 0.01895681
+                              year:
+                                type: number
+                                format: double
+                                example: 0.25276421
+        400:
+          description: Bad request (invalid parameters)
         404:
           description: APY data not found
         500:
           description: Server error
-  /apy/all/{chain}:
+
+  /apy/all:
     get:
-      summary: Get all APY data for a specific chain
+      summary: Get all APY data
       tags:
         - APY
       parameters:
-        - in: path
+        - in: query
           name: chain
           schema:
             type: string
-          required: true
+          required: false
           description: The chain to get the APY data for
+        - in: query
+          name: collateralType
+          schema:
+            type: string
+          required: true
+          description: The collateral type to get the APY data for
       responses:
         200:
-          description: All APY data for the specified chain
+          description: All APY data
           content:
             application/json:
               schema:
                 type: object
-                properties:
-                  '{chain}':
-                    type: array
-                    items:
-                      type: object
-                      properties:
-                        id:
-                          type: integer
-                          example: 1
-                        created_at:
-                          type: string
-                          format: date-time
-                          example: '2023-06-24T12:34:56Z'
-                        updated_at:
-                          type: string
-                          format: date-time
-                          example: '2023-06-24T12:34:56Z'
-                        ts:
-                          type: string
-                          format: date-time
-                          example: '2023-06-24T12:34:56Z'
-                        chain:
-                          type: string
-                          example: 'mainnet'
-                        pool_id:
-                          type: integer
-                          example: 1
-                        collateral_type:
-                          type: string
-                          example: '0x1234567890abcdef'
-                        collateral_value:
-                          type: number
-                          format: double
-                          example: 1000.0
-                        apys:
-                          type: object
-                          properties:
-                            apy_24h:
-                              type: object
-                              properties:
-                                minute:
-                                  type: number
-                                  format: double
-                                  example: 0.00000011
-                                hour:
-                                  type: number
-                                  format: double
-                                  example: 0.00000640
-                                week:
-                                  type: number
-                                  format: double
-                                  example: 0.00107918
-                                month:
-                                  type: number
-                                  format: double
-                                  example: 0.00468485
-                                year:
-                                  type: number
-                                  format: double
-                                  example: 0.05768958
-                            apy_7d:
-                              type: object
-                              properties:
-                                minute:
-                                  type: number
-                                  format: double
-                                  example: 0.00000026
-                                hour:
-                                  type: number
-                                  format: double
-                                  example: 0.00001536
-                                week:
-                                  type: number
-                                  format: double
-                                  example: 0.00259109
-                                month:
-                                  type: number
-                                  format: double
-                                  example: 0.01127665
-                                year:
-                                  type: number
-                                  format: double
-                                  example: 0.14403616
-                            apy_28d:
-                              type: object
-                              properties:
-                                minute:
-                                  type: number
-                                  format: double
-                                  example: 0.00000043
-                                hour:
-                                  type: number
-                                  format: double
-                                  example: 0.00002573
-                                week:
-                                  type: number
-                                  format: double
-                                  example: 0.00434311
-                                month:
-                                  type: number
-                                  format: double
-                                  example: 0.01895681
-                                year:
-                                  type: number
-                                  format: double
-                                  example: 0.25276421
+                additionalProperties:
+                  type: array
+                  items:
+                    type: object
+                    properties:
+                      id:
+                        type: integer
+                        example: 1
+                      created_at:
+                        type: string
+                        format: date-time
+                        example: '2023-06-24T12:34:56Z'
+                      updated_at:
+                        type: string
+                        format: date-time
+                        example: '2023-06-24T12:34:56Z'
+                      ts:
+                        type: string
+                        format: date-time
+                        example: '2023-06-24T12:34:56Z'
+                      chain:
+                        type: string
+                        example: 'mainnet'
+                      pool_id:
+                        type: integer
+                        example: 1
+                      collateral_type:
+                        type: string
+                        example: '0x1234567890abcdef'
+                      collateral_value:
+                        type: number
+                        format: double
+                        example: 1000.0
+                      apys:
+                        type: object
+                        properties:
+                          apy_24h:
+                            type: object
+                            properties:
+                              minute:
+                                type: number
+                                format: double
+                                example: 0.00000011
+                              hour:
+                                type: number
+                                format: double
+                                example: 0.00000640
+                              week:
+                                type: number
+                                format: double
+                                example: 0.00107918
+                              month:
+                                type: number
+                                format: double
+                                example: 0.00468485
+                              year:
+                                type: number
+                                format: double
+                                example: 0.05768958
+                          apy_7d:
+                            type: object
+                            properties:
+                              minute:
+                                type: number
+                                format: double
+                                example: 0.00000026
+                              hour:
+                                type: number
+                                format: double
+                                example: 0.00001536
+                              week:
+                                type: number
+                                format: double
+                                example: 0.00259109
+                              month:
+                                type: number
+                                format: double
+                                example: 0.01127665
+                              year:
+                                type: number
+                                format: double
+                                example: 0.14403616
+                          apy_28d:
+                            type: object
+                            properties:
+                              minute:
+                                type: number
+                                format: double
+                                example: 0.00000043
+                              hour:
+                                type: number
+                                format: double
+                                example: 0.00002573
+                              week:
+                                type: number
+                                format: double
+                                example: 0.00434311
+                              month:
+                                type: number
+                                format: double
+                                example: 0.01895681
+                              year:
+                                type: number
+                                format: double
+                                example: 0.25276421
         400:
-          description: Invalid or missing chain parameter
+          description: Bad request (invalid parameters)
         404:
-          description: APY data not found for the specified chain
+          description: APY data not found
         500:
           description: Server error
-  /apy/summary/{chain}:
+
+  /apy/summary:
     get:
       summary: Get the APY summary statistics
       tags:
         - APY
       parameters:
-        - in: path
+        - in: query
           name: chain
           schema:
             type: string
-          required: true
+          required: false
           description: The chain to get the APY summary statistics for
+        - in: query
+          name: collateralType
+          schema:
+            type: string
+          required: true
+          description: The collateral type to get the APY summary statistics for
       responses:
         200:
           description: The APY summary statistics
@@ -282,65 +305,74 @@ paths:
             application/json:
               schema:
                 type: object
-                properties:
-                  current:
-                    type: number
-                    format: double
-                    example: 0.14403616
-                  delta_24h:
-                    type: number
-                    format: double
-                    example: 0.00259109
-                  delta_7d:
-                    type: number
-                    format: double
-                    example: 0.01127665
-                  delta_28d:
-                    type: number
-                    format: double
-                    example: 0.01895681
-                  delta_ytd:
-                    type: number
-                    format: double
-                    example: 0.25276421
-                  ath:
-                    type: number
-                    format: double
-                    example: 0.25276421
-                  atl:
-                    type: number
-                    format: double
-                    example: 0.05768958
-                  ath_percentage:
-                    type: number
-                    format: double
-                    example: 0.1
-                  atl_percentage:
-                    type: number
-                    format: double
-                    example: 0.2
-                  standard_deviation:
-                    type: number
-                    format: double
-                    example: 0.03
+                additionalProperties:
+                  type: object
+                  properties:
+                    current:
+                      type: number
+                      format: double
+                      example: 0.14403616
+                    delta_24h:
+                      type: number
+                      format: double
+                      example: 0.00259109
+                    delta_7d:
+                      type: number
+                      format: double
+                      example: 0.01127665
+                    delta_28d:
+                      type: number
+                      format: double
+                      example: 0.01895681
+                    delta_ytd:
+                      type: number
+                      format: double
+                      example: 0.25276421
+                    ath:
+                      type: number
+                      format: double
+                      example: 0.25276421
+                    atl:
+                      type: number
+                      format: double
+                      example: 0.05768958
+                    ath_percentage:
+                      type: number
+                      format: double
+                      example: 0.1
+                    atl_percentage:
+                      type: number
+                      format: double
+                      example: 0.2
+                    standard_deviation:
+                      type: number
+                      format: double
+                      example: 0.03
         400:
-          description: Invalid or missing chain parameter
+          description: Bad request (invalid parameters)
         404:
           description: APY summary statistics not found
         500:
           description: Server error
-  /apy/daily/{chain}:
+
+  /apy/daily:
     get:
       summary: Get daily aggregated APY data
       tags:
         - APY
       parameters:
-        - in: path
+        - in: query
           name: chain
           schema:
             type: string
-          required: true
+          required: false
           description: The chain to get the daily aggregated APY data for
+        - in: query
+          name: collateralType
+          schema:
+            type: string
+          required: true
+          description: The collateral type to get the daily aggregated APY data for
       responses:
         200:
           description: Daily aggregated APY data
@@ -348,100 +380,34 @@ paths:
             application/json:
               schema:
                 type: object
-                properties:
-                  '{chain}':
-                    type: array
-                    items:
-                      type: object
-                      properties:
-                        ts:
-                          type: string
-                          format: date-time
-                          example: '2023-06-24T00:00:00Z'
-                        daily_apy_percentage_delta:
-                          type: number
-                          format: double
-                          example: 0.0123
-                          nullable: true
+                additionalProperties:
+                  type: array
+                  items:
+                    type: object
+                    properties:
+                      ts:
+                        type: string
+                        format: date-time
+                        example: '2023-06-24T00:00:00Z'
+                      daily_apy_percentage_delta:
+                        type: number
+                        format: double
+                        example: 0.0123
+                        nullable: true
         400:
-          description: Invalid or missing chain parameter
+          description: Bad request (invalid parameters)
         404:
-          description: Daily aggregated APY data not found for the specified chain
+          description: Daily aggregated APY data not found
         500:
           description: Server error
-  /apy/daily/summary/{chain}:
-    get:
-      summary: Get daily APY summary statistics
-      tags:
-        - APY
-      parameters:
-        - in: path
-          name: chain
-          schema:
-            type: string
-          required: true
-          description: The chain to get the daily APY summary statistics for
-      responses:
-        200:
-          description: Daily APY summary statistics
-          content:
-            application/json:
-              schema:
-                type: object
-                properties:
-                  current:
-                    type: number
-                    format: double
-                    example: 0.14403616
-                  delta_24h:
-                    type: number
-                    format: double
-                    example: 0.00259109
-                  delta_7d:
-                    type: number
-                    format: double
-                    example: 0.01127665
-                  delta_28d:
-                    type: number
-                    format: double
-                    example: 0.01895681
-                  delta_ytd:
-                    type: number
-                    format: double
-                    example: 0.25276421
-                  ath:
-                    type: number
-                    format: double
-                    example: 0.25276421
-                  atl:
-                    type: number
-                    format: double
-                    example: 0.05768958
-                  ath_percentage:
-                    type: number
-                    format: double
-                    example: 0.1
-                  atl_percentage:
-                    type: number
-                    format: double
-                    example: 0.2
-                  standard_deviation:
-                    type: number
-                    format: double
-                    example: 0.03
-        400:
-          description: Invalid or missing chain parameter
-        404:
-          description: Daily APY summary statistics not found
-        500:
-          description: Server error
-  /tvl/latest/{chain}:
+            
+  /tvl/latest:
     get:
       summary: Get the latest TVL data
       tags:
         - TVL
       parameters:
-        - in: path
+        - in: query
           name: chain
           schema:
             type: string
@@ -505,13 +471,14 @@ paths:
           description: TVL data not found
         500:
           description: Server error
-  /tvl/all/{chain}:
+
+  /tvl/cumulative:
     get:
-      summary: Get all TVL data
+      summary: Get cumulative TVL data
       tags:
         - TVL
       parameters:
-        - in: path
+        - in: query
           name: chain
           schema:
             type: string
@@ -519,7 +486,7 @@ paths:
           description: The chain to get the TVL data for
       responses:
         200:
-          description: All TVL data
+          description: Cumulative TVL data
           content:
             application/json:
               schema:
@@ -575,17 +542,18 @@ paths:
           description: TVL data not found
         500:
           description: Server error
-  /tvl/summary/{chain}:
+
+  /tvl/summary:
     get:
       summary: Get the TVL summary statistics
       tags:
         - TVL
       parameters:
-        - in: path
+        - in: query
           name: chain
           schema:
             type: string
-          required: true
+          required: false
           description: The chain to get the TVL summary statistics for
       responses:
         200:
@@ -594,62 +562,67 @@ paths:
             application/json:
               schema:
                 type: object
-                properties:
-                  current:
-                    type: number
-                    format: double
-                    example: 25611607.372685123
-                  delta_24h:
-                    type: number
-                    format: double
-                    example: 1000000.5
-                  delta_7d:
-                    type: number
-                    format: double
-                    example: 2500000.75
-                  delta_28d:
-                    type: number
-                    format: double
-                    example: 5000000.25
-                  delta_ytd:
-                    type: number
-                    format: double
-                    example: 10000000.5
-                  ath:
-                    type: number
-                    format: double
-                    example: 30000000.0
-                  atl:
-                    type: number
-                    format: double
-                    example: 20000000.0
-                  ath_percentage:
-                    type: number
-                    format: double
-                    example: 85.37
-                  atl_percentage:
-                    type: number
-                    format: double
-                    example: 128.06
-                  standard_deviation:
-                    type: number
-                    format: double
-                    example: 1500000.25
+                additionalProperties:
+                  type: object
+                  properties:
+                    current:
+                      type: number
+                      format: double
+                      example: 25611607.372685123
+                    delta_24h:
+                      type: number
+                      format: double
+                      example: 1000000.5
+                    delta_7d:
+                      type: number
+                      format: double
+                      example: 2500000.75
+                    delta_28d:
+                      type: number
+                      format: double
+                      example: 5000000.25
+                    delta_ytd:
+                      type: number
+                      format: double
+                      example: 10000000.5
+                    ath:
+                      type: number
+                      format: double
+                      example: 30000000.0
+                    atl:
+                      type: number
+                      format: double
+                      example: 20000000.0
+                    ath_percentage:
+                      type: number
+                      format: double
+                      example: 85.37
+                    atl_percentage:
+                      type: number
+                      format: double
+                      example: 128.06
+                    standard_deviation:
+                      type: number
+                      format: double
+                      example: 1500000.25
         400:
-          description: Bad request (invalid or missing chain parameter)
+          description: Bad request (invalid chain parameter)
+        404:
+          description: TVL summary statistics not found
         500:
           description: Server error
-  /tvl/daily/{chain}:
+
+  /tvl/daily:
     get:
       summary: Get daily TVL data
       tags:
         - TVL
       parameters:
-        - in: path
+        - in: query
           name: chain
           schema:
             type: string
-          required: true
+          required: false
           description: The chain to get the daily TVL data for
       responses:
         200:
@@ -658,97 +631,33 @@ paths:
             application/json:
               schema:
                 type: object
-                properties:
-                  '{chain}':
-                    type: array
-                    items:
-                      type: object
-                      properties:
-                        ts:
-                          type: string
-                          format: date-time
-                          example: '2024-06-25T00:00:00.000Z'
-                        daily_tvl_change:
-                          type: number
-                          format: double
-                          example: 1000000.5
+                additionalProperties:
+                  type: array
+                  items:
+                    type: object
+                    properties:
+                      ts:
+                        type: string
+                        format: date-time
+                        example: '2024-06-25T00:00:00.000Z'
+                      daily_tvl_change:
+                        type: number
+                        format: double
+                        example: 1000000.5
         400:
-          description: Bad request (invalid or missing chain parameter)
+          description: Bad request (invalid chain parameter)
         404:
-          description: Daily TVL data not found for the specified chain
+          description: Daily TVL data not found
         500:
           description: Server error
-  /tvl/daily/summary/{chain}:
-    get:
-      summary: Get daily TVL summary statistics
-      tags:
-        - TVL
-      parameters:
-        - in: path
-          name: chain
-          schema:
-            type: string
-          required: true
-          description: The chain to get the daily TVL summary statistics for
-      responses:
-        200:
-          description: Daily TVL summary statistics
-          content:
-            application/json:
-              schema:
-                type: object
-                properties:
-                  current:
-                    type: number
-                    format: double
-                    example: 1000000.5
-                  delta_24h:
-                    type: number
-                    format: double
-                    example: 50000.25
-                  delta_7d:
-                    type: number
-                    format: double
-                    example: 150000.75
-                  delta_28d:
-                    type: number
-                    format: double
-                    example: 500000.25
-                  delta_ytd:
-                    type: number
-                    format: double
-                    example: 2000000.5
-                  ath:
-                    type: number
-                    format: double
-                    example: 3000000.0
-                  atl:
-                    type: number
-                    format: double
-                    example: 500000.0
-                  ath_percentage:
-                    type: number
-                    format: double
-                    example: 33.33
-                  atl_percentage:
-                    type: number
-                    format: double
-                    example: 200.0
-                  standard_deviation:
-                    type: number
-                    format: double
-                    example: 250000.25
-        400:
-          description: Bad request (invalid or missing chain parameter)
-        500:
-          description: Server error
-  /core-delegations/latest/{chain}:
+            
+  /core-delegations/latest:
     get:
       summary: Get the latest core delegations data
       tags:
         - Core Delegations
       parameters:
-        - in: path
+        - in: query
           name: chain
           schema:
             type: string
@@ -798,17 +707,20 @@ paths:
                         type: string
                         format: date-time
                         example: '2024-06-27T15:37:37.000Z'
+        400:
+          description: Bad request (invalid chain parameter)
         404:
           description: Core delegations data not found
         500:
           description: Server error
-  /core-delegations/all/{chain}:
+
+  /core-delegations/cumulative:
     get:
-      summary: Get all core delegations data
+      summary: Get cumulative core delegations data
       tags:
         - Core Delegations
       parameters:
-        - in: path
+        - in: query
           name: chain
           schema:
             type: string
@@ -816,7 +728,7 @@ paths:
           description: The chain to get the core delegations data for
       responses:
         200:
-          description: All core delegations data
+          description: Cumulative core delegations data
           content:
             application/json:
               schema:
@@ -858,21 +770,24 @@ paths:
                         type: string
                         format: date-time
                         example: '2024-06-27T15:11:44.000Z'
+        400:
+          description: Bad request (invalid chain parameter)
         404:
           description: Core delegations data not found
         500:
           description: Server error
-  /core-delegations/summary/{chain}:
+
+  /core-delegations/summary:
     get:
       summary: Get the core delegations summary statistics
       tags:
         - Core Delegations
       parameters:
-        - in: path
+        - in: query
           name: chain
           schema:
             type: string
-          required: true
+          required: false
           description: The chain to get the core delegations summary statistics for
       responses:
         200:
@@ -881,62 +796,65 @@ paths:
             application/json:
               schema:
                 type: object
-                properties:
-                  current:
-                    type: number
-                    format: double
-                    example: 26161135.01363557
-                  delta_24h:
-                    type: number
-                    format: double
-                    example: 1000000.5
-                  delta_7d:
-                    type: number
-                    format: double
-                    example: 2500000.75
-                  delta_28d:
-                    type: number
-                    format: double
-                    example: 5000000.25
-                  delta_ytd:
-                    type: number
-                    format: double
-                    example: 10000000.5
-                  ath:
-                    type: number
-                    format: double
-                    example: 30000000.0
-                  atl:
-                    type: number
-                    format: double
-                    example: 20000000.0
-                  ath_percentage:
-                    type: number
-                    format: double
-                    example: 87.20
-                  atl_percentage:
-                    type: number
-                    format: double
-                    example: 130.81
-                  standard_deviation:
-                    type: number
-                    format: double
-                    example: 1500000.25
+                additionalProperties:
+                  type: object
+                  properties:
+                    current:
+                      type: number
+                      format: double
+                      example: 26161135.01363557
+                    delta_24h:
+                      type: number
+                      format: double
+                      example: 1000000.5
+                    delta_7d:
+                      type: number
+                      format: double
+                      example: 2500000.75
+                    delta_28d:
+                      type: number
+                      format: double
+                      example: 5000000.25
+                    delta_ytd:
+                      type: number
+                      format: double
+                      example: 10000000.5
+                    ath:
+                      type: number
+                      format: double
+                      example: 30000000.0
+                    atl:
+                      type: number
+                      format: double
+                      example: 20000000.0
+                    ath_percentage:
+                      type: number
+                      format: double
+                      example: 87.20
+                    atl_percentage:
+                      type: number
+                      format: double
+                      example: 130.81
+                    standard_deviation:
+                      type: number
+                      format: double
+                      example: 1500000.25
         400:
-          description: Bad request (invalid or missing chain parameter)
+          description: Bad request (invalid chain parameter)
         500:
           description: Server error
-  /core-delegations/daily/{chain}:
+
+  /core-delegations/daily:
     get:
       summary: Get daily core delegations data
       tags:
         - Core Delegations
       parameters:
-        - in: path
+        - in: query
           name: chain
           schema:
             type: string
-          required: true
+          required: false
           description: The chain to get the daily core delegations data for
       responses:
         200:
@@ -945,108 +863,43 @@ paths:
             application/json:
               schema:
                 type: object
-                properties:
-                  '{chain}':
-                    type: array
-                    items:
-                      type: object
-                      properties:
-                        ts:
-                          type: string
-                          format: date-time
-                          example: '2024-06-27T00:00:00.000Z'
-                        daily_delegations_change:
-                          type: number
-                          format: double
-                          example: 1000000.5
+                additionalProperties:
+                  type: array
+                  items:
+                    type: object
+                    properties:
+                      ts:
+                        type: string
+                        format: date-time
+                        example: '2024-06-27T00:00:00.000Z'
+                      daily_delegations_change:
+                        type: number
+                        format: double
+                        example: 1000000.5
         400:
-          description: Bad request (invalid or missing chain parameter)
+          description: Bad request (invalid chain parameter)
         404:
-          description: Daily core delegations data not found for the specified chain
+          description: Daily core delegations data not found
         500:
           description: Server error
-  /core-delegations/daily/summary/{chain}:
-    get:
-      summary: Get daily core delegations summary statistics
-      tags:
-        - Core Delegations
-      parameters:
-        - in: path
-          name: chain
-          schema:
-            type: string
-          required: true
-          description: The chain to get the daily core delegations summary statistics for
-      responses:
-        200:
-          description: Daily core delegations summary statistics
-          content:
-            application/json:
-              schema:
-                type: object
-                properties:
-                  current:
-                    type: number
-                    format: double
-                    example: 1000000.5
-                  delta_24h:
-                    type: number
-                    format: double
-                    example: 50000.25
-                  delta_7d:
-                    type: number
-                    format: double
-                    example: 150000.75
-                  delta_28d:
-                    type: number
-                    format: double
-                    example: 500000.25
-                  delta_ytd:
-                    type: number
-                    format: double
-                    example: 2000000.5
-                  ath:
-                    type: number
-                    format: double
-                    example: 3000000.0
-                  atl:
-                    type: number
-                    format: double
-                    example: 500000.0
-                  ath_percentage:
-                    type: number
-                    format: double
-                    example: 33.33
-                  atl_percentage:
-                    type: number
-                    format: double
-                    example: 200.0
-                  standard_deviation:
-                    type: number
-                    format: double
-                    example: 250000.25
-        400:
-          description: Bad request (invalid or missing chain parameter)
-        500:
-          description: Server error
-
-  /core-account-delegations/staker-count/{chain}/{collateralType}:
+            
+  /core-account-delegations/stakers:
     get:
       summary: Get the unique staker count
       tags:
         - Core Account Delegations
       parameters:
-        - in: path
+        - in: query
           name: chain
           schema:
             type: string
           required: false
           description: The chain to get the staker count for
-        - in: path
+        - in: query
           name: collateralType
           schema:
             type: string
-          required: false
+          required: true
           description: The collateral type to filter by
       responses:
         200:
@@ -1056,28 +909,32 @@ paths:
               schema:
                 type: object
                 additionalProperties:
-                  type: string
-                  example: '305'
+                  type: integer
+                  example: 305
+        400:
+          description: Bad request (invalid parameters)
+        404:
+          description: No staker count data found
         500:
           description: Server error
 
-  /core-account-delegations/cumulative-unique-stakers/{chain}/{collateralType}:
+  /core-account-delegations/stakers/cumulative:
     get:
       summary: Get cumulative unique staker data
       tags: 
         - Core Account Delegations
       parameters:
-        - in: path
+        - in: query
           name: chain
           schema:
             type: string
           required: false
           description: The chain to get the cumulative unique staker data for
-        - in: path
+        - in: query
           name: collateralType
           schema:
             type: string
-          required: false
+          required: true
           description: The collateral type to filter by
       responses:
         200:
@@ -1104,72 +961,10 @@ paths:
                       collateral_type:
                         type: string
                         example: '0xC74eA762cF06c9151cE074E6a569a5945b6302E7'
+        400:
+          description: Bad request (invalid parameters)
         404:
-          description: Cumulative unique staker data not found
-        500:
-          description: Server error
-
-  /core-account-delegations/all/{chain}/{collateralType}:
-    get:
-      summary: Get all core account delegations data
-      tags:
-        - Core Account Delegations
-      parameters:
-        - in: path
-          name: chain
-          schema:
-            type: string
-          required: false
-          description: The chain to get the data for
-        - in: path
-          name: collateralType
-          schema:
-            type: string
-          required: false
-          description: The collateral type to filter by
-      responses:
-        200:
-          description: All core account delegations data
-          content:
-            application/json:
-              schema:
-                type: array
-                items:
-                  type: object
-                  properties:
-                    id:
-                      type: integer
-                      example: 1450
-                    created_at:
-                      type: string
-                      format: date-time
-                      example: '2024-06-27T15:00:50.345Z'
-                    updated_at:
-                      type: string
-                      format: date-time
-                      example: '2024-06-27T15:00:50.345Z'
-                    ts:
-                      type: string
-                      format: date-time
-                      example: '2024-06-27T14:58:45.000Z'
-                    chain:
-                      type: string
-                      example: arbitrum
-                    account_id:
-                      type: string
-                      example: '170141183460469231731687303715884105785'
-                    pool_id:
-                      type: integer
-                      example: 1
-                    collateral_type:
-                      type: string
-                      example: '0x912CE59144191C1204E64559FE8253a0e49E6548'
-                    amount_delegated:
-                      type: number
-                      format: double
-                      example: 19128.7385237578
-        404:
-          description: Core account delegations data not found
+          description: No cumulative unique stakers data found
         500:
           description: Server error
 
@@ -1226,163 +1021,105 @@ paths:
                       type: number
                       format: double
                       example: 200
+        400:
+          description: Bad request
         404:
           description: Core account delegations data not found for this account ID
         500:
           description: Server error
 
-  /core-account-delegations/ordered-by-account/{chain}/{collateralType}:
+  /core-account-delegations/stakers/summary:
     get:
-      summary: Get core account delegations data ordered by account
+      summary: Get the unique stakers summary statistics
       tags:
         - Core Account Delegations
       parameters:
-        - in: path
+        - in: query
           name: chain
           schema:
             type: string
           required: false
-          description: The chain to get the data for
-        - in: path
+          description: The chain to get the unique stakers summary statistics for
+        - in: query
           name: collateralType
-          schema:
-            type: string
-          required: false
-          description: The collateral type to filter by
-      responses:
-        200:
-          description: Core account delegations data ordered by account
-          content:
-            application/json:
-              schema:
-                type: array
-                items:
-                  type: object
-                  properties:
-                    id:
-                      type: integer
-                      example: 879
-                    created_at:
-                      type: string
-                      format: date-time
-                      example: '2024-06-25T15:45:11.350Z'
-                    updated_at:
-                      type: string
-                      format: date-time
-                      example: '2024-06-25T15:45:11.350Z'
-                    ts:
-                      type: string
-                      format: date-time
-                      example: '2023-12-15T08:04:45.000Z'
-                    chain:
-                      type: string
-                      example: base
-                    account_id:
-                      type: string
-                      example: '1'
-                    pool_id:
-                      type: integer
-                      example: 1
-                    collateral_type:
-                      type: string
-                      example: '0xC74eA762cF06c9151cE074E6a569a5945b6302E7'
-                    amount_delegated:
-                      type: number
-                      format: double
-                      example: 200
-        404:
-          description: Core account delegations data not found
-        500:
-          description: Server error
-
-  /core-account-delegations/cumulative-unique-stakers/summary/{chain}/{collateralType}:
-    get:
-      summary: Get the cumulative unique stakers summary statistics
-      tags:
-        - Core Account Delegations
-      parameters:
-        - in: path
-          name: chain
           schema:
             type: string
           required: true
-          description: The chain to get the cumulative unique stakers summary statistics for
-        - in: path
-          name: collateralType
-          schema:
-            type: string
-          required: false
           description: The collateral type to filter by
       responses:
         200:
-          description: The cumulative unique stakers summary statistics
+          description: The unique stakers summary statistics
           content:
             application/json:
               schema:
                 type: object
-                properties:
-                  current:
-                    type: number
-                    format: double
-                    example: 305
-                  delta_24h:
-                    type: number
-                    format: double
-                    example: 10
-                  delta_7d:
-                    type: number
-                    format: double
-                    example: 25
-                  delta_28d:
-                    type: number
-                    format: double
-                    example: 50
-                  delta_ytd:
-                    type: number
-                    format: double
-                    example: 100
-                  ath:
-                    type: number
-                    format: double
-                    example: 310
-                  atl:
-                    type: number
-                    format: double
-                    example: 200
-                  ath_percentage:
-                    type: number
-                    format: double
-                    example: 98.39
-                  atl_percentage:
-                    type: number
-                    format: double
-                    example: 152.50
-                  standard_deviation:
-                    type: number
-                    format: double
-                    example: 15.5
+                additionalProperties:
+                  type: object
+                  properties:
+                    current:
+                      type: number
+                      format: double
+                      example: 305
+                    delta_24h:
+                      type: number
+                      format: double
+                      example: 10
+                    delta_7d:
+                      type: number
+                      format: double
+                      example: 25
+                    delta_28d:
+                      type: number
+                      format: double
+                      example: 50
+                    delta_ytd:
+                      type: number
+                      format: double
+                      example: 100
+                    ath:
+                      type: number
+                      format: double
+                      example: 310
+                    atl:
+                      type: number
+                      format: double
+                      example: 200
+                    ath_percentage:
+                      type: number
+                      format: double
+                      example: 98.39
+                    atl_percentage:
+                      type: number
+                      format: double
+                      example: 152.50
+                    standard_deviation:
+                      type: number
+                      format: double
+                      example: 15.5
         400:
-          description: Bad request (invalid or missing chain parameter)
+          description: Bad request (invalid parameters)
+        404:
+          description: No summary stats found
         500:
           description: Server error
 
-  /core-account-delegations/daily-new-unique-stakers/{chain}/{collateralType}:
+  /core-account-delegations/stakers/daily:
     get:
       summary: Get daily new unique stakers data
       tags:
         - Core Account Delegations
       parameters:
-        - in: path
+        - in: query
           name: chain
           schema:
             type: string
-          required: true
+          required: false
           description: The chain to get the daily new unique stakers data for
-        - in: path
+        - in: query
           name: collateralType
           schema:
             type: string
-          required: false
+          required: true
           description: The collateral type to filter by
       responses:
         200:
@@ -1404,89 +1141,19 @@ paths:
                         type: integer
                         example: 42
         400:
-          description: Bad request - Invalid chain parameter
+          description: Bad request (invalid parameters)
         404:
           description: Daily new unique stakers data not found
         500:
           description: Server error
 
-  /core-account-delegations/daily-new-unique-stakers/summary/{chain}/{collateralType}:
-    get:
-      summary: Get summary statistics for daily new unique stakers
-      tags:
-        - Core Account Delegations
-      parameters:
-        - in: path
-          name: chain
-          schema:
-            type: string
-          required: true
-          description: The chain to get the summary statistics for
-        - in: path
-          name: collateralType
-          schema:
-            type: string
-          required: false
-          description: The collateral type to filter by
-      responses:
-        200:
-          description: Summary statistics for daily new unique stakers
-          content:
-            application/json:
-              schema:
-                type: object
-                properties:
-                  current:
-                    type: integer
-                    example: 42
-                  delta_24h:
-                    type: number
-                    format: float
-                    example: 5.5
-                  delta_7d:
-                    type: number
-                    format: float
-                    example: -2.3
-                  delta_28d:
-                    type: number
-                    format: float
-                    example: 10.1
-                  delta_ytd:
-                    type: number
-                    format: float
-                    example: 15.7
-                  ath:
-                    type: integer
-                    example: 100
-                  atl:
-                    type: integer
-                    example: 5
-                  ath_percentage:
-                    type: number
-                    format: float
-                    example: 42.0
-                  atl_percentage:
-                    type: number
-                    format: float
-                    example: 840.0
-                  standard_deviation:
-                    type: number
-                    format: float
-                    example: 12.3
-        400:
-          description: Bad request - Invalid or missing chain parameter
-        404:
-          description: No data found for the specified chain
-        500:
-          description: Server error
-
-  /pool-rewards/latest/{chain}:
+  /pool-rewards/latest:
     get:
       summary: Get the latest pool rewards data
       tags:
         - Pool Rewards
       parameters:
-        - in: path
+        - in: query
           name: chain
           schema:
             type: string
@@ -1532,17 +1199,20 @@ paths:
                         type: number
                         format: double
                         example: 139.08178975083112
+        400:
+          description: Bad request (invalid chain parameter)
         404:
           description: Pool rewards data not found
         500:
           description: Server error
-  /pool-rewards/all/{chain}:
+
+  /pool-rewards/cumulative:
     get:
-      summary: Get all pool rewards data
+      summary: Get cumulative pool rewards data
       tags:
         - Pool Rewards
       parameters:
-        - in: path
+        - in: query
           name: chain
           schema:
             type: string
@@ -1550,7 +1220,7 @@ paths:
           description: The chain to get the pool rewards data for
       responses:
         200:
-          description: All pool rewards data
+          description: Cumulative pool rewards data
           content:
             application/json:
               schema:
@@ -1581,21 +1251,24 @@ paths:
                         type: number
                         format: double
                         example: 1000000.50
+        400:
+          description: Bad request (invalid chain parameter)
         404:
           description: Pool rewards data not found
         500:
           description: Server error
-  /pool-rewards/summary/{chain}:
+
+  /pool-rewards/summary:
     get:
       summary: Get the pool rewards summary statistics
       tags:
         - Pool Rewards
       parameters:
-        - in: path
+        - in: query
           name: chain
           schema:
             type: string
-          required: true
+          required: false
           description: The chain to get the pool rewards summary statistics for
       responses:
         200:
@@ -1604,62 +1277,65 @@ paths:
             application/json:
               schema:
                 type: object
-                properties:
-                  current:
-                    type: number
-                    format: double
-                    example: 1000000.5
-                  delta_24h:
-                    type: number
-                    format: double
-                    example: 10000.5
-                  delta_7d:
-                    type: number
-                    format: double
-                    example: 50000.75
-                  delta_28d:
-                    type: number
-                    format: double
-                    example: 200000.25
-                  delta_ytd:
-                    type: number
-                    format: double
-                    example: 500000.5
-                  ath:
-                    type: number
-                    format: double
-                    example: 1100000.0
-                  atl:
-                    type: number
-                    format: double
-                    example: 500000.0
-                  ath_percentage:
-                    type: number
-                    format: double
-                    example: 90.91
-                  atl_percentage:
-                    type: number
-                    format: double
-                    example: 200.00
-                  standard_deviation:
-                    type: number
-                    format: double
-                    example: 50000.0
+                additionalProperties:
+                  type: object
+                  properties:
+                    current:
+                      type: number
+                      format: double
+                      example: 1000000.5
+                    delta_24h:
+                      type: number
+                      format: double
+                      example: 10000.5
+                    delta_7d:
+                      type: number
+                      format: double
+                      example: 50000.75
+                    delta_28d:
+                      type: number
+                      format: double
+                      example: 200000.25
+                    delta_ytd:
+                      type: number
+                      format: double
+                      example: 500000.5
+                    ath:
+                      type: number
+                      format: double
+                      example: 1100000.0
+                    atl:
+                      type: number
+                      format: double
+                      example: 500000.0
+                    ath_percentage:
+                      type: number
+                      format: double
+                      example: 90.91
+                    atl_percentage:
+                      type: number
+                      format: double
+                      example: 200.00
+                    standard_deviation:
+                      type: number
+                      format: double
+                      example: 50000.0
         400:
-          description: Bad request (invalid or missing chain parameter)
+          description: Bad request (invalid chain parameter)
         500:
           description: Server error
-  /pool-rewards/daily/{chain}:
+
+  /pool-rewards/daily:
     get:
       summary: Get daily pool rewards data
       tags:
         - Pool Rewards
       parameters:
-        - in: path
+        - in: query
           name: chain
           schema:
             type: string
-          required: true
+          required: false
           description: The chain to get the daily pool rewards data for
       responses:
         200:
@@ -1668,173 +1344,38 @@ paths:
             application/json:
               schema:
                 type: object
-                properties:
-                  '{chain}':
-                    type: array
-                    items:
-                      type: object
-                      properties:
-                        ts:
-                          type: string
-                          format: date-time
-                          example: '2024-06-27T00:00:00.000Z'
-                        daily_rewards:
-                          type: number
-                          format: double
-                          example: 5000.75
+                additionalProperties:
+                  type: array
+                  items:
+                    type: object
+                    properties:
+                      ts:
+                        type: string
+                        format: date-time
+                        example: '2024-06-27T00:00:00.000Z'
+                      daily_rewards:
+                        type: number
+                        format: double
+                        example: 5000.75
         400:
-          description: Bad request (invalid or missing chain parameter)
+          description: Bad request (invalid chain parameter)
         404:
-          description: Daily pool rewards data not found for the specified chain
-        500:
-          description: Server error
-  /pool-rewards/daily/summary/{chain}:
-    get:
-      summary: Get daily pool rewards summary statistics
-      tags:
-        - Pool Rewards
-      parameters:
-        - in: path
-          name: chain
-          schema:
-            type: string
-          required: true
-          description: The chain to get the daily pool rewards summary statistics for
-      responses:
-        200:
-          description: Daily pool rewards summary statistics
-          content:
-            application/json:
-              schema:
-                type: object
-                properties:
-                  current:
-                    type: number
-                    format: double
-                    example: 5000.75
-                  delta_24h:
-                    type: number
-                    format: double
-                    example: 100.5
-                  delta_7d:
-                    type: number
-                    format: double
-                    example: 500.75
-                  delta_28d:
-                    type: number
-                    format: double
-                    example: 2000.25
-                  delta_ytd:
-                    type: number
-                    format: double
-                    example: 5000.5
-                  ath:
-                    type: number
-                    format: double
-                    example: 6000.0
-                  atl:
-                    type: number
-                    format: double
-                    example: 1000.0
-                  ath_percentage:
-                    type: number
-                    format: double
-                    example: 83.35
-                  atl_percentage:
-                    type: number
-                    format: double
-                    example: 500.00
-                  standard_deviation:
-                    type: number
-                    format: double
-                    example: 1000.0
-        400:
-          description: Bad request (invalid or missing chain parameter)
-        500:
-          description: Server error
-  /perp-account-stats/all/{chain}:
-    get:
-      summary: Get all perp account stats data
-      tags:
-        - Perp Account Stats
-      parameters:
-        - in: path
-          name: chain
-          schema:
-            type: string
-          required: false
-          description: The chain to get the perp account stats data for
-      responses:
-        200:
-          description: All perp account stats data
-          content:
-            application/json:
-              schema:
-                type: array
-                items:
-                  type: object
-                  properties:
-                    id:
-                      type: integer
-                      example: 1
-                    created_at:
-                      type: string
-                      format: date-time
-                      example: '2024-06-27T14:01:04.001Z'
-                    updated_at:
-                      type: string
-                      format: date-time
-                      example: '2024-06-27T14:01:04.001Z'
-                    ts:
-                      type: string
-                      format: date-time
-                      example: '2024-06-27T13:00:00.000Z'
-                    chain:
-                      type: string
-                      example: base
-                    account_id:
-                      type: string
-                      example: '0x1234567890123456789012345678901234567890'
-                    fees:
-                      type: number
-                      format: double
-                      example: 10.5
-                    volume:
-                      type: number
-                      format: double
-                      example: 1000.0
-                    amount_liquidated:
-                      type: number
-                      format: double
-                      example: 50.0
-                    liquidations:
-                      type: integer
-                      example: 2
-                    cumulative_fees:
-                      type: number
-                      format: double
-                      example: 100.5
-                    cumulative_volume:
-                      type: number
-                      format: double
-                      example: 10000.0
-        404:
-          description: Perp account stats data not found
+          description: Daily pool rewards data not found
         500:
           description: Server error
 
-  /perp-account-stats/cumulative-unique-traders/{chain}:
+  /perp-account-stats/traders/cumulative:
     get:
       summary: Get cumulative unique traders data
       tags:
         - Perp Account Stats
       parameters:
-        - in: path
+        - in: query
           name: chain
           schema:
             type: string
           required: false
-          description: The chain to get the cumulative unique traders data for
+          description: The chain to get the cumulative unique traders data for (optional)
       responses:
         200:
           description: The cumulative unique traders data
@@ -1854,21 +1395,23 @@ paths:
                       cumulative_trader_count:
                         type: integer
                         example: 150
+        400:
+          description: Bad request (invalid chain parameter)
         500:
           description: Server error
 
-  /perp-account-stats/cumulative-unique-traders/summary/{chain}:
+  /perp-account-stats/traders/summary:
     get:
       summary: Get the cumulative unique traders summary statistics
       tags:
         - Perp Account Stats
       parameters:
-        - in: path
+        - in: query
           name: chain
           schema:
             type: string
-          required: true
-          description: The chain to get the cumulative unique traders summary statistics for
+          required: false
+          description: The chain to get the cumulative unique traders summary statistics for (optional)
       responses:
         200:
           description: The cumulative unique traders summary statistics
@@ -1876,64 +1419,66 @@ paths:
             application/json:
               schema:
                 type: object
-                properties:
-                  current:
-                    type: number
-                    format: double
-                    example: 1000
-                  delta_24h:
-                    type: number
-                    format: double
-                    example: 50
-                  delta_7d:
-                    type: number
-                    format: double
-                    example: 200
-                  delta_28d:
-                    type: number
-                    format: double
-                    example: 500
-                  delta_ytd:
-                    type: number
-                    format: double
-                    example: 800
-                  ath:
-                    type: number
-                    format: double
-                    example: 1100
-                  atl:
-                    type: number
-                    format: double
-                    example: 100
-                  ath_percentage:
-                    type: number
-                    format: double
-                    example: 90.91
-                  atl_percentage:
-                    type: number
-                    format: double
-                    example: 1000.00
-                  standard_deviation:
-                    type: number
-                    format: double
-                    example: 150.25
+                additionalProperties:
+                  type: object
+                  properties:
+                    current:
+                      type: number
+                      format: double
+                      example: 1000
+                    delta_24h:
+                      type: number
+                      format: double
+                      example: 50
+                    delta_7d:
+                      type: number
+                      format: double
+                      example: 200
+                    delta_28d:
+                      type: number
+                      format: double
+                      example: 500
+                    delta_ytd:
+                      type: number
+                      format: double
+                      example: 800
+                    ath:
+                      type: number
+                      format: double
+                      example: 1100
+                    atl:
+                      type: number
+                      format: double
+                      example: 100
+                    ath_percentage:
+                      type: number
+                      format: double
+                      example: 90.91
+                    atl_percentage:
+                      type: number
+                      format: double
+                      example: 1000.00
+                    standard_deviation:
+                      type: number
+                      format: double
+                      example: 150.25
         400:
-          description: Bad request (invalid or missing chain parameter)
+          description: Bad request (invalid chain parameter)
         500:
           description: Server error
 
-  /perp-account-stats/daily-new-unique-traders/{chain}:
+  /perp-account-stats/traders/daily:
     get:
       summary: Get daily new unique traders data
       tags:
         - Perp Account Stats
       parameters:
-        - in: path
+        - in: query
           name: chain
           schema:
             type: string
-          required: true
-          description: The chain to get the daily new unique traders data for
+          required: false
+          description: The chain to get the daily new unique traders data for (optional)
       responses:
         200:
           description: Daily new unique traders data
@@ -1960,390 +1505,56 @@ paths:
         500:
           description: Server error
 
-  /perp-account-stats/daily-new-unique-traders/summary/{chain}:
+  /perp-stats/latest:
     get:
-      summary: Get summary statistics for daily new unique traders
-      tags:
-        - Perp Account Stats
-      parameters:
-        - in: path
-          name: chain
-          schema:
-            type: string
-          required: true
-          description: The chain to get the summary statistics for
-      responses:
-        200:
-          description: Summary statistics for daily new unique traders
-          content:
-            application/json:
-              schema:
-                type: object
-                properties:
-                  current:
-                    type: integer
-                    example: 42
-                  delta_24h:
-                    type: number
-                    format: float
-                    example: 5.5
-                  delta_7d:
-                    type: number
-                    format: float
-                    example: -2.3
-                  delta_28d:
-                    type: number
-                    format: float
-                    example: 10.1
-                  delta_ytd:
-                    type: number
-                    format: float
-                    example: 15.7
-                  ath:
-                    type: integer
-                    example: 100
-                  atl:
-                    type: integer
-                    example: 5
-                  ath_percentage:
-                    type: number
-                    format: float
-                    example: 42.0
-                  atl_percentage:
-                    type: number
-                    format: float
-                    example: 840.0
-                  standard_deviation:
-                    type: number
-                    format: float
-                    example: 12.3
-        400:
-          description: Bad request - Invalid or missing chain parameter
-        404:
-          description: No data found for the specified chain
-        500:
-          description: Server error
-  /perp-stats/latest/{chain}:
-    get:
-      summary: Get the latest perp stats data
+      summary: Get latest perp stats data
       tags:
         - Perp Stats
       parameters:
-        - in: path
+        - in: query
           name: chain
           schema:
             type: string
           required: false
-          description: The chain to get the perp stats data for
+          description: The chain to get the latest perp stats data for (optional)
       responses:
         200:
           description: The latest perp stats data
           content:
             application/json:
               schema:
-                type: array
-                items:
-                  type: object
-                  properties:
-                    id:
-                      type: integer
-                      example: 1
-                    created_at:
-                      type: string
-                      format: date-time
-                      example: '2024-06-27T14:01:04.001Z'
-                    updated_at:
-                      type: string
-                      format: date-time
-                      example: '2024-06-27T14:01:04.001Z'
-                    ts:
-                      type: string
-                      format: date-time
-                      example: '2024-06-27T13:00:00.000Z'
-                    chain:
-                      type: string
-                      example: base
-                    cumulative_volume:
-                      type: number
-                      format: double
-                      example: 1000000.5
-                    cumulative_collected_fees:
-                      type: number
-                      format: double
-                      example: 10000.25
-                    cumulative_exchange_fees:
-                      type: number
-                      format: double
-                      example: 5000.75
+                type: object
+                additionalProperties:
+                  type: array
+                  items:
+                    type: object
+                    properties:
+                      ts:
+                        type: string
+                        format: date-time
+                      cumulative_volume:
+                        type: number
+                      cumulative_exchange_fees:
+                        type: number
+        400:
+          description: Bad request (invalid chain parameter)
         404:
           description: Perp stats data not found
         500:
           description: Server error
 
-  /perp-stats/all/{chain}:
-    get:
-      summary: Get all perp stats data
-      tags:
-        - Perp Stats
-      parameters:
-        - in: path
-          name: chain
-          schema:
-            type: string
-          required: false
-          description: The chain to get the perp stats data for
-      responses:
-        200:
-          description: All perp stats data
-          content:
-            application/json:
-              schema:
-                type: array
-                items:
-                  type: object
-                  properties:
-                    id:
-                      type: integer
-                      example: 1
-                    created_at:
-                      type: string
-                      format: date-time
-                      example: '2024-06-27T14:01:04.001Z'
-                    updated_at:
-                      type: string
-                      format: date-time
-                      example: '2024-06-27T14:01:04.001Z'
-                    ts:
-                      type: string
-                      format: date-time
-                      example: '2024-06-27T13:00:00.000Z'
-                    chain:
-                      type: string
-                      example: base
-                    cumulative_volume:
-                      type: number
-                      format: double
-                      example: 1000000.5
-                    cumulative_collected_fees:
-                      type: number
-                      format: double
-                      example: 10000.25
-                    cumulative_exchange_fees:
-                      type: number
-                      format: double
-                      example: 5000.75
-        404:
-          description: Perp stats data not found
-        500:
-          description: Server error
-
-  /perp-stats/cumulative-volume/summary/{chain}:
-    get:
-      summary: Get the cumulative volume summary statistics
-      tags:
-        - Perp Stats
-      parameters:
-        - in: path
-          name: chain
-          schema:
-            type: string
-          required: true
-          description: The chain to get the cumulative volume summary statistics for
-      responses:
-        200:
-          description: The cumulative volume summary statistics
-          content:
-            application/json:
-              schema:
-                type: object
-                properties:
-                  current:
-                    type: number
-                    format: double
-                    example: 1000000.5
-                  delta_24h:
-                    type: number
-                    format: double
-                    example: 50000.25
-                  delta_7d:
-                    type: number
-                    format: double
-                    example: 200000.75
-                  delta_28d:
-                    type: number
-                    format: double
-                    example: 500000.5
-                  delta_ytd:
-                    type: number
-                    format: double
-                    example: 800000.25
-                  ath:
-                    type: number
-                    format: double
-                    example: 1100000.0
-                  atl:
-                    type: number
-                    format: double
-                    example: 500000.0
-                  ath_percentage:
-                    type: number
-                    format: double
-                    example: 90.91
-                  atl_percentage:
-                    type: number
-                    format: double
-                    example: 200.00
-                  standard_deviation:
-                    type: number
-                    format: double
-                    example: 100000.25
-        400:
-          description: Bad request (invalid or missing chain parameter)
-        500:
-          description: Server error
-
-  /perp-stats/cumulative-exchange-fees/summary/{chain}:
-    get:
-      summary: Get the cumulative exchange fees summary statistics
-      tags:
-        - Perp Stats
-      parameters:
-        - in: path
-          name: chain
-          schema:
-            type: string
-          required: true
-          description: The chain to get the cumulative exchange fees summary statistics for
-      responses:
-        200:
-          description: The cumulative exchange fees summary statistics
-          content:
-            application/json:
-              schema:
-                type: object
-                properties:
-                  current:
-                    type: number
-                    format: double
-                    example: 10000.25
-                  delta_24h:
-                    type: number
-                    format: double
-                    example: 500.25
-                  delta_7d:
-                    type: number
-                    format: double
-                    example: 2000.75
-                  delta_28d:
-                    type: number
-                    format: double
-                    example: 5000.5
-                  delta_ytd:
-                    type: number
-                    format: double
-                    example: 8000.25
-                  ath:
-                    type: number
-                    format: double
-                    example: 11000.0
-                  atl:
-                    type: number
-                    format: double
-                    example: 5000.0
-                  ath_percentage:
-                    type: number
-                    format: double
-                    example: 90.91
-                  atl_percentage:
-                    type: number
-                    format: double
-                    example: 200.00
-                  standard_deviation:
-                    type: number
-                    format: double
-                    example: 1000.25
-        400:
-          description: Bad request (invalid or missing chain parameter)
-        500:
-          description: Server error
-
-  /perp-stats/cumulative-collected-fees/summary/{chain}:
-    get:
-      summary: Get the cumulative collected fees summary statistics
-      tags:
-        - Perp Stats
-      parameters:
-        - in: path
-          name: chain
-          schema:
-            type: string
-          required: true
-          description: The chain to get the cumulative collected fees summary statistics for
-      responses:
-        200:
-          description: The cumulative collected fees summary statistics
-          content:
-            application/json:
-              schema:
-                type: object
-                properties:
-                  current:
-                    type: number
-                    format: double
-                    example: 5000.75
-                  delta_24h:
-                    type: number
-                    format: double
-                    example: 250.25
-                  delta_7d:
-                    type: number
-                    format: double
-                    example: 1000.75
-                  delta_28d:
-                    type: number
-                    format: double
-                    example: 2500.5
-                  delta_ytd:
-                    type: number
-                    format: double
-                    example: 4000.25
-                  ath:
-                    type: number
-                    format: double
-                    example: 5500.0
-                  atl:
-                    type: number
-                    format: double
-                    example: 2500.0
-                  ath_percentage:
-                    type: number
-                    format: double
-                    example: 90.91
-                  atl_percentage:
-                    type: number
-                    format: double
-                    example: 200.00
-                  standard_deviation:
-                    type: number
-                    format: double
-                    example: 500.25
-        400:
-          description: Bad request (invalid or missing chain parameter)
-        500:
-          description: Server error
-
-  /perp-stats/cumulative-volume/{chain}:
+  /perp-stats/volume/cumulative:
     get:
       summary: Get cumulative volume data
       tags:
         - Perp Stats
       parameters:
-        - in: path
+        - in: query
           name: chain
           schema:
             type: string
-          required: true
-          description: The chain to get the cumulative volume data for
+          required: false
+          description: The chain to get the cumulative volume data for (optional)
       responses:
         200:
           description: The cumulative volume data
@@ -2359,102 +1570,72 @@ paths:
                       ts:
                         type: string
                         format: date-time
-                        example: '2024-06-27T13:00:00.000Z'
                       cumulative_volume:
                         type: number
-                        format: double
-                        example: 1000000.5
         400:
-          description: Bad request (invalid or missing chain parameter)
+          description: Bad request (invalid chain parameter)
         500:
           description: Server error
 
-  /perp-stats/cumulative-exchange-fees/{chain}:
+  /perp-stats/volume/summary:
     get:
-      summary: Get cumulative exchange fees data
+      summary: Get cumulative volume summary statistics
       tags:
         - Perp Stats
       parameters:
-        - in: path
+        - in: query
           name: chain
           schema:
             type: string
-          required: true
-          description: The chain to get the cumulative exchange fees data for
+          required: false
+          description: The chain to get the cumulative volume summary statistics for (optional)
       responses:
         200:
-          description: The cumulative exchange fees data
+          description: The cumulative volume summary statistics
           content:
             application/json:
               schema:
                 type: object
                 additionalProperties:
-                  type: array
-                  items:
-                    type: object
-                    properties:
-                      ts:
-                        type: string
-                        format: date-time
-                        example: '2024-06-27T13:00:00.000Z'
-                      cumulative_exchange_fees:
-                        type: number
-                        format: double
-                        example: 10000.25
+                  type: object
+                  properties:
+                    current:
+                      type: number
+                    delta_24h:
+                      type: number
+                    delta_7d:
+                      type: number
+                    delta_28d:
+                      type: number
+                    delta_ytd:
+                      type: number
+                    ath:
+                      type: number
+                    atl:
+                      type: number
+                    ath_percentage:
+                      type: number
+                    atl_percentage:
+                      type: number
+                    standard_deviation:
+                      type: number
         400:
-          description: Bad request (invalid or missing chain parameter)
+          description: Bad request (invalid chain parameter)
         500:
           description: Server error
 
-  /perp-stats/cumulative-collected-fees/{chain}:
-    get:
-      summary: Get cumulative collected fees data
-      tags:
-        - Perp Stats
-      parameters:
-        - in: path
-          name: chain
-          schema:
-            type: string
-          required: true
-          description: The chain to get the cumulative collected fees data for
-      responses:
-        200:
-          description: The cumulative collected fees data
-          content:
-            application/json:
-              schema:
-                type: object
-                additionalProperties:
-                  type: array
-                  items:
-                    type: object
-                    properties:
-                      ts:
-                        type: string
-                        format: date-time
-                        example: '2024-06-27T13:00:00.000Z'
-                      cumulative_collected_fees:
-                        type: number
-                        format: double
-                        example: 5000.75
-        400:
-          description: Bad request (invalid or missing chain parameter)
-        500:
-          description: Server error
-  
-  /perp-stats/daily-volume/{chain}:
+  /perp-stats/volume/daily:
     get:
       summary: Get daily volume data
       tags:
         - Perp Stats
       parameters:
-        - in: path
+        - in: query
           name: chain
           schema:
             type: string
-          required: true
-          description: The chain to get the daily volume data for
+          required: false
+          description: The chain to get the daily volume data for (optional)
       responses:
         200:
           description: The daily volume data
@@ -2470,28 +1651,106 @@ paths:
                       ts:
                         type: string
                         format: date-time
-                        example: '2024-06-27T00:00:00Z'
-                      daily_volume:
+                      daily_cumulative_volume:
                         type: number
-                        format: double
-                        example: 50000.75
         400:
-          description: Bad request - Invalid chain parameter
+          description: Bad request (invalid chain parameter)
         500:
           description: Server error
 
-  /perp-stats/daily-exchange-fees/{chain}:
+  /perp-stats/exchange-fees/cumulative:
+    get:
+      summary: Get cumulative exchange fees data
+      tags:
+        - Perp Stats
+      parameters:
+        - in: query
+          name: chain
+          schema:
+            type: string
+          required: false
+          description: The chain to get the cumulative exchange fees data for (optional)
+      responses:
+        200:
+          description: The cumulative exchange fees data
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties:
+                  type: array
+                  items:
+                    type: object
+                    properties:
+                      ts:
+                        type: string
+                        format: date-time
+                      cumulative_exchange_fees:
+                        type: number
+        400:
+          description: Bad request (invalid chain parameter)
+        500:
+          description: Server error
+
+  /perp-stats/exchange-fees/summary:
+    get:
+      summary: Get cumulative exchange fees summary statistics
+      tags:
+        - Perp Stats
+      parameters:
+        - in: query
+          name: chain
+          schema:
+            type: string
+          required: false
+          description: The chain to get the cumulative exchange fees summary statistics for (optional)
+      responses:
+        200:
+          description: The cumulative exchange fees summary statistics
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties:
+                  type: object
+                  properties:
+                    current:
+                      type: number
+                    delta_24h:
+                      type: number
+                    delta_7d:
+                      type: number
+                    delta_28d:
+                      type: number
+                    delta_ytd:
+                      type: number
+                    ath:
+                      type: number
+                    atl:
+                      type: number
+                    ath_percentage:
+                      type: number
+                    atl_percentage:
+                      type: number
+                    standard_deviation:
+                      type: number
+        400:
+          description: Bad request (invalid chain parameter)
+        500:
+          description: Server error
+
+  /perp-stats/exchange-fees/daily:
     get:
       summary: Get daily exchange fees data
       tags:
         - Perp Stats
       parameters:
-        - in: path
+        - in: query
           name: chain
           schema:
             type: string
-          required: true
-          description: The chain to get the daily exchange fees data for
+          required: false
+          description: The chain to get the daily exchange fees data for (optional)
       responses:
         200:
           description: The daily exchange fees data
@@ -2507,31 +1766,28 @@ paths:
                       ts:
                         type: string
                         format: date-time
-                        example: '2024-06-27T00:00:00Z'
-                      daily_exchange_fees:
+                      daily_cumulative_exchange_fees:
                         type: number
-                        format: double
-                        example: 1000.25
         400:
-          description: Bad request - Invalid chain parameter
+          description: Bad request (invalid chain parameter)
         500:
           description: Server error
-
-  /perp-stats/daily-collected-fees/{chain}:
+          
+  /perp-market-history/open-interest/daily:
     get:
-      summary: Get daily collected fees data
+      summary: Get daily open interest data
       tags:
-        - Perp Stats
+        - Perp Market History
       parameters:
-        - in: path
+        - in: query
           name: chain
           schema:
             type: string
-          required: true
-          description: The chain to get the daily collected fees data for
+          required: false
+          description: The chain to get the daily open interest data for (optional)
       responses:
         200:
-          description: The daily collected fees data
+          description: The daily open interest data
           content:
             application/json:
               schema:
@@ -2544,210 +1800,59 @@ paths:
                       ts:
                         type: string
                         format: date-time
-                        example: '2024-06-27T00:00:00Z'
-                      daily_collected_fees:
+                      daily_oi:
                         type: number
-                        format: double
-                        example: 500.25
         400:
-          description: Bad request - Invalid chain parameter
+          description: Bad request (invalid chain parameter)
         500:
           description: Server error
 
-  /perp-stats/daily-volume/summary/{chain}:
+  /perp-market-history/open-interest/daily-change:
     get:
-      summary: Get daily volume summary statistics
-      tags:
-        - Perp Stats
-      parameters:
-        - in: path
-          name: chain
-          schema:
-            type: string
-          required: true
-          description: The chain to get the daily volume summary statistics for
-      responses:
-        200:
-          description: The daily volume summary statistics
-          content:
-            application/json:
-              schema:
-                type: object
-                properties:
-                  current:
-                    type: number
-                    format: double
-                    example: 50000.75
-                  delta_24h:
-                    type: number
-                    format: double
-                    example: 2500.25
-                  delta_7d:
-                    type: number
-                    format: double
-                    example: 10000.75
-                  delta_28d:
-                    type: number
-                    format: double
-                    example: 25000.5
-                  delta_ytd:
-                    type: number
-                    format: double
-                    example: 100000.25
-                  ath:
-                    type: number
-                    format: double
-                    example: 75000.0
-                  atl:
-                    type: number
-                    format: double
-                    example:
-  /perp-market-history/all/{chain}:
-    get:
-      summary: Get all perp market history data
+      summary: Get daily open interest change data
       tags:
         - Perp Market History
       parameters:
-        - in: path
+        - in: query
           name: chain
           schema:
             type: string
           required: false
-          description: The chain to get the perp market history data for
+          description: The chain to get the daily open interest change data for (optional)
       responses:
         200:
-          description: All perp market history data
+          description: The daily open interest change data
           content:
             application/json:
               schema:
-                type: array
-                items:
-                  type: object
-                  properties:
-                    id:
-                      type: integer
-                      example: 1
-                    created_at:
-                      type: string
-                      format: date-time
-                      example: '2024-06-27T14:01:04.001Z'
-                    updated_at:
-                      type: string
-                      format: date-time
-                      example: '2024-06-27T14:01:04.001Z'
-                    ts:
-                      type: string
-                      format: date-time
-                      example: '2024-06-27T13:00:00.000Z'
-                    chain:
-                      type: string
-                      example: base
-                    block_number:
-                      type: integer
-                      example: 1234567
-                    market_id:
-                      type: integer
-                      example: 1
-                    market_symbol:
-                      type: string
-                      example: 'ETH-USD'
-                    price:
-                      type: number
-                      format: double
-                      example: 2000.5
-                    size:
-                      type: number
-                      format: double
-                      example: 10.5
-                    funding_rate:
-                      type: number
-                      format: double
-                      example: 0.0001
-                    long_rate_apr:
-                      type: number
-                      format: double
-                      example: 0.05
-                    short_rate_apr:
-                      type: number
-                      format: double
-                      example: 0.04
-                    size_usd:
-                      type: number
-                      format: double
-                      example: 21005.25
-                    long_oi:
-                      type: number
-                      format: double
-                      example: 15000.75
-                    short_oi:
-                      type: number
-                      format: double
-                      example: 14000.5
-                    long_oi_pct:
-                      type: number
-                      format: double
-                      example: 0.52
-                    short_oi_pct:
-                      type: number
-                      format: double
-                      example: 0.48
-        404:
-          description: Perp market history data not found
-        500:
-          description: Server error
-
-  /perp-market-history/open-interest/{chain}:
-    get:
-      summary: Get open interest data
-      tags:
-        - Perp Market History
-      parameters:
-        - in: path
-          name: chain
-          schema:
-            type: string
-          required: true
-          description: The chain to get the open interest data for
-      responses:
-        200:
-          description: The open interest data
-          content:
-            application/json:
-              schema:
-                type: array
-                items:
-                  type: object
-                  properties:
-                    ts:
-                      type: string
-                      format: date-time
-                      example: '2024-06-27T00:00:00.000Z'
-                    daily_oi:
-                      type: number
-                      format: double
-                      example: 1000000.5
-                    chain:
-                      type: string
-                      example: base
+                type: object
+                additionalProperties:
+                  type: array
+                  items:
+                    type: object
+                    properties:
+                      ts:
+                        type: string
+                        format: date-time
+                      daily_oi_change:
+                        type: number
         400:
-          description: Bad request (invalid or missing chain parameter)
-        404:
-          description: Open interest data not found
+          description: Bad request (invalid chain parameter)
         500:
           description: Server error
 
-  /perp-market-history/open-interest/summary/{chain}:
+  /perp-market-history/open-interest/daily/summary:
     get:
-      summary: Get the open interest summary statistics
+      summary: Get open interest summary statistics
       tags:
         - Perp Market History
       parameters:
-        - in: path
+        - in: query
           name: chain
           schema:
             type: string
-          required: true
-          description: The chain to get the open interest summary statistics for
+          required: false
+          description: The chain to get the open interest summary statistics for (optional)
       responses:
         200:
           description: The open interest summary statistics
@@ -2755,48 +1860,30 @@ paths:
             application/json:
               schema:
                 type: object
-                properties:
-                  current:
-                    type: number
-                    format: double
-                    example: 1000000.5
-                  delta_24h:
-                    type: number
-                    format: double
-                    example: 50000.25
-                  delta_7d:
-                    type: number
-                    format: double
-                    example: 200000.75
-                  delta_28d:
-                    type: number
-                    format: double
-                    example: 500000.5
-                  delta_ytd:
-                    type: number
-                    format: double
-                    example: 800000.25
-                  ath:
-                    type: number
-                    format: double
-                    example: 1100000.0
-                  atl:
-                    type: number
-                    format: double
-                    example: 500000.0
-                  ath_percentage:
-                    type: number
-                    format: double
-                    example: 90.91
-                  atl_percentage:
-                    type: number
-                    format: double
-                    example: 200.00
-                  standard_deviation:
-                    type: number
-                    format: double
-                    example: 100000.25
+                additionalProperties:
+                  type: object
+                  properties:
+                    current:
+                      type: number
+                    delta_24h:
+                      type: number
+                    delta_7d:
+                      type: number
+                    delta_28d:
+                      type: number
+                    delta_ytd:
+                      type: number
+                    ath:
+                      type: number
+                    atl:
+                      type: number
+                    ath_percentage:
+                      type: number
+                    atl_percentage:
+                      type: number
+                    standard_deviation:
+                      type: number
         400:
-          description: Bad request (invalid or missing chain parameter)
+          description: Bad request (invalid chain parameter)
         500:
           description: Server error
