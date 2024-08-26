@@ -1,10 +1,13 @@
 openapi: 3.0.0
 info:
-  title: Synthetix Cache API
+  title: Synthetix V3 API
   version: 1.0.0
-  description: API documentation for the Synthetix Cache API
-servers:
-  - url: https://synthetix-cache-api-f7db01015ec1.herokuapp.com/api/v1
+  description: |
+    API documentation for the Synthetix V3 API.
+
+    **Base URL**: `https://synthetix-cache-api-f7db01015ec1.herokuapp.com`
+
+    **Base Path**: `/api/v1`
 paths:
   /apy/latest:
     get:

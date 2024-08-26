@@ -1,0 +1,194 @@
+/* Synthetix-themed Swagger UI CSS */
+:root {
+  --synthetix-cyan: #00d1ff;
+  --synthetix-cyan-dark: #00657D;
+  --synthetix-navy-900: #0A0A25;
+  --synthetix-navy-800: #06061B;
+  --synthetix-navy-700: #0B0B22;
+  --synthetix-gray-50: #FEFEFF;
+  --synthetix-gray-500: #9999AC;
+  --synthetix-gray-900: #424251;
+  --synthetix-border-and-line-colour: #1F1F2D;
+  --synthetix-whiteAlpha-100: rgba(255, 255, 255, 0.06);
+}
+
+body {
+  background-color: var(--synthetix-navy-900);
+  color: var(--synthetix-gray-500);
+}
+
+.swagger-ui {
+  font-family: 'Inter', sans-serif;
+}
+
+/* Hide the Swagger UI top bar */
+.swagger-ui .topbar {
+  display: none;
+}
+
+.swagger-ui .info .title,
+.swagger-ui .opblock-tag {
+  color: var(--synthetix-gray-50);
+  font-size: 32px;
+}
+
+/* Format Base URL and Base Path */
+.swagger-ui .info p a,
+.swagger-ui .info p code {
+  background-color: var(--synthetix-navy-800) !important;
+  border: 1px solid var(--synthetix-border-and-line-colour);
+  padding: 4px 8px;
+  color: var(--synthetix-gray-50);
+  text-decoration: none;
+  border-radius: 4px;
+  display: inline-block;
+  margin-top: 4px;
+}
+
+/* Style the buttons */
+.swagger-ui .btn.execute {
+  background-color: var(--synthetix-cyan-dark) !important;
+  border: 1px solid var(--synthetix-border-and-line-colour) !important;
+  color: var(--synthetix-gray-50) !important;
+}
+
+.swagger-ui .btn.authorize {
+  color: #77a797; /* Muted green */
+  border-color: var(--synthetix-border-and-line-colour);
+}
+
+/* Update method button colors */
+.swagger-ui .opblock-summary-method {
+  background-color: var(--synthetix-whiteAlpha-100) !important;
+  color: var(--synthetix-gray-500) !important;
+}
+
+.swagger-ui .opblock {
+  background-color: var(--synthetix-navy-700);
+  border-color: var(--synthetix-border-and-line-colour) !important;
+}
+
+.swagger-ui .opblock .opblock-summary,
+.swagger-ui .expand-operation {
+  border-color: var(--synthetix-border-and-line-colour) !important;
+}
+
+.swagger-ui .expand-operation svg {
+  fill: var(--synthetix-gray-500) !important;
+}
+
+.swagger-ui section.models,
+.swagger-ui section.models.is-open h4,
+.swagger-ui .opblock .opblock-section-header,
+.swagger-ui table thead tr th,
+.swagger-ui .parameters,
+.swagger-ui .responses-table {
+  border-color: var(--synthetix-border-and-line-colour) !important;
+}
+
+.swagger-ui .model-title,
+.swagger-ui .parameter__name,
+.swagger-ui .parameter__type,
+.swagger-ui table thead tr td,
+.swagger-ui .response-col_status {
+  color: var(--synthetix-gray-500);
+}
+
+.swagger-ui table thead tr td,
+.swagger-ui table thead tr th,
+.swagger-ui .execute-wrapper,
+.swagger-ui .table-container,
+.swagger-ui .parameters-col_description,
+.swagger-ui .parameters-col_name,
+.swagger-ui .servers > label select,
+.swagger-ui input[type=email],
+.swagger-ui input[type=file],
+.swagger-ui input[type=password],
+.swagger-ui input[type=search],
+.swagger-ui input[type=text],
+.swagger-ui textarea,
+.swagger-ui select {
+  background-color: var(--synthetix-navy-800) !important;
+  color: var(--synthetix-gray-50) !important;
+  border-color: var(--synthetix-border-and-line-colour) !important;
+}
+
+.swagger-ui .servers {
+  display: none;
+}
+
+/* Style the subheaders */
+.swagger-ui .opblock-section-header {
+  background-color: var(--synthetix-navy-900) !important;
+}
+
+.swagger-ui .opblock-section-header h4 {
+  color: var(--synthetix-gray-500) !important;
+}
+
+/* Style JSON response */
+.swagger-ui .response-col_description pre {
+  background-color: var(--synthetix-navy-800) !important; 
+  color: var(--synthetix-gray-500) !important; 
+  border-radius: 4px;
+  padding: 10px;
+  border: 3px solid var(--synthetix-border-and-line-colour) !important;
+}
+
+.swagger-ui .response-col_description pre code span {
+  color: var(--synthetix-gray-50) !important; 
+}
+
+/* Media type and controls */
+.swagger-ui .response-col_description .response-col_media-type,
+.swagger-ui .response-col_description .controls {
+  border-color: var(--synthetix-cyan) !important;
+  color: var(--synthetix-cyan) !important;
+}
+
+/* Change the arrow (caret) colors to gray */
+.swagger-ui .opblock-summary .arrow,
+.swagger-ui table thead .arrow,
+.swagger-ui .arrow svg,
+.swagger-ui .arrow path {
+  fill: var(--synthetix-gray-500) !important;
+}
+
+/* Remove any remaining blue borders */
+.swagger-ui .swagger-container,
+.swagger-ui .some-other-class-with-blue-border {
+  border: 1px solid var(--synthetix-border-and-line-colour) !important;
+}
+
+/* Ensure all buttons match the Synthetix theme */
+.swagger-ui .btn {
+  background: var(--synthetix-whiteAlpha-100) !important;
+  color: var(--synthetix-gray-50) !important;
+}
+
+/* Specific styling for GET method buttons */
+.swagger-ui .opblock.opblock-get .opblock-summary-method {
+  background: var(--synthetix-cyan-dark) !important;
+  color: var(--synthetix-gray-50) !important;
+}
+
+.swagger-ui .opblock-summary-control {
+  background: var(--synthetix-navy-800);
+  border-radius: 0 4px 4px 0;
+}
+
+.swagger-ui .opblock.opblock-get {
+  background: var(--synthetix-navy-800) !important;
+}
+
+.swagger-ui .opblock.opblock-get .tab-header .tab-item.active h4 span:after {
+  background: var(--synthetix-navy-900);
+}
+
+.swagger-ui .info .title, .swagger-ui .opblock-tag {
+  font-size: 18px;
+}
+
+.swagger-ui .opblock .opblock-summary-path-description-wrapper {
+  background: var(--synthetix-navy-800);
+}

@@ -2,6 +2,8 @@ const express = require('express');
 const cors = require('cors');
 const swaggerUi = require('swagger-ui-express');
 const YAML = require('yamljs');
+const fs = require('fs');
+const path = require('path');
 
 const app = express();
 
@@ -38,9 +40,18 @@ apiRouter.use('/perp-stats', perpStatsRoutes);
 apiRouter.use('/perp-account-stats', perpAccountStatsRoutes);
 apiRouter.use('/perp-market-history', perpMarketHistoryRoutes);
 
-// Setup Swagger UI with the combined document
+const customCss = fs.readFileSync(path.join(__dirname, 'swagger-custom.css'), 'utf8');
+
+// Setup Swagger UI with the combined document and custom options
 if (swaggerDocument) {
-  app.use('/api-docs', swaggerUi.serve, swaggerUi.setup(swaggerDocument));
+  const options = {
+    customCss,
+    customSiteTitle: "Synthetix Stats API Documentation",
+    customfavIcon: "/path/to/favicon.ico", // Update this path
+    customLogo: "/path/to/synthetix-logo.png", // Update this path
+  };
+  
+  app.use('/api-docs', swaggerUi.serve, swaggerUi.setup(swaggerDocument, options));
 } else {
   console.error('Swagger documentation is not available.');
 }
