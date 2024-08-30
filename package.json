@@ -24,6 +24,7 @@
     "fs": "^0.0.1-security",
     "knex": "^3.1.0",
     "pg": "^8.11.5",
+    "redis": "^4.7.0",
     "swagger-combine": "^1.4.0",
     "swagger-jsdoc": "^6.2.8",
     "swagger-ui-express": "^5.0.1",
