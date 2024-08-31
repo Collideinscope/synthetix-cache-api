@@ -13,6 +13,7 @@ class RedisService {
       url: process.env.REDIS_URL
     };
 
+    // Only add TLS options if we're not in a local environment
     if (process.env.REDIS_URL && !process.env.REDIS_URL.includes('localhost')) {
       options.socket = {
         tls: true,
@@ -39,7 +40,6 @@ class RedisService {
     } catch (error) {
       console.error('Failed to connect to Redis:', error);
       this.connected = false;
-      // Instead of throwing, we'll log the error and continue
     }
   }
 
@@ -47,8 +47,7 @@ class RedisService {
     if (this.connected) return true;
     return new Promise((resolve, reject) => {
       const timer = setTimeout(() => {
-        console.log('Redis connection timeout');
-        resolve(false); // Resolve with false instead of rejecting
+        reject(new Error('Redis connection timeout'));
       }, timeout);
       this.client.once('ready', () => {
         clearTimeout(timer);
@@ -56,30 +55,27 @@ class RedisService {
       });
       this.client.once('error', (err) => {
         clearTimeout(timer);
-        console.error('Redis connection error:', err);
-        resolve(false); // Resolve with false instead of rejecting
+        reject(err);
       });
     });
   }
 
   async get(key) {
     if (!this.connected) {
-      console.warn('Redis client is not connected. Returning null.');
-      return null;
+      throw new Error('Redis client is not connected');
     }
     try {
       const value = await this.client.get(key);
       return value ? JSON.parse(value) : null;
     } catch (error) {
       console.error('Redis Get Error', error);
-      return null; // Return null instead of throwing
+      throw error;
     }
   }
 
   async set(key, value, ttl) {
     if (!this.connected) {
-      console.warn('Redis client is not connected. Skipping set operation.');
-      return;
+      throw new Error('Redis client is not connected');
     }
     try {
       await this.client.set(key, JSON.stringify(value), {
@@ -87,7 +83,7 @@ class RedisService {
       });
     } catch (error) {
       console.error('Redis Set Error', error);
-      // Log error but don't throw
+      throw error;
     }
   }
 }
