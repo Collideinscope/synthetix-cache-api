@@ -27,8 +27,11 @@ const transformDataByChain = (data) => {
 
 router.get('/latest', async (req, res) => {
   try {
-    const { chain, collateralType } = req.query;
+    let { chain, collateralType } = req.query;
     validateParameters(chain, collateralType);
+    chain = chain?.toLowerCase();
+    collateralType = collateralType?.toLowerCase();
+    
     const result = await getLatestAPYData(chain, collateralType);
     if (Object.values(result).every(data => data.length === 0)) {
       return res.status(404).json({ error: 'APY data not found' });
@@ -43,8 +46,11 @@ router.get('/latest', async (req, res) => {
 
 router.get('/all', async (req, res) => {
   try {
-    const { chain, collateralType } = req.query;
+    let { chain, collateralType } = req.query;
     validateParameters(chain, collateralType);
+    chain = chain?.toLowerCase();
+    collateralType = collateralType?.toLowerCase();
+    
     const result = await getAllAPYData(chain, collateralType);
     if (chain && (!result[chain] || result[chain].length === 0)) {
       return res.status(404).json({ error: 'APY data not found for the specified chain' });
@@ -62,8 +68,11 @@ router.get('/all', async (req, res) => {
 
 router.get('/summary', async (req, res) => {
   try {
-    const { chain, collateralType } = req.query;
+    let { chain, collateralType } = req.query;
     validateParameters(chain, collateralType);
+    chain = chain?.toLowerCase();
+    collateralType = collateralType?.toLowerCase();
+    
     const stats = await getAPYSummaryStats(chain, collateralType);
     if (Object.keys(stats).length === 0) {
       return res.status(404).json({ error: 'APY summary stats not found' });
@@ -77,8 +86,11 @@ router.get('/summary', async (req, res) => {
 
 router.get('/daily', async (req, res) => {
   try {
-    const { chain, collateralType } = req.query;
+    let { chain, collateralType } = req.query;
     validateParameters(chain, collateralType);
+    chain = chain?.toLowerCase();
+    collateralType = collateralType?.toLowerCase();
+    
     const data = await getDailyAggregatedAPYData(chain, collateralType);
     if (chain && (!data[chain] || data[chain].length === 0)) {
       return res.status(404).json({ error: 'Daily aggregated APY data not found for the specified chain' });

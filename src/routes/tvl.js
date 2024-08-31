@@ -19,8 +19,11 @@ const validateParameters = (chain, collateralType) => {
 
 router.get('/latest', async (req, res) => {
   try {
-    const { chain, collateralType } = req.query;
+    let { chain, collateralType } = req.query;
     validateParameters(chain, collateralType);
+    chain = chain?.toLowerCase();
+    collateralType = collateralType?.toLowerCase();
+    
     const result = await getLatestTVLData(chain, collateralType);
     if (chain && (!result[chain] || result[chain].length === 0)) {
       return res.status(404).json({ error: 'TVL data not found for the specified chain' });
@@ -37,8 +40,11 @@ router.get('/latest', async (req, res) => {
 
 router.get('/cumulative', async (req, res) => {
   try {
-    const { chain, collateralType } = req.query;
+    let { chain, collateralType } = req.query;
     validateParameters(chain, collateralType);
+    chain = chain?.toLowerCase();
+    collateralType = collateralType?.toLowerCase();
+    
     const result = await getCumulativeTVLData(chain, collateralType);
     if (chain && (!result[chain] || result[chain].length === 0)) {
       return res.status(404).json({ error: 'TVL data not found for the specified chain' });
@@ -55,8 +61,11 @@ router.get('/cumulative', async (req, res) => {
 
 router.get('/summary', async (req, res) => {
   try {
-    const { chain, collateralType } = req.query;
+    let { chain, collateralType } = req.query;
     validateParameters(chain, collateralType);
+    chain = chain?.toLowerCase();
+    collateralType = collateralType?.toLowerCase();
+    
     const result = await getTVLSummaryStats(chain, collateralType);
     if (chain && (!result[chain] || Object.keys(result[chain]).length === 0)) {
       return res.status(404).json({ error: 'TVL summary not found for the specified chain' });
@@ -73,8 +82,11 @@ router.get('/summary', async (req, res) => {
 
 router.get('/daily', async (req, res) => {
   try {
-    const { chain, collateralType } = req.query;
+    let { chain, collateralType } = req.query;
     validateParameters(chain, collateralType);
+    chain = chain?.toLowerCase();
+    collateralType = collateralType?.toLowerCase();
+    
     const result = await getDailyTVLData(chain, collateralType);
     if (chain && (!result[chain] || result[chain].length === 0)) {
       return res.status(404).json({ error: 'Daily TVL data not found for the specified chain' });

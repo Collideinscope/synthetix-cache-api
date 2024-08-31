@@ -19,8 +19,11 @@ const validateParameters = (chain, collateralType) => {
 
 router.get('/latest', async (req, res) => {
   try {
-    const { chain, collateralType } = req.query;
+    let { chain, collateralType } = req.query;
     validateParameters(chain, collateralType);
+    chain = chain?.toLowerCase();
+    collateralType = collateralType?.toLowerCase();
+    
     const result = await getLatestPoolRewardsData(chain, collateralType);
     if (Object.values(result).every(data => data.length === 0)) {
       return res.status(404).json({ error: 'Pool rewards data not found' });
@@ -34,8 +37,11 @@ router.get('/latest', async (req, res) => {
 
 router.get('/cumulative', async (req, res) => {
   try {
-    const { chain, collateralType } = req.query;
+    let { chain, collateralType } = req.query;
     validateParameters(chain, collateralType);
+    chain = chain?.toLowerCase();
+    collateralType = collateralType?.toLowerCase();
+    
     const result = await getCumulativePoolRewardsData(chain, collateralType);
     if (Object.values(result).every(data => data.length === 0)) {
       return res.status(404).json({ error: 'Pool rewards data not found' });
@@ -49,8 +55,11 @@ router.get('/cumulative', async (req, res) => {
 
 router.get('/summary', async (req, res) => {
   try {
-    const { chain, collateralType } = req.query;
+    let { chain, collateralType } = req.query;
     validateParameters(chain, collateralType);
+    chain = chain?.toLowerCase();
+    collateralType = collateralType?.toLowerCase();
+    
     const stats = await getPoolRewardsSummaryStats(chain, collateralType);
     if (Object.values(stats).every(data => Object.keys(data).length === 0)) {
       return res.status(404).json({ error: 'Pool rewards summary stats not found' });
@@ -64,8 +73,11 @@ router.get('/summary', async (req, res) => {
 
 router.get('/daily', async (req, res) => {
   try {
-    const { chain, collateralType } = req.query;
+    let { chain, collateralType } = req.query;
     validateParameters(chain, collateralType);
+    chain = chain?.toLowerCase();
+    collateralType = collateralType?.toLowerCase();
+    
     const data = await getDailyPoolRewardsData(chain, collateralType);
     if (Object.values(data).every(chainData => chainData.length === 0)) {
       return res.status(404).json({ error: 'Daily pool rewards data not found' });
