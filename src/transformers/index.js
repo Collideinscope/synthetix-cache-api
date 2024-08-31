@@ -14,7 +14,7 @@ const modifyAPYDataWithTimeframes = (data) => {
       apy_7d: parseFloat(obj.apy_7d),
       apy_28d: parseFloat(obj.apy_28d),
     };
-  console.log(data)
+
     const apyValues = Object.entries(apyPeriods).reduce((acc, [period, apy]) => {
       acc[period] = TIMEFRAMES.reduce((result, timeframe) => {
         result[timeframe] = calculateAPY(apy, timeframe);
