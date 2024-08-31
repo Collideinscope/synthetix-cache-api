@@ -6,10 +6,12 @@ const {
   getTVLSummaryStats,
   getDailyTVLData,
 } = require('../services/tvlService');
-
 const { CHAINS } = require('../helpers');
 
-const validateOptionalChain = (chain) => {
+const validateParameters = (chain, collateralType) => {
+  if (!collateralType) {
+    throw new Error("collateralType is required");
+  }
   if (chain && !CHAINS.includes(chain)) {
     throw new Error("Invalid chain parameter");
   }
@@ -17,20 +19,15 @@ const validateOptionalChain = (chain) => {
 
 router.get('/latest', async (req, res) => {
   try {
-    const { chain } = req.query;
-
-    validateOptionalChain(chain);
-
-    const result = await getLatestTVLData(chain);
-
+    const { chain, collateralType } = req.query;
+    validateParameters(chain, collateralType);
+    const result = await getLatestTVLData(chain, collateralType);
     if (chain && (!result[chain] || result[chain].length === 0)) {
-      return res.status(404).send('TVL data not found for the specified chain');
+      return res.status(404).json({ error: 'TVL data not found for the specified chain' });
     }
-
     if (!chain && Object.values(result).every(data => data.length === 0)) {
-      return res.status(404).send('TVL data not found');
+      return res.status(404).json({ error: 'TVL data not found' });
     }
-
     return res.json(result);
   } catch (error) {
     console.error('Error in /tvl/latest route:', error);
@@ -40,20 +37,15 @@ router.get('/latest', async (req, res) => {
 
 router.get('/cumulative', async (req, res) => {
   try {
-    const { chain } = req.query;
-
-    validateOptionalChain(chain);
-
-    const result = await getCumulativeTVLData(chain);
-
+    const { chain, collateralType } = req.query;
+    validateParameters(chain, collateralType);
+    const result = await getCumulativeTVLData(chain, collateralType);
     if (chain && (!result[chain] || result[chain].length === 0)) {
-      return res.status(404).send('TVL data not found for the specified chain');
+      return res.status(404).json({ error: 'TVL data not found for the specified chain' });
     }
-
     if (!chain && Object.values(result).every(data => data.length === 0)) {
-      return res.status(404).send('TVL data not found');
+      return res.status(404).json({ error: 'TVL data not found' });
     }
-
     return res.json(result);
   } catch (error) {
     console.error('Error in /tvl/cumulative route:', error);
@@ -63,20 +55,15 @@ router.get('/cumulative', async (req, res) => {
 
 router.get('/summary', async (req, res) => {
   try {
-    const { chain } = req.query;
-
-    validateOptionalChain(chain);
-
-    const result = await getTVLSummaryStats(chain);
-
+    const { chain, collateralType } = req.query;
+    validateParameters(chain, collateralType);
+    const result = await getTVLSummaryStats(chain, collateralType);
     if (chain && (!result[chain] || Object.keys(result[chain]).length === 0)) {
-      return res.status(404).send('TVL summary not found for the specified chain');
+      return res.status(404).json({ error: 'TVL summary not found for the specified chain' });
     }
-
     if (!chain && Object.keys(result).every(key => Object.keys(result[key]).length === 0)) {
-      return res.status(404).send('TVL summary not found');
+      return res.status(404).json({ error: 'TVL summary not found' });
     }
-
     return res.json(result);
   } catch (error) {
     console.error('Error in /tvl/summary route:', error);
@@ -86,20 +73,15 @@ router.get('/summary', async (req, res) => {
 
 router.get('/daily', async (req, res) => {
   try {
-    const { chain } = req.query;
-
-    validateOptionalChain(chain);
-
-    const result = await getDailyTVLData(chain);
-
+    const { chain, collateralType } = req.query;
+    validateParameters(chain, collateralType);
+    const result = await getDailyTVLData(chain, collateralType);
     if (chain && (!result[chain] || result[chain].length === 0)) {
-      return res.status(404).send('Daily TVL data not found for the specified chain');
+      return res.status(404).json({ error: 'Daily TVL data not found for the specified chain' });
     }
-
     if (!chain && Object.values(result).every(chainData => chainData.length === 0)) {
-      return res.status(404).send('Daily TVL data not found');
+      return res.status(404).json({ error: 'Daily TVL data not found' });
     }
-
     return res.json(result);
   } catch (error) {
     console.error('Error in /tvl/daily route:', error);

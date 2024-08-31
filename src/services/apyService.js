@@ -5,7 +5,6 @@ const { CHAINS } = require('../helpers');
 const {
   calculateDelta,
   calculatePercentage,
-  calculateStandardDeviation,
   smoothData
 } = require('../helpers');
 
@@ -126,7 +125,6 @@ const getAPYSummaryStats = async (chain, collateralType) => {
         }
 
         const apyValues = smoothedData.map(item => parseFloat(item.apy_28d));
-        const standardDeviation = calculateStandardDeviation(apyValues);
 
         const current = parseFloat(allData[allData.length - 1].apy_28d);
         const ath = Math.max(...apyValues, current);
@@ -142,7 +140,6 @@ const getAPYSummaryStats = async (chain, collateralType) => {
           atl,
           ath_percentage: calculatePercentage(parseFloat(current), ath),
           atl_percentage: calculatePercentage(parseFloat(current), atl),
-          standard_deviation: standardDeviation
         };
 
         await redisService.set(cacheKey, result, CACHE_TTL);
@@ -162,6 +159,7 @@ const getAPYSummaryStats = async (chain, collateralType) => {
       }, {});
     }
   } catch (error) {
+    console.error('Error in getAPYSummaryStats:', error);
     throw new Error('Error fetching APY summary stats: ' + error.message);
   }
 };

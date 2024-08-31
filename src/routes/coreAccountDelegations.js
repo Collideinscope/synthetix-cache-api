@@ -3,7 +3,6 @@ const router = express.Router();
 const {
   getStakerCount,
   getCumulativeUniqueStakers,
-  getCoreAccountDelegationsDataByAccount,
   getUniqueStakersSummaryStats,
   getDailyNewUniqueStakers,
 } = require('../services/coreAccountDelegationsService');
@@ -48,19 +47,6 @@ router.get('/stakers/cumulative', async (req, res) => {
   }
 });
 
-router.get('/account/:accountId', async (req, res) => {
-  try {
-    const { accountId } = req.params;
-    const result = await getCoreAccountDelegationsDataByAccount(accountId);
-    if (!result.length) {
-      return res.status(404).json({ error: 'Core account delegations data not found for this account ID' });
-    }
-    return res.json(result);
-  } catch (error) {
-    console.error('Error in /account route:', error);
-    return res.status(400).json({ error: error.message });
-  }
-});
 
 router.get('/stakers/summary', async (req, res) => {
   try {

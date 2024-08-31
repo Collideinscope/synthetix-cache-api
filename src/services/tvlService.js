@@ -1,24 +1,40 @@
-const { knex, troyDBKnex } = require('../config/db');
+const { troyDBKnex } = require('../config/db');
+const redisService = require('./redisService');
 const { CHAINS } = require('../helpers');
 
 const {
   calculateDelta,
   calculatePercentage,
-  calculateStandardDeviation,
   smoothData
 } = require('../helpers');
 
-const getLatestTVLData = async (chain) => {
+const CACHE_TTL = 3600; // 1 hour
+
+const getLatestTVLData = async (chain, collateralType) => {
   try {
-    if (chain && !CHAINS.includes(chain)) {
-      throw new Error('Invalid chain parameter');
+    if (!collateralType) {
+      throw new Error('collateralType is required');
     }
 
     const fetchLatest = async (chainToFetch) => {
-      const result = await knex('tvl')
-        .where('chain', chainToFetch)
-        .orderBy('ts', 'desc')
-        .limit(1);
+      const cacheKey = `latestTVL:${chainToFetch}:${collateralType}`;
+      let result = await redisService.get(cacheKey);
+
+      if (!result) {
+        console.log('not from cache');
+        const tableName = `prod_${chainToFetch}_mainnet.fct_core_vault_collateral_${chainToFetch}_mainnet`;
+        try {
+          result = await troyDBKnex(tableName)
+            .where('collateral_type', collateralType)
+            .orderBy('ts', 'desc')
+            .limit(1);
+        } catch (error) {
+          console.error(`Error fetching data for ${chainToFetch}:`, error);
+          result = [];
+        }
+        await redisService.set(cacheKey, result, CACHE_TTL);
+      }
+
       return { [chainToFetch]: result };
     };
 
@@ -33,22 +49,33 @@ const getLatestTVLData = async (chain) => {
   }
 };
 
-const getCumulativeTVLData = async (chain) => {
+const getCumulativeTVLData = async (chain, collateralType) => {
   try {
-    if (chain && !CHAINS.includes(chain)) {
-      throw new Error('Invalid chain parameter');
+    if (!collateralType) {
+      throw new Error('collateralType is required');
     }
 
-    const baseQuery = (chainToQuery) => knex('tvl')
-      .where({
-        chain: chainToQuery,
-        pool_id: 1,
-        collateral_type: '0xc74ea762cf06c9151ce074e6a569a5945b6302e7'
-      })
-      .orderBy('ts', 'asc');
-
     const fetchAll = async (chainToFetch) => {
-      const result = await baseQuery(chainToFetch);
+      const cacheKey = `cumulativeTVL:${chainToFetch}:${collateralType}`;
+      let result = await redisService.get(cacheKey);
+
+      if (!result) {
+        console.log('not from cache');
+        const tableName = `prod_${chainToFetch}_mainnet.fct_core_vault_collateral_${chainToFetch}_mainnet`;
+        try {
+          result = await troyDBKnex(tableName)
+            .where({
+              pool_id: 1,
+              collateral_type: collateralType
+            })
+            .orderBy('ts', 'asc');
+        } catch (error) {
+          console.error(`Error fetching data for ${chainToFetch}:`, error);
+          result = [];
+        }
+        await redisService.set(cacheKey, result, CACHE_TTL);
+      }
+
       return { [chainToFetch]: result };
     };
 
@@ -59,66 +86,85 @@ const getCumulativeTVLData = async (chain) => {
       return results.reduce((acc, curr) => ({ ...acc, ...curr }), {});
     }
   } catch (error) {
-    throw new Error('Error fetching all TVL data: ' + error.message);
+    throw new Error('Error fetching cumulative TVL data: ' + error.message);
   }
 };
 
-const getTVLSummaryStats = async (chain) => {
+const getTVLSummaryStats = async (chain, collateralType) => {
   try {
-    if (chain && !CHAINS.includes(chain)) {
-      throw new Error('Invalid chain parameter');
+    if (!collateralType) {
+      throw new Error('collateralType is required');
     }
 
     const processChainData = async (chainToProcess) => {
-      const baseQuery = () => knex('tvl')
-        .where({
-          chain: chainToProcess,
-          pool_id: 1,
-          collateral_type: '0xc74ea762cf06c9151ce074e6a569a5945b6302e7'
-        });
+      const cacheKey = `TVLSummary:${chainToProcess}:${collateralType}`;
+      let result = await redisService.get(cacheKey);
 
-      const allData = await baseQuery().orderBy('ts', 'asc');
-      if (allData.length === 0) {
-        return null; // No data for this chain
+      if (!result) {
+        console.log('not from cache');
+        const tableName = `prod_${chainToProcess}_mainnet.fct_core_vault_collateral_${chainToProcess}_mainnet`;
+        let allData = [];
+        try {
+          allData = await troyDBKnex(tableName)
+            .where({
+              pool_id: 1,
+              collateral_type: collateralType
+            })
+            .orderBy('ts', 'asc');
+        } catch (error) {
+          console.error(`Error fetching data for ${chainToProcess}:`, error);
+          return null;  
+        }
+
+        if (allData.length === 0) {
+          return null;
+        }
+
+        try {
+          const smoothedData = smoothData(allData, 'collateral_value');
+          const reversedSmoothedData = [...smoothedData].reverse();
+
+          const latestData = reversedSmoothedData[0];
+          const latestTs = new Date(latestData.ts);
+
+          const getDateFromLatest = (days) => new Date(latestTs.getTime() - days * 24 * 60 * 60 * 1000);
+
+          const value24h = reversedSmoothedData.find(item => new Date(item.ts) <= getDateFromLatest(1));
+          const value7d = reversedSmoothedData.find(item => new Date(item.ts) <= getDateFromLatest(7));
+          const value28d = reversedSmoothedData.find(item => new Date(item.ts) <= getDateFromLatest(28));
+
+          let valueYtd = smoothedData.find(item => new Date(item.ts) >= new Date(latestTs.getFullYear(), 0, 1));
+
+          if (!valueYtd) {
+            valueYtd = reversedSmoothedData[reversedSmoothedData.length - 1];
+          }
+
+          const tvlValues = smoothedData.map(item => parseFloat(item.collateral_value));
+
+          const current = parseFloat(allData[allData.length - 1].collateral_value);
+          const ath = Math.max(...tvlValues, current);
+          const atl = Math.min(...tvlValues, current);
+
+          result = {
+            current,
+            delta_24h: calculateDelta(current, value24h ? parseFloat(value24h.collateral_value) : null),
+            delta_7d: calculateDelta(current, value7d ? parseFloat(value7d.collateral_value) : null),
+            delta_28d: calculateDelta(current, value28d ? parseFloat(value28d.collateral_value) : null),
+            delta_ytd: calculateDelta(current, valueYtd ? parseFloat(valueYtd.collateral_value) : null),
+            ath,
+            atl,
+            ath_percentage: calculatePercentage(current, ath),
+            atl_percentage: atl === 0 ? 100 : calculatePercentage(current, atl),
+          };
+
+          await redisService.set(cacheKey, result, CACHE_TTL);
+        } catch (error) {
+          console.error(`Error processing data for ${chainToProcess}:`, error);
+          return null;
+        }
       }
 
-      const smoothedData = smoothData(allData, 'collateral_value');
-      const reversedSmoothedData = [...smoothedData].reverse();
-
-      const latestData = reversedSmoothedData[0];
-      const latestTs = new Date(latestData.ts);
-
-      const getDateFromLatest = (days) => new Date(latestTs.getTime() - days * 24 * 60 * 60 * 1000);
-
-      const value24h = reversedSmoothedData.find(item => new Date(item.ts) <= getDateFromLatest(1));
-      const value7d = reversedSmoothedData.find(item => new Date(item.ts) <= getDateFromLatest(7));
-      const value28d = reversedSmoothedData.find(item => new Date(item.ts) <= getDateFromLatest(28));
-
-      let valueYtd = smoothedData.find(item => new Date(item.ts) >= new Date(latestTs.getFullYear(), 0, 1));
-
-      if (!valueYtd) {
-        valueYtd = reversedSmoothedData[reversedSmoothedData.length - 1];
-      }
-
-      const tvlValues = smoothedData.map(item => parseFloat(item.collateral_value));
-      const standardDeviation = calculateStandardDeviation(tvlValues);
-
-      const current = parseFloat(allData[allData.length - 1].collateral_value);
-      const ath = Math.max(...tvlValues, current);
-      const atl = Math.min(...tvlValues, current);
-
-      return {
-        current,
-        delta_24h: calculateDelta(current, value24h ? parseFloat(value24h.collateral_value) : null),
-        delta_7d: calculateDelta(current, value7d ? parseFloat(value7d.collateral_value) : null),
-        delta_28d: calculateDelta(current, value28d ? parseFloat(value28d.collateral_value) : null),
-        delta_ytd: calculateDelta(current, valueYtd ? parseFloat(valueYtd.collateral_value) : null),
-        ath,
-        atl,
-        ath_percentage: calculatePercentage(current, ath),
-        atl_percentage: atl === 0 ? 100 : calculatePercentage(current, atl),
-        standard_deviation: standardDeviation
-      };
+      return result;
     };
 
     if (chain) {
@@ -132,159 +178,55 @@ const getTVLSummaryStats = async (chain) => {
       }, {});
     }
   } catch (error) {
+    console.error('Error in getTVLSummaryStats:', error);
     throw new Error('Error fetching TVL summary stats: ' + error.message);
   }
 };
 
-const fetchAndInsertTVLData = async (chain) => {
-  if (!chain) {
-    throw new Error('Chain must be provided for data updates.');
-  }
-
-  if (!CHAINS.includes(chain)) {
-    throw new Error(`Chain ${chain} not recognized.`);
-  }
-
+const getDailyTVLData = async (chain, collateralType) => {
   try {
-    const tableName = chain === 'base'
-      ? `prod_${chain}_mainnet.fct_core_vault_collateral_${chain}_mainnet`
-      : `${chain}_mainnet.core_vault_collateral`;
+    if (!collateralType) {
+      throw new Error('collateralType is required');
+    }
 
-    const rows = await troyDBKnex.raw(`
-      SELECT ts, block_number, pool_id, collateral_type, contract_address, amount, collateral_value
-      FROM ${tableName}
-      ORDER BY ts DESC;
-    `);
+    const fetchDaily = async (chainToProcess) => {
+      const cacheKey = `dailyTVL:${chainToProcess}:${collateralType}`;
+      let result = await redisService.get(cacheKey);
 
-    const rowsAggregatedByHour = rows.rows.reduce((acc, row) => {
-      const hourKey = `${row.ts.toISOString().slice(0, 13)}_${row.pool_id}_${row.collateral_type}_${chain}`;
+      if (!result) {
+        console.log('not from cache');
+        const tableName = `prod_${chainToProcess}_mainnet.fct_core_vault_collateral_${chainToProcess}_mainnet`;
+        try {
+          const queryResult = await troyDBKnex.raw(`
+            WITH daily_data AS (
+              SELECT
+                DATE_TRUNC('day', ts) AS date,
+                FIRST_VALUE(SUM(collateral_value)) OVER (PARTITION BY DATE_TRUNC('day', ts) ORDER BY ts ASC) AS start_of_day_tvl,
+                LAST_VALUE(SUM(collateral_value)) OVER (PARTITION BY DATE_TRUNC('day', ts) ORDER BY ts ASC ROWS BETWEEN UNBOUNDED PRECEDING AND UNBOUNDED FOLLOWING) AS end_of_day_tvl
+              FROM ${tableName}
+              WHERE pool_id = 1
+                AND collateral_type = ?
+              GROUP BY DATE_TRUNC('day', ts), ts
+            )
+            SELECT DISTINCT
+              date,
+              end_of_day_tvl - start_of_day_tvl AS daily_tvl_change
+            FROM daily_data
+            ORDER BY date;
+          `, [collateralType]);
 
-      if (!acc[hourKey] || row.amount > acc[hourKey].amount) {
-        acc[hourKey] = {
-          ...row,
-          block_ts: row.ts,
-          chain,
-          ts: new Date(row.ts.toISOString().slice(0, 13) + ':00:00Z')
-        };
+          result = queryResult.rows.map(row => ({
+            ts: row.date,
+            daily_tvl_change: parseFloat(row.daily_tvl_change)
+          }));
+        } catch (error) {
+          console.error(`Error fetching data for ${chainToProcess}:`, error);
+          result = [];
+        }
+        await redisService.set(cacheKey, result, CACHE_TTL);
       }
-    
-      return acc;
-    }, {});
 
-    const dataToInsert = Object.values(rowsAggregatedByHour);
-
-    await knex('tvl')
-      .insert(dataToInsert)
-      .onConflict(['chain', 'ts', 'pool_id', 'collateral_type'])
-      .merge({
-        amount: knex.raw('GREATEST(tvl.amount, excluded.amount)'),
-        block_ts: knex.raw('CASE WHEN tvl.amount <= excluded.amount THEN excluded.block_ts ELSE tvl.block_ts END'),
-      });
-
-    console.log(`TVL data seeded successfully for ${chain} chain.`);
-  } catch (error) {
-    console.error(`Error seeding TVL data for ${chain} chain:`, error);
-  }
-};
-
-const fetchAndUpdateLatestTVLData = async (chain) => {
-  if (!chain) {
-    throw new Error('Chain must be provided for data updates.');
-  }
-
-  if (!CHAINS.includes(chain)) {
-    throw new Error(`Chain ${chain} not recognized.`);
-  }
-
-  try {
-    const tableName = chain === 'base'
-      ? `prod_${chain}_mainnet.fct_core_vault_collateral_${chain}_mainnet`
-      : `${chain}_mainnet.core_vault_collateral`;
-
-    const lastTimestampResult = await knex('tvl')
-      .where('chain', chain)
-      .orderBy('block_ts', 'desc')
-      .first();
-
-    const lastTimestamp = lastTimestampResult.block_ts;
-
-    const newRows = await troyDBKnex.raw(`
-      SELECT ts, block_number, pool_id, collateral_type, contract_address, amount, collateral_value
-      FROM ${tableName}
-      WHERE ts > ?
-      ORDER BY ts DESC;
-    `, [lastTimestamp]);
-
-    if (newRows.rows.length === 0) {
-      console.log(`No new TVL data to update for ${chain} chain.`);
-      return;
-    }
-
-    const rowsAggregatedByHour = newRows.rows.reduce((acc, row) => {
-      const hourKey = `${row.ts.toISOString().slice(0, 13)}_${row.pool_id}_${row.collateral_type}_${chain}`;
-
-      if (!acc[hourKey] || row.amount > acc[hourKey].amount) {
-        acc[hourKey] = {
-          ...row,
-          block_ts: row.ts,
-          chain,
-          ts: new Date(row.ts.toISOString().slice(0, 13) + ':00:00Z')
-        };
-      }
-    
-      return acc;
-    }, {});
-
-    const dataToInsert = Object.values(rowsAggregatedByHour);
-
-    if (dataToInsert.length > 0) {
-      await knex('tvl')
-        .insert(dataToInsert)
-        .onConflict(['chain', 'ts', 'pool_id', 'collateral_type'])
-        .merge({
-          amount: knex.raw('GREATEST(tvl.amount, excluded.amount)'),
-          block_ts: knex.raw('CASE WHEN tvl.amount <= excluded.amount THEN excluded.block_ts ELSE tvl.block_ts END'),
-        });
-    }
-
-    console.log(`TVL data updated successfully for ${chain} chain.`);
-  } catch (error) {
-    console.error(`Error updating TVL data for ${chain} chain:`, error);
-  }
-};
-
-const getDailyTVLData = async (chain) => {
-  try {
-    if (chain && !CHAINS.includes(chain)) {
-      throw new Error('Invalid chain parameter');
-    }
-
-    const fetchDaily = async (chainToFetch) => {
-      const result = await knex.raw(`
-        WITH daily_data AS (
-          SELECT
-            DATE_TRUNC('day', ts) AS date,
-            FIRST_VALUE(SUM(collateral_value)) OVER (PARTITION BY DATE_TRUNC('day', ts) ORDER BY ts ASC) AS start_of_day_tvl,
-            LAST_VALUE(SUM(collateral_value)) OVER (PARTITION BY DATE_TRUNC('day', ts) ORDER BY ts ASC ROWS BETWEEN UNBOUNDED PRECEDING AND UNBOUNDED FOLLOWING) AS end_of_day_tvl
-          FROM tvl
-          WHERE chain = ?
-            AND pool_id = 1
-            AND collateral_type = '0xc74ea762cf06c9151ce074e6a569a5945b6302e7'
-          GROUP BY DATE_TRUNC('day', ts), ts
-        )
-        SELECT DISTINCT
-          date,
-          end_of_day_tvl - start_of_day_tvl AS daily_tvl_change
-        FROM daily_data
-        ORDER BY date;
-      `, [chainToFetch]);
-
-      const data = result.rows.map(row => ({
-        ts: row.date,
-        daily_tvl_change: parseFloat(row.daily_tvl_change)
-      }));
-
-      return { [chainToFetch]: data };
+      return { [chainToProcess]: result };
     };
 
     if (chain) {
@@ -301,8 +243,6 @@ const getDailyTVLData = async (chain) => {
 module.exports = {
   getLatestTVLData,
   getCumulativeTVLData,
-  fetchAndInsertTVLData,
-  fetchAndUpdateLatestTVLData,
   getTVLSummaryStats,
   getDailyTVLData,
 };
