@@ -167,7 +167,7 @@ const getOpenInterestSummaryStats = async (chain) => {
   try {
     const processChainData = async (chainToProcess) => {
       const cacheKey = `openInterestSummaryStats:${chainToProcess}`;
-      let result = await redisService.get(cacheKey);
+      let result = null // await redisService.get(cacheKey);
 
       if (!result) {
         console.log('Processing open interest summary stats');
