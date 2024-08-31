@@ -16,7 +16,7 @@ class RedisService {
     // Only add TLS options if we're not in a local environment
     if (process.env.REDIS_URL && !process.env.REDIS_URL.includes('localhost')) {
       options.socket = {
-        tls: true,
+        tls: false,
         rejectUnauthorized: false
       };
     }
