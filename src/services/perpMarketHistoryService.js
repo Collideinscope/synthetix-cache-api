@@ -215,7 +215,7 @@ const getOpenInterestSummaryStats = async (chain) => {
         await redisService.set(cacheKey, result, CACHE_TTL);
       }
 
-      return { [chainToProcess]: result };
+      return result;
     };
 
     if (chain) {

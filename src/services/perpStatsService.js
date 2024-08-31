@@ -50,14 +50,13 @@ const getSummaryStats = async (chain, column) => {
 
       if (!result) {
         console.log('Processing perp stats summary');
-        const allData = await knex('perp_stats')
-          .where('chain', chainToProcess)
-          .orderBy('ts', 'desc');
         
-        if (allData.length === 0) {
+        const data = await fetchCumulativeData(chainToProcess, column); 
+
+        if (data.length === 0) {
           result = {};
         } else {
-          const smoothedData = smoothData(allData, column);
+          const smoothedData = smoothData(data, column);
           const reversedSmoothedData = [...smoothedData].reverse();
 
           const latestData = reversedSmoothedData[0];
@@ -75,7 +74,7 @@ const getSummaryStats = async (chain, column) => {
           }
 
           const columnValues = smoothedData.map(item => parseFloat(item[column]));
-          const current = parseFloat(allData[0][column]);
+          const current = parseFloat(data[data.length - 1][column]);
           const ath = Math.max(...columnValues, current);
           const atl = Math.min(...columnValues, current);
 
