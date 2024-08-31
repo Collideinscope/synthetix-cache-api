@@ -8,7 +8,10 @@ const {
 } = require('../services/poolRewardsService');
 const { CHAINS } = require('../helpers');
 
-const validateOptionalChain = (chain) => {
+const validateParameters = (chain, collateralType) => {
+  if (!collateralType) {
+    throw new Error("collateralType is required");
+  }
   if (chain && !CHAINS.includes(chain)) {
     throw new Error("Invalid chain parameter");
   }
@@ -16,14 +19,11 @@ const validateOptionalChain = (chain) => {
 
 router.get('/latest', async (req, res) => {
   try {
-    const { chain } = req.query;
-    validateOptionalChain(chain);
-    const result = await getLatestPoolRewardsData(chain);
-    if (chain && (!result[chain] || result[chain].length === 0)) {
-      return res.status(404).send('Pool rewards data not found for the specified chain');
-    }
-    if (!chain && Object.values(result).every(data => data.length === 0)) {
-      return res.status(404).send('Pool rewards data not found');
+    const { chain, collateralType } = req.query;
+    validateParameters(chain, collateralType);
+    const result = await getLatestPoolRewardsData(chain, collateralType);
+    if (Object.values(result).every(data => data.length === 0)) {
+      return res.status(404).json({ error: 'Pool rewards data not found' });
     }
     return res.json(result);
   } catch (error) {
@@ -34,14 +34,11 @@ router.get('/latest', async (req, res) => {
 
 router.get('/cumulative', async (req, res) => {
   try {
-    const { chain } = req.query;
-    validateOptionalChain(chain);
-    const result = await getCumulativePoolRewardsData(chain);
-    if (chain && (!result[chain] || result[chain].length === 0)) {
-      return res.status(404).send('Pool rewards data not found for the specified chain');
-    }
-    if (!chain && Object.values(result).every(data => data.length === 0)) {
-      return res.status(404).send('Pool rewards data not found');
+    const { chain, collateralType } = req.query;
+    validateParameters(chain, collateralType);
+    const result = await getCumulativePoolRewardsData(chain, collateralType);
+    if (Object.values(result).every(data => data.length === 0)) {
+      return res.status(404).json({ error: 'Pool rewards data not found' });
     }
     return res.json(result);
   } catch (error) {
@@ -52,9 +49,12 @@ router.get('/cumulative', async (req, res) => {
 
 router.get('/summary', async (req, res) => {
   try {
-    const { chain } = req.query;
-    validateOptionalChain(chain);
-    const stats = await getPoolRewardsSummaryStats(chain);
+    const { chain, collateralType } = req.query;
+    validateParameters(chain, collateralType);
+    const stats = await getPoolRewardsSummaryStats(chain, collateralType);
+    if (Object.values(stats).every(data => Object.keys(data).length === 0)) {
+      return res.status(404).json({ error: 'Pool rewards summary stats not found' });
+    }
     res.json(stats);
   } catch (error) {
     console.error('Error in /pool-rewards/summary route:', error);
@@ -64,14 +64,11 @@ router.get('/summary', async (req, res) => {
 
 router.get('/daily', async (req, res) => {
   try {
-    const { chain } = req.query;
-    validateOptionalChain(chain);
-    const data = await getDailyPoolRewardsData(chain);
-    if (chain && (!data[chain] || data[chain].length === 0)) {
-      return res.status(404).send('Daily pool rewards data not found for the specified chain');
-    }
-    if (!chain && Object.values(data).every(chainData => chainData.length === 0)) {
-      return res.status(404).send('Daily pool rewards data not found');
+    const { chain, collateralType } = req.query;
+    validateParameters(chain, collateralType);
+    const data = await getDailyPoolRewardsData(chain, collateralType);
+    if (Object.values(data).every(chainData => chainData.length === 0)) {
+      return res.status(404).json({ error: 'Daily pool rewards data not found' });
     }
     res.json(data);
   } catch (error) {

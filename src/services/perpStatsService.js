@@ -1,23 +1,29 @@
-const { knex, troyDBKnex } = require('../config/db');
+const { knex } = require('../config/db');
+const redisService = require('./redisService');
 const { CHAINS } = require('../helpers');
+
 const {
   calculateDelta,
   calculatePercentage,
-  calculateStandardDeviation,
   smoothData
 } = require('../helpers');
 
+const CACHE_TTL = 3600; // 1 hour
+
 const getLatestPerpStatsData = async (chain) => {
   try {
-    if (chain && !CHAINS.includes(chain)) {
-      throw new Error('Invalid chain parameter');
-    }
-
     const fetchLatest = async (chainToFetch) => {
-      const result = await knex('perp_stats')
-        .where('chain', chainToFetch)
-        .orderBy('ts', 'desc')
-        .limit(1);
+      const cacheKey = `latestPerpStats:${chainToFetch}`;
+      let result = await redisService.get(cacheKey);
+
+      if (!result) {
+        console.log('not from cache');
+        result = await knex('perp_stats')
+          .where('chain', chainToFetch)
+          .orderBy('ts', 'desc')
+          .limit(1);
+        await redisService.set(cacheKey, result, CACHE_TTL);
+      }
 
       return { [chainToFetch]: result };
     };
@@ -26,7 +32,10 @@ const getLatestPerpStatsData = async (chain) => {
       return await fetchLatest(chain);
     } else {
       const results = await Promise.all(CHAINS.map(fetchLatest));
-      return results.reduce((acc, curr) => ({ ...acc, ...curr }), {});
+      return CHAINS.reduce((acc, chain, index) => {
+        acc[chain] = results[index][chain] || [];
+        return acc;
+      }, {});
     }
   } catch (error) {
     throw new Error('Error fetching latest perp stats data: ' + error.message);
@@ -35,58 +44,63 @@ const getLatestPerpStatsData = async (chain) => {
 
 const getSummaryStats = async (chain, column) => {
   try {
-    if (chain && !CHAINS.includes(chain)) {
-      throw new Error('Invalid chain parameter');
-    }
-
     const processChainData = async (chainToProcess) => {
-      const baseQuery = () => knex('perp_stats').where('chain', chainToProcess);
+      const cacheKey = `perpStatsSummary:${chainToProcess}:${column}`;
+      let result = await redisService.get(cacheKey);
 
-      const allData = await baseQuery().orderBy('ts', 'desc');
-      
-      if (allData.length === 0) {
-        return null; // No data for this chain
+      if (!result) {
+        console.log('Processing perp stats summary');
+        const allData = await knex('perp_stats')
+          .where('chain', chainToProcess)
+          .orderBy('ts', 'desc');
+        
+        if (allData.length === 0) {
+          result = {};
+        } else {
+          const smoothedData = smoothData(allData, column);
+          const reversedSmoothedData = [...smoothedData].reverse();
+
+          const latestData = reversedSmoothedData[0];
+          const latestTs = new Date(latestData.ts);
+
+          const getDateFromLatest = (days) => new Date(latestTs.getTime() - days * 24 * 60 * 60 * 1000);
+
+          const value24h = reversedSmoothedData.find(item => new Date(item.ts) <= getDateFromLatest(1));
+          const value7d = reversedSmoothedData.find(item => new Date(item.ts) <= getDateFromLatest(7));
+          const value28d = reversedSmoothedData.find(item => new Date(item.ts) <= getDateFromLatest(28));
+          let valueYtd = smoothedData.find(item => new Date(item.ts) >= new Date(latestTs.getFullYear(), 0, 1));
+
+          if (!valueYtd) {
+            valueYtd = reversedSmoothedData[reversedSmoothedData.length - 1];
+          }
+
+          const columnValues = smoothedData.map(item => parseFloat(item[column]));
+          const current = parseFloat(allData[0][column]);
+          const ath = Math.max(...columnValues, current);
+          const atl = Math.min(...columnValues, current);
+
+          result = {
+            current,
+            delta_24h: calculateDelta(current, value24h ? parseFloat(value24h[column]) : null),
+            delta_7d: calculateDelta(current, value7d ? parseFloat(value7d[column]) : null),
+            delta_28d: calculateDelta(current, value28d ? parseFloat(value28d[column]) : null),
+            delta_ytd: calculateDelta(current, valueYtd ? parseFloat(valueYtd[column]) : null),
+            ath,
+            atl,
+            ath_percentage: calculatePercentage(current, ath),
+            atl_percentage: atl === 0 ? 100 : calculatePercentage(current, atl),
+          };
+        }
+
+        await redisService.set(cacheKey, result, CACHE_TTL);
       }
 
-      const latestData = allData[0];
-      const latestTs = new Date(latestData.ts);
-
-      const getClosestDataPoint = (targetDate) => {
-        return allData.reduce((closest, current) => {
-          const currentDate = new Date(current.ts);
-          const closestDate = new Date(closest.ts);
-          return Math.abs(currentDate - targetDate) < Math.abs(closestDate - targetDate) ? current : closest;
-        });
-      };
-
-      const value24h = getClosestDataPoint(new Date(latestTs.getTime() - 24 * 60 * 60 * 1000));
-      const value7d = getClosestDataPoint(new Date(latestTs.getTime() - 7 * 24 * 60 * 60 * 1000));
-      const value28d = getClosestDataPoint(new Date(latestTs.getTime() - 28 * 24 * 60 * 60 * 1000));
-      const valueYtd = getClosestDataPoint(new Date(latestTs.getFullYear(), 0, 1));
-
-      const columnValues = allData.map(item => parseFloat(item[column]));
-      const standardDeviation = calculateStandardDeviation(columnValues);
-      const current = parseFloat(latestData[column]);
-      const ath = Math.max(...columnValues);
-      const atl = Math.min(...columnValues);
-
-      return {
-        current,
-        delta_24h: calculateDelta(current, parseFloat(value24h[column])),
-        delta_7d: calculateDelta(current, parseFloat(value7d[column])),
-        delta_28d: calculateDelta(current, parseFloat(value28d[column])),
-        delta_ytd: calculateDelta(current, parseFloat(valueYtd[column])),
-        ath,
-        atl,
-        ath_percentage: calculatePercentage(current, ath),
-        atl_percentage: atl === 0 ? 100 : calculatePercentage(current, atl),
-        standard_deviation: standardDeviation
-      };
+      return result;
     };
 
     if (chain) {
       const result = await processChainData(chain);
-      return result ? { [chain]: result } : {};
+      return { [chain]: result };
     } else {
       const results = await Promise.all(CHAINS.map(processChainData));
       return CHAINS.reduce((acc, chain, index) => {
@@ -95,7 +109,7 @@ const getSummaryStats = async (chain, column) => {
       }, {});
     }
   } catch (error) {
-    throw new Error('Error fetching perp stats summary stats: ' + error.message);
+    throw new Error(`Error fetching perp stats summary stats for ${column}: ` + error.message);
   }
 };
 
@@ -108,8 +122,12 @@ const getCumulativeExchangeFeesSummaryStats = async (chain) => {
 };
 
 const fetchCumulativeData = async (chain, dataType) => {
-  try {
-    const result = await knex.raw(`
+  const cacheKey = `cumulativePerpStats:${chain}:${dataType}`;
+  let result = await redisService.get(cacheKey);
+
+  if (!result) {
+    console.log('not from cache');
+    result = await knex.raw(`
       SELECT 
         ts,
         ${dataType}
@@ -121,34 +139,29 @@ const fetchCumulativeData = async (chain, dataType) => {
         ts;
     `, [chain]);
 
-    return result.rows.map(row => ({
+    result = result.rows.map(row => ({
       ts: row.ts,
-      [dataType]: row[dataType],
+      [dataType]: parseFloat(row[dataType]),
     }));
-  } catch (error) {
-    throw new Error(`Error fetching cumulative ${dataType} data: ` + error.message);
+
+    await redisService.set(cacheKey, result, CACHE_TTL);
   }
+
+  return result;
 };
 
 const getCumulativeVolumeData = async (chain) => {
   try {
-    if (chain && !CHAINS.includes(chain)) {
-      throw new Error('Invalid chain parameter');
-    }
-
     if (chain) {
       const data = await fetchCumulativeData(chain, 'cumulative_volume');
       return { [chain]: data };
-    }
-
-    const results = await Promise.all(
-      CHAINS.map(async (chain) => {
+    } else {
+      const results = await Promise.all(CHAINS.map(async (chain) => {
         const data = await fetchCumulativeData(chain, 'cumulative_volume');
         return { [chain]: data };
-      })
-    );
-
-    return results.reduce((acc, curr) => ({ ...acc, ...curr }), {});
+      }));
+      return results.reduce((acc, curr) => ({ ...acc, ...curr }), {});
+    }
   } catch (error) {
     throw new Error('Error fetching cumulative volume data: ' + error.message);
   }
@@ -156,78 +169,74 @@ const getCumulativeVolumeData = async (chain) => {
 
 const getCumulativeExchangeFeesData = async (chain) => {
   try {
-    if (chain && !CHAINS.includes(chain)) {
-      throw new Error('Invalid chain parameter');
-    }
-
     if (chain) {
       const data = await fetchCumulativeData(chain, 'cumulative_exchange_fees');
       return { [chain]: data };
-    }
-
-    const results = await Promise.all(
-      CHAINS.map(async (chain) => {
+    } else {
+      const results = await Promise.all(CHAINS.map(async (chain) => {
         const data = await fetchCumulativeData(chain, 'cumulative_exchange_fees');
         return { [chain]: data };
-      })
-    );
-
-    return results.reduce((acc, curr) => ({ ...acc, ...curr }), {});
+      }));
+      return results.reduce((acc, curr) => ({ ...acc, ...curr }), {});
+    }
   } catch (error) {
     throw new Error('Error fetching cumulative exchange fees data: ' + error.message);
   }
 };
 
 const fetchDailyData = async (chain, dataType) => {
-  const result = await knex.raw(`
-    WITH daily_data AS (
-      SELECT 
-        DATE_TRUNC('day', ts) AS date,
-        ${dataType},
-        LAG(${dataType}) OVER (ORDER BY ts) AS prev_${dataType}
-      FROM 
-        perp_stats
-      WHERE
-        chain = ?
-      ORDER BY 
-        ts
-    )
-    SELECT 
-      date,
-      COALESCE(${dataType} - prev_${dataType}, ${dataType}) AS daily_${dataType}
-    FROM 
-      daily_data
-    WHERE
-      prev_${dataType} IS NOT NULL OR date = (SELECT MIN(date) FROM daily_data)
-    ORDER BY 
-      date;
-  `, [chain]);
+  const cacheKey = `dailyPerpStats:${chain}:${dataType}`;
+  let result = await redisService.get(cacheKey);
 
-  return result.rows.map(row => ({
-    ts: row.date,
-    [`daily_${dataType}`]: row[`daily_${dataType}`],
-  }));
+  if (!result) {
+    console.log('not from cache');
+    result = await knex.raw(`
+      WITH daily_data AS (
+        SELECT 
+          DATE_TRUNC('day', ts) AS date,
+          ${dataType},
+          LAG(${dataType}) OVER (ORDER BY ts) AS prev_${dataType}
+        FROM 
+          perp_stats
+        WHERE
+          chain = ?
+        ORDER BY 
+          ts
+      )
+      SELECT 
+        date,
+        COALESCE(${dataType} - prev_${dataType}, ${dataType}) AS daily_${dataType}
+      FROM 
+        daily_data
+      WHERE
+        prev_${dataType} IS NOT NULL OR date = (SELECT MIN(date) FROM daily_data)
+      ORDER BY 
+        date;
+    `, [chain]);
+
+    result = result.rows.map(row => ({
+      ts: row.date,
+      [`daily_${dataType}`]: parseFloat(row[`daily_${dataType}`]),
+    }));
+
+    await redisService.set(cacheKey, result, CACHE_TTL);
+  }
+
+  return result;
 };
 
 const getDailyVolumeData = async (chain) => {
   try {
-    if (chain && !CHAINS.includes(chain)) {
-      throw new Error('Invalid chain parameter');
-    }
-
     if (chain) {
       const data = await fetchDailyData(chain, 'cumulative_volume');
       return { [chain]: data };
-    }
-
-    const results = await Promise.all(
-      CHAINS.map(async (chain) => {
+    } else {
+      const results = await Promise.all(CHAINS.map(async (chain) => {
         const data = await fetchDailyData(chain, 'cumulative_volume');
         return { [chain]: data };
-      })
-    );
-
-    return results.reduce((acc, curr) => ({ ...acc, ...curr }), {});
+      }));
+      return results.reduce((acc, curr) => ({ ...acc, ...curr }), {});
+    }
   } catch (error) {
     throw new Error('Error fetching daily volume data: ' + error.message);
   }
@@ -235,108 +244,18 @@ const getDailyVolumeData = async (chain) => {
 
 const getDailyExchangeFeesData = async (chain) => {
   try {
-    if (chain && !CHAINS.includes(chain)) {
-      throw new Error('Invalid chain parameter');
-    }
-
     if (chain) {
       const data = await fetchDailyData(chain, 'cumulative_exchange_fees');
       return { [chain]: data };
-    }
-
-    const results = await Promise.all(
-      CHAINS.map(async (chain) => {
+    } else {
+      const results = await Promise.all(CHAINS.map(async (chain) => {
         const data = await fetchDailyData(chain, 'cumulative_exchange_fees');
         return { [chain]: data };
-      })
-    );
-
-    return results.reduce((acc, curr) => ({ ...acc, ...curr }), {});
+      }));
+      return results.reduce((acc, curr) => ({ ...acc, ...curr }), {});
+    }
   } catch (error) {
     throw new Error('Error fetching daily exchange fees data: ' + error.message);
-  }
-};
-
-const fetchAndInsertAllPerpStatsData = async (chain) => {
-  if (!chain) {
-    console.error(`Chain must be provided for data updates.`);
-  }
-
-  try {
-    const tableName = `prod_${chain}_mainnet.fct_perp_stats_daily_${chain}_mainnet`;
-
-    const rows = await troyDBKnex.raw(`
-      SELECT ts, cumulative_volume, cumulative_collected_fees, cumulative_exchange_fees
-      FROM ${tableName}
-      ORDER BY ts DESC;
-    `);
-
-    const dataToInsert = rows.rows.map(row => ({
-      ...row,
-      chain,
-    }));
-
-    await knex('perp_stats')
-      .insert(dataToInsert)
-      .onConflict(['chain', 'ts'])
-      .merge({
-        cumulative_volume: knex.raw('GREATEST(perp_stats.cumulative_volume, excluded.cumulative_volume)'),
-        cumulative_collected_fees: knex.raw('EXCLUDED.cumulative_collected_fees'),
-        cumulative_exchange_fees: knex.raw('EXCLUDED.cumulative_exchange_fees')
-      });
-
-    console.log(`Perp stats data seeded successfully for ${chain} chain.`);
-  } catch (error) {
-    console.error(`Error seeding perp stats data for ${chain} chain:`, error);
-  }
-};
-
-const fetchAndUpdateLatestPerpStatsData = async (chain) => {
-  if (!chain) {
-    console.error(`Chain must be provided for data updates.`);
-    return;
-  }
-
-  try {
-    const tableName = `prod_${chain}_mainnet.fct_perp_stats_daily_${chain}_mainnet`;
-
-    const lastTimestampResult = await knex('perp_stats')
-      .where('chain', chain)
-      .orderBy('ts', 'desc')
-      .first();
-
-    const lastTimestamp = lastTimestampResult.ts;
-
-    const newRows = await troyDBKnex.raw(`
-      SELECT ts, cumulative_volume, cumulative_collected_fees, cumulative_exchange_fees
-      FROM ${tableName}
-      WHERE ts > ?
-      ORDER BY ts DESC;
-    `, [lastTimestamp]);
-
-    if (newRows.rows.length === 0) {
-      console.log(`No new perp stats data to update for ${chain} chain.`);
-      return;
-    }
-
-    const dataToInsert = newRows.rows.map(row => ({
-      ...row,
-      chain,
-    }));
-
-    if (dataToInsert.length > 0) {
-      await knex('perp_stats')
-        .insert(dataToInsert)
-        .onConflict(['chain', 'ts'])
-        .merge({
-          cumulative_volume: knex.raw('EXCLUDED.cumulative_volume'),
-          cumulative_collected_fees: knex.raw('EXCLUDED.cumulative_collected_fees'),
-          cumulative_exchange_fees: knex.raw('EXCLUDED.cumulative_exchange_fees')        });
-    }
-
-    console.log(`Perp stats data updated successfully for ${chain} chain.`);
-  } catch (error) {
-    console.error(`Error updating perp stats data for ${chain} chain:`, error);
   }
 };
 
@@ -348,6 +267,4 @@ module.exports = {
   getCumulativeExchangeFeesData,
   getDailyVolumeData,
   getDailyExchangeFeesData,
-  fetchAndInsertAllPerpStatsData,
-  fetchAndUpdateLatestPerpStatsData,
 };
