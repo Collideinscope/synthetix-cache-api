@@ -9,9 +9,19 @@ class RedisService {
 
   async connect() {
     console.log('Attempting to connect to Redis at:', process.env.REDIS_URL);
-    this.client = redis.createClient({
+    const options = {
       url: process.env.REDIS_URL
-    });
+    };
+
+    // Only add TLS options if we're not in a local environment
+    if (process.env.REDIS_URL && !process.env.REDIS_URL.includes('localhost')) {
+      options.socket = {
+        tls: true,
+        rejectUnauthorized: false
+      };
+    }
+
+    this.client = redis.createClient(options);
 
     this.client.on('error', (error) => {
       console.error('Redis Client Error', error);
@@ -35,17 +45,14 @@ class RedisService {
 
   async waitForConnection(timeout = 30000) {
     if (this.connected) return true;
-
     return new Promise((resolve, reject) => {
       const timer = setTimeout(() => {
         reject(new Error('Redis connection timeout'));
       }, timeout);
-
       this.client.once('ready', () => {
         clearTimeout(timer);
         resolve(true);
       });
-
       this.client.once('error', (err) => {
         clearTimeout(timer);
         reject(err);
