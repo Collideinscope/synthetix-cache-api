@@ -46,7 +46,7 @@ const getSummaryStats = async (chain, column) => {
   try {
     const processChainData = async (chainToProcess) => {
       const cacheKey = `perpStatsSummary:${chainToProcess}:${column}`;
-      let result = null //await redisService.get(cacheKey);
+      let result = await redisService.get(cacheKey);
       
       if (!result) {
         console.log('Processing perp stats summary');

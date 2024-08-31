@@ -17,7 +17,7 @@ const getLatestAPYData = async (chain, collateralType) => {
 
   const fetchLatest = async (chainToFetch) => {
     const cacheKey = `latestAPY:${chainToFetch}:${collateralType}`;
-    let result = null //await redisService.get(cacheKey);
+    let result = await redisService.get(cacheKey);
 
     if (!result) {
       const tableName = `prod_${chainToFetch}_mainnet.fct_core_apr_${chainToFetch}_mainnet`;
@@ -55,7 +55,7 @@ const getAllAPYData = async (chain, collateralType) => {
 
   const fetchAll = async (chainToFetch) => {
     const cacheKey = `allAPY:${chainToFetch}:${collateralType}`;
-    let result = null //await redisService.get(cacheKey);
+    let result = await redisService.get(cacheKey);
 
     if (!result) {
       console.log('Fetching all APY data from database');
