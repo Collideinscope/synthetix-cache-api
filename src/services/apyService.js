@@ -60,8 +60,11 @@ const getAllAPYData = async (chain, collateralType) => {
     if (!result) {
       console.log('Fetching all APY data from database');
       const tableName = `prod_${chainToFetch}_mainnet.fct_core_apr_${chainToFetch}_mainnet`;
+      const startDate = new Date('2024-05-01');
+      
       const data = await troyDBKnex(tableName)
         .where('collateral_type', collateralType)
+        .where('ts', '>=', startDate)
         .select('ts', 'apy_24h', 'apy_7d', 'apy_28d')
         .orderBy('ts', 'asc');
 
