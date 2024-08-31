@@ -36,6 +36,7 @@ router.get('/latest', async (req, res) => {
     if (Object.values(result).every(data => data.length === 0)) {
       return res.status(404).json({ error: 'APY data not found' });
     }
+console.log(result)
     const transformedData = transformDataByChain(result);
     return res.json(transformedData);
   } catch (error) {

@@ -11,75 +11,80 @@ const {
 const CACHE_TTL = 3600; // 1 hour
 
 const getLatestAPYData = async (chain, collateralType) => {
-  try {
-    if (!collateralType) {
-      throw new Error('collateralType is required');
-    }
+  if (!collateralType) {
+    throw new Error('collateralType is required');
+  }
 
-    const fetchLatest = async (chainToFetch) => {
-      const cacheKey = `latestAPY:${chainToFetch}:${collateralType}`;
-      let result = await redisService.get(cacheKey);
+  const fetchLatest = async (chainToFetch) => {
+    const cacheKey = `latestAPY:${chainToFetch}:${collateralType}`;
+    let result = null //await redisService.get(cacheKey);
 
-      if (!result) {
-        console.log('not from cache')
-        const tableName = `prod_${chainToFetch}_mainnet.fct_core_apr_${chainToFetch}_mainnet`;
-        result = await troyDBKnex(tableName)
-          .where('collateral_type', collateralType)
-          .orderBy('ts', 'desc')
-          .limit(1);
+    if (!result) {
+      const tableName = `prod_${chainToFetch}_mainnet.fct_core_apr_${chainToFetch}_mainnet`;
+      const data = await troyDBKnex(tableName)
+        .where('collateral_type', collateralType)
+        .orderBy('ts', 'desc')
+        .first();
 
-        if (result.length > 0) {
-          await redisService.set(cacheKey, result, CACHE_TTL);
-        }
+      if (data) {
+        result = {
+          ts: data.ts,
+          apy_24h: parseFloat(data.apy_24h),
+          apy_7d: parseFloat(data.apy_7d),
+          apy_28d: parseFloat(data.apy_28d)
+        };
+        await redisService.set(cacheKey, result, CACHE_TTL);
       }
-
-      return { [chainToFetch]: result };
-    };
-
-    if (chain) {
-      return await fetchLatest(chain);
-    } else {
-      const results = await Promise.all(CHAINS.map(fetchLatest));
-      return results.reduce((acc, curr) => ({ ...acc, ...curr }), {});
     }
-  } catch (error) {
-    throw new Error('Error fetching latest APY data: ' + error.message);
+
+    return { [chainToFetch]: result ? [result] : [] };
+  };
+
+  if (chain) {
+    return await fetchLatest(chain);
+  } else {
+    const results = await Promise.all(CHAINS.map(fetchLatest));
+    return Object.assign({}, ...results);
   }
 };
 
 const getAllAPYData = async (chain, collateralType) => {
-  try {
-    if (!collateralType) {
-      throw new Error('collateralType is required');
-    }
+  if (!collateralType) {
+    throw new Error('collateralType is required');
+  }
 
-    const fetchAll = async (chainToFetch) => {
-      const cacheKey = `allAPY:${chainToFetch}:${collateralType}`;
-      let result = await redisService.get(cacheKey);
+  const fetchAll = async (chainToFetch) => {
+    const cacheKey = `allAPY:${chainToFetch}:${collateralType}`;
+    let result = null //await redisService.get(cacheKey);
 
-      if (!result) {
-        console.log('not from cache')
-        const tableName = `prod_${chainToFetch}_mainnet.fct_core_apr_${chainToFetch}_mainnet`;
-        result = await troyDBKnex(tableName)
-          .where('collateral_type', collateralType)
-          .orderBy('ts', 'asc');
+    if (!result) {
+      console.log('Fetching all APY data from database');
+      const tableName = `prod_${chainToFetch}_mainnet.fct_core_apr_${chainToFetch}_mainnet`;
+      const data = await troyDBKnex(tableName)
+        .where('collateral_type', collateralType)
+        .select('ts', 'apy_24h', 'apy_7d', 'apy_28d')
+        .orderBy('ts', 'asc');
 
-        if (result.length > 0) {
-          await redisService.set(cacheKey, result, CACHE_TTL);
-        }
+      result = data.map(row => ({
+        ts: row.ts,
+        apy_24h: parseFloat(row.apy_24h),
+        apy_7d: parseFloat(row.apy_7d),
+        apy_28d: parseFloat(row.apy_28d)
+      }));
+
+      if (result.length > 0) {
+        await redisService.set(cacheKey, result, CACHE_TTL);
       }
-
-      return { [chainToFetch]: result };
-    };
-
-    if (chain) {
-      return await fetchAll(chain);
-    } else {
-      const results = await Promise.all(CHAINS.map(fetchAll));
-      return results.reduce((acc, curr) => ({ ...acc, ...curr }), {});
     }
-  } catch (error) {
-    throw new Error('Error fetching all APY data: ' + error.message);
+
+    return { [chainToFetch]: result };
+  };
+
+  if (chain) {
+    return await fetchAll(chain);
+  } else {
+    const results = await Promise.all(CHAINS.map(fetchAll));
+    return Object.assign({}, ...results);
   }
 };
 

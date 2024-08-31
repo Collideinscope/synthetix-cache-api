@@ -47,68 +47,60 @@ const getSummaryStats = async (chain, column) => {
     const processChainData = async (chainToProcess) => {
       const cacheKey = `perpStatsSummary:${chainToProcess}:${column}`;
       let result = null //await redisService.get(cacheKey);
-
+      
       if (!result) {
         console.log('Processing perp stats summary');
+        const data = await fetchCumulativeData(chainToProcess, column);
         
-        const data = await fetchCumulativeData(chainToProcess, column); 
-
         if (data.length === 0) {
           result = {};
         } else {
           const smoothedData = smoothData(data, column);
-          const reversedSmoothedData = [...smoothedData].reverse();
-
-          const latestData = reversedSmoothedData[0];
+          const latestData = smoothedData[smoothedData.length - 1];
           const latestTs = new Date(latestData.ts);
-
-          const getDateFromLatest = (days) => new Date(latestTs.getTime() - days * 24 * 60 * 60 * 1000);
-
-          const value24h = reversedSmoothedData.find(item => new Date(item.ts) <= getDateFromLatest(1));
-          const value7d = reversedSmoothedData.find(item => new Date(item.ts) <= getDateFromLatest(7));
-          const value28d = reversedSmoothedData.find(item => new Date(item.ts) <= getDateFromLatest(28));
-          let valueYtd = smoothedData.find(item => new Date(item.ts) >= new Date(latestTs.getFullYear(), 0, 1));
-
-          if (!valueYtd) {
-            valueYtd = reversedSmoothedData[reversedSmoothedData.length - 1];
-          }
-
+          
+          const findValueAtDate = (days) => {
+            const targetDate = new Date(latestTs.getTime() - days * 24 * 60 * 60 * 1000);
+            return smoothedData.findLast(item => new Date(item.ts) <= targetDate);
+          };
+          
+          const value24h = findValueAtDate(1);
+          const value7d = findValueAtDate(7);
+          const value28d = findValueAtDate(28);
+          const valueYtd = smoothedData.find(item => new Date(item.ts) >= new Date(latestTs.getFullYear(), 0, 1)) || smoothedData[0];
+          
+          const current = parseFloat(latestData[column]);
           const columnValues = smoothedData.map(item => parseFloat(item[column]));
-          const current = parseFloat(data[data.length - 1][column]);
-          const ath = Math.max(...columnValues, current);
-          const atl = Math.min(...columnValues, current);
-
+          
           result = {
             current,
             delta_24h: calculateDelta(current, value24h ? parseFloat(value24h[column]) : null),
             delta_7d: calculateDelta(current, value7d ? parseFloat(value7d[column]) : null),
             delta_28d: calculateDelta(current, value28d ? parseFloat(value28d[column]) : null),
             delta_ytd: calculateDelta(current, valueYtd ? parseFloat(valueYtd[column]) : null),
-            ath,
-            atl,
-            ath_percentage: calculatePercentage(current, ath),
-            atl_percentage: atl === 0 ? 100 : calculatePercentage(current, atl),
+            ath: Math.max(...columnValues),
+            atl: Math.min(...columnValues),
           };
+          
+          result.ath_percentage = calculatePercentage(current, result.ath);
+          result.atl_percentage = result.atl === 0 ? 100 : calculatePercentage(current, result.atl);
         }
-
+        
         await redisService.set(cacheKey, result, CACHE_TTL);
       }
-
+      
       return result;
     };
-
+    
     if (chain) {
       const result = await processChainData(chain);
       return { [chain]: result };
     } else {
       const results = await Promise.all(CHAINS.map(processChainData));
-      return CHAINS.reduce((acc, chain, index) => {
-        acc[chain] = results[index] || {};
-        return acc;
-      }, {});
+      return Object.fromEntries(CHAINS.map((chain, index) => [chain, results[index] || {}]));
     }
   } catch (error) {
-    throw new Error(`Error fetching perp stats summary stats for ${column}: ` + error.message);
+    throw new Error(`Error fetching perp stats summary stats for ${column}: ${error.message}`);
   }
 };
 
