@@ -101,85 +101,59 @@ const getTVLSummaryStats = async (chain, collateralType) => {
       let result = await redisService.get(cacheKey);
 
       if (!result) {
-        console.log('not from cache');
-        const tableName = `prod_${chainToProcess}_mainnet.fct_core_vault_collateral_${chainToProcess}_mainnet`;
-        let allData = [];
-        try {
-          allData = await troyDBKnex(tableName)
-            .where({
-              pool_id: 1,
-              collateral_type: collateralType
-            })
-            .orderBy('ts', 'asc');
-        } catch (error) {
-          console.error(`Error fetching data for ${chainToProcess}:`, error);
-          return null;  
-        }
-
-        if (allData.length === 0) {
-          return null;
-        }
-
-        try {
-          const smoothedData = smoothData(allData, 'collateral_value');
-          const reversedSmoothedData = [...smoothedData].reverse();
-
-          const latestData = reversedSmoothedData[0];
+        console.log('Processing TVL summary');
+        const allData = await getCumulativeTVLData(chainToProcess, collateralType);
+        const chainData = allData[chainToProcess];
+        
+        if (chainData.length === 0) {
+          result = {};
+        } else {
+          const smoothedData = smoothData(chainData, 'collateral_value');
+          const latestData = smoothedData[smoothedData.length - 1];
           const latestTs = new Date(latestData.ts);
-
-          const getDateFromLatest = (days) => new Date(latestTs.getTime() - days * 24 * 60 * 60 * 1000);
-
-          const value24h = reversedSmoothedData.find(item => new Date(item.ts) <= getDateFromLatest(1));
-          const value7d = reversedSmoothedData.find(item => new Date(item.ts) <= getDateFromLatest(7));
-          const value28d = reversedSmoothedData.find(item => new Date(item.ts) <= getDateFromLatest(28));
-
-          let valueYtd = smoothedData.find(item => new Date(item.ts) >= new Date(latestTs.getFullYear(), 0, 1));
-
-          if (!valueYtd) {
-            valueYtd = reversedSmoothedData[reversedSmoothedData.length - 1];
-          }
-
+          
+          const findValueAtDate = (days) => {
+            const targetDate = new Date(latestTs.getTime() - days * 24 * 60 * 60 * 1000);
+            return smoothedData.findLast(item => new Date(item.ts) <= targetDate);
+          };
+          
+          const value24h = findValueAtDate(1);
+          const value7d = findValueAtDate(7);
+          const value28d = findValueAtDate(28);
+          const valueYtd = smoothedData.find(item => new Date(item.ts) >= new Date(latestTs.getFullYear(), 0, 1)) || smoothedData[0];
+          
+          const current = parseFloat(latestData.collateral_value);
           const tvlValues = smoothedData.map(item => parseFloat(item.collateral_value));
-
-          const current = parseFloat(allData[allData.length - 1].collateral_value);
-          const ath = Math.max(...tvlValues, current);
-          const atl = Math.min(...tvlValues, current);
-
+          
           result = {
             current,
             delta_24h: calculateDelta(current, value24h ? parseFloat(value24h.collateral_value) : null),
             delta_7d: calculateDelta(current, value7d ? parseFloat(value7d.collateral_value) : null),
             delta_28d: calculateDelta(current, value28d ? parseFloat(value28d.collateral_value) : null),
             delta_ytd: calculateDelta(current, valueYtd ? parseFloat(valueYtd.collateral_value) : null),
-            ath,
-            atl,
-            ath_percentage: calculatePercentage(current, ath),
-            atl_percentage: atl === 0 ? 100 : calculatePercentage(current, atl),
+            ath: Math.max(...tvlValues),
+            atl: Math.min(...tvlValues),
           };
-
-          await redisService.set(cacheKey, result, CACHE_TTL);
-        } catch (error) {
-          console.error(`Error processing data for ${chainToProcess}:`, error);
-          return null;
+          
+          result.ath_percentage = calculatePercentage(current, result.ath);
+          result.atl_percentage = result.atl === 0 ? 100 : calculatePercentage(current, result.atl);
         }
+        
+        await redisService.set(cacheKey, result, CACHE_TTL);
       }
-
+      
       return result;
     };
-
+    
     if (chain) {
       const result = await processChainData(chain);
-      return result ? { [chain]: result } : {};
+      return { [chain]: result };
     } else {
       const results = await Promise.all(CHAINS.map(processChainData));
-      return CHAINS.reduce((acc, chain, index) => {
-        acc[chain] = results[index] || {};
-        return acc;
-      }, {});
+      return Object.fromEntries(CHAINS.map((chain, index) => [chain, results[index] || {}]));
     }
   } catch (error) {
-    console.error('Error in getTVLSummaryStats:', error);
-    throw new Error('Error fetching TVL summary stats: ' + error.message);
+    throw new Error(`Error fetching TVL summary stats: ${error.message}`);
   }
 };
 
