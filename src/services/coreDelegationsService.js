@@ -63,7 +63,6 @@ const getCoreDelegationsData = async (chain, collateralType) => {
       result = await troyDBKnex(tableName)
         .where('collateral_type', collateralType)
         .orderBy('ts', 'asc')
-        .timeout(30000); // 30 seconds timeout
     } catch (error) {
       console.error(`Error fetching data for ${chain}:`, error);
       result = [];

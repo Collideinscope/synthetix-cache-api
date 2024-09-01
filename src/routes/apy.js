@@ -73,7 +73,6 @@ router.get('/summary', async (req, res) => {
     validateParameters(chain, collateralType);
     chain = chain?.toLowerCase();
     collateralType = collateralType?.toLowerCase();
-    
     const stats = await getAPYSummaryStats(chain, collateralType);
     if (Object.keys(stats).length === 0) {
       return res.status(404).json({ error: 'APY summary stats not found' });

@@ -65,30 +65,36 @@ const getCumulativeUniqueStakers = async (chain, collateralType) => {
         const tableName = `prod_${chainToFetch}_mainnet.fct_core_account_delegation_${chainToFetch}_mainnet`;
         try {
           const queryResult = await troyDBKnex.raw(`
-            WITH daily_new_stakers AS (
-              SELECT
-                date_trunc('day', ts) AS day,
-                pool_id,
-                collateral_type,
+            WITH daily_stakers AS (
+              SELECT DISTINCT
+                DATE_TRUNC('day', ts) AS day,
                 account_id,
-                MIN(date_trunc('day', ts)) OVER (PARTITION BY account_id, pool_id, collateral_type) AS first_staked_day
+                pool_id,
+                collateral_type
               FROM
                 ${tableName}
               WHERE
                 collateral_type = ?
             ),
-            daily_cumulative_counts AS (
+            daily_counts AS (
               SELECT
                 day,
                 pool_id,
                 collateral_type,
-                COUNT(DISTINCT CASE WHEN day = first_staked_day THEN account_id END) AS new_stakers,
-                SUM(COUNT(DISTINCT CASE WHEN day = first_staked_day THEN account_id END)) 
-                  OVER (PARTITION BY pool_id, collateral_type ORDER BY day) AS cumulative_staker_count
+                COUNT(DISTINCT account_id) AS daily_unique_stakers
               FROM
-                daily_new_stakers
+                daily_stakers
               GROUP BY
                 day, pool_id, collateral_type
+            ),
+            cumulative_counts AS (
+              SELECT
+                day,
+                pool_id,
+                collateral_type,
+                SUM(daily_unique_stakers) OVER (PARTITION BY pool_id, collateral_type ORDER BY day) AS cumulative_staker_count
+              FROM
+                daily_counts
             )
             SELECT
               day AS ts,
@@ -96,7 +102,7 @@ const getCumulativeUniqueStakers = async (chain, collateralType) => {
               collateral_type,
               cumulative_staker_count
             FROM
-              daily_cumulative_counts
+              cumulative_counts
             ORDER BY
               ts, pool_id, collateral_type;
           `, [collateralType]);
@@ -212,31 +218,29 @@ const getDailyNewUniqueStakers = async (chain, collateralType) => {
         const tableName = `prod_${chainToFetch}_mainnet.fct_core_account_delegation_${chainToFetch}_mainnet`;
         try {
           result = await troyDBKnex.raw(`
-            WITH first_staking_day AS (
-              SELECT
-                account_id,
-                MIN(DATE_TRUNC('day', ts)) AS first_day
+            WITH daily_stakers AS (
+              SELECT DISTINCT
+                DATE_TRUNC('day', ts) AS date,
+                account_id
               FROM
                 ${tableName}
               WHERE
                 collateral_type = ?
-              GROUP BY
-                account_id
             )
             SELECT
-              first_day AS date,
-              COUNT(*) AS daily_new_unique_stakers
+              date,
+              COUNT(DISTINCT account_id) AS daily_unique_stakers
             FROM
-              first_staking_day
+              daily_stakers
             GROUP BY
-              first_day
+              date
             ORDER BY
-              first_day;
+              date;
           `, [collateralType]);
 
           result = result.rows.map(row => ({
             ts: row.date,
-            daily_new_unique_stakers: parseInt(row.daily_new_unique_stakers),
+            daily_unique_stakers: parseInt(row.daily_unique_stakers),
           }));
         } catch (error) {
           console.error(`Error fetching data for ${chainToFetch}:`, error);
@@ -255,7 +259,7 @@ const getDailyNewUniqueStakers = async (chain, collateralType) => {
       return results.reduce((acc, curr) => ({ ...acc, ...curr }), {});
     }
   } catch (error) {
-    throw new Error('Error fetching daily new unique stakers: ' + error.message);
+    throw new Error('Error fetching daily unique stakers: ' + error.message);
   }
 };
 

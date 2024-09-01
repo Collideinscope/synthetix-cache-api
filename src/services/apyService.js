@@ -102,69 +102,64 @@ const getAPYSummaryStats = async (chain, collateralType) => {
       let result = await redisService.get(cacheKey);
 
       if (!result) {
-        console.log('not from cache')
-        const startDate = new Date('2024-05-01');
-        const tableName = `prod_${chainToProcess}_mainnet.fct_core_apr_${chainToProcess}_mainnet`;
-        const allData = await troyDBKnex(tableName)
-          .where('collateral_type', collateralType)
-          .where('ts', '>=', startDate)
-          .orderBy('ts', 'asc');
+        console.log('Processing APY summary for', chainToProcess);
 
-        if (allData.length === 0) {
+        try {
+          const data = await getAllAPYData(chainToProcess, collateralType);
+          const allData = data[chainToProcess];
+
+          if (allData.length === 0) {
+            console.log('No data found for', chainToProcess);
+            return null;
+          }
+
+          const smoothedData = smoothData(allData, 'apy_28d');
+          const latestData = smoothedData[smoothedData.length - 1];
+          const latestTs = new Date(latestData.ts);
+
+          const findValueAtDate = (days) => {
+            const targetDate = new Date(latestTs.getTime() - days * 24 * 60 * 60 * 1000);
+            return smoothedData.findLast(item => new Date(item.ts) <= targetDate);
+          };
+
+          const value24h = findValueAtDate(1);
+          const value7d = findValueAtDate(7);
+          const value28d = findValueAtDate(28);
+          const valueYtd = smoothedData.find(item => new Date(item.ts) >= new Date(latestTs.getFullYear(), 0, 1)) || smoothedData[0];
+
+          const apyValues = smoothedData.map(item => parseFloat(item.apy_28d));
+          const current = parseFloat(latestData.apy_28d);
+          const ath = Math.max(...apyValues);
+          const atl = Math.min(...apyValues);
+
+          result = {
+            current,
+            delta_24h: calculateDelta(current, value24h ? parseFloat(value24h.apy_28d) : null),
+            delta_7d: calculateDelta(current, value7d ? parseFloat(value7d.apy_28d) : null),
+            delta_28d: calculateDelta(current, value28d ? parseFloat(value28d.apy_28d) : null),
+            delta_ytd: calculateDelta(current, valueYtd ? parseFloat(valueYtd.apy_28d) : null),
+            ath,
+            atl,
+            ath_percentage: calculatePercentage(current, ath),
+            atl_percentage: calculatePercentage(current, atl),
+          };
+
+          await redisService.set(cacheKey, result, CACHE_TTL);
+        } catch (error) {
+          console.error(`Error processing data for ${chainToProcess}:`, error);
           return null;
         }
-
-        const smoothedData = smoothData(allData, 'apy_28d');
-        const reversedSmoothedData = [...smoothedData].reverse();
-
-        const latestData = reversedSmoothedData[0];
-        const latestTs = new Date(latestData.ts);
-
-        const getDateFromLatest = (days) => new Date(latestTs.getTime() - days * 24 * 60 * 60 * 1000);
-
-        const value24h = reversedSmoothedData.find(item => new Date(item.ts) <= getDateFromLatest(1));
-        const value7d = reversedSmoothedData.find(item => new Date(item.ts) <= getDateFromLatest(7));
-        const value28d = reversedSmoothedData.find(item => new Date(item.ts) <= getDateFromLatest(28));
-
-        let valueYtd = smoothedData.find(item => new Date(item.ts) >= new Date(latestTs.getFullYear(), 0, 1));
-
-        if (!valueYtd) {
-          valueYtd = reversedSmoothedData[reversedSmoothedData.length - 1]; 
-        }
-
-        const apyValues = smoothedData.map(item => parseFloat(item.apy_28d));
-
-        const current = parseFloat(allData[allData.length - 1].apy_28d);
-        const ath = Math.max(...apyValues, current);
-        const atl = Math.min(...apyValues, current);
-
-        result = {
-          current: parseFloat(allData[allData.length - 1].apy_28d),
-          delta_24h: calculateDelta(parseFloat(current), value24h ? parseFloat(value24h.apy_28d) : null),
-          delta_7d: calculateDelta(parseFloat(current), value7d ? parseFloat(value7d.apy_28d) : null),
-          delta_28d: calculateDelta(parseFloat(current), value28d ? parseFloat(value28d.apy_28d) : null),
-          delta_ytd: calculateDelta(parseFloat(current), valueYtd ? parseFloat(valueYtd.apy_28d) : null),
-          ath,
-          atl,
-          ath_percentage: calculatePercentage(parseFloat(current), ath),
-          atl_percentage: calculatePercentage(parseFloat(current), atl),
-        };
-
-        await redisService.set(cacheKey, result, CACHE_TTL);
       }
 
       return result;
-    }
+    };
 
     if (chain) {
       const result = await processChainData(chain);
       return result ? { [chain]: result } : {};
     } else {
       const results = await Promise.all(CHAINS.map(processChainData));
-      return CHAINS.reduce((acc, chain, index) => {
-        acc[chain] = results[index] || {};
-        return acc;
-      }, {});
+      return Object.fromEntries(CHAINS.map((chain, index) => [chain, results[index] || {}]));
     }
   } catch (error) {
     console.error('Error in getAPYSummaryStats:', error);

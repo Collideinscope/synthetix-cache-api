@@ -19,36 +19,43 @@ const getCumulativeUniqueTraders = async (chain) => {
       if (!result) {
         console.log('not from cache');
         result = await knex.raw(`
-          WITH first_trade_day AS (
-            SELECT
-                account_id,
-                MIN(date_trunc('day', ts)) AS first_day
+          WITH daily_traders AS (
+            SELECT DISTINCT
+              DATE_TRUNC('day', ts) AS day,
+              account_id
             FROM
-                perp_account_stats
+              perp_account_stats
             WHERE
-                chain = ?
-            GROUP BY
-                account_id
+              chain = ?
           ),
-          cumulative_trader_counts AS (
-              SELECT
-                  first_day AS ts,
-                  COUNT(*) OVER (ORDER BY first_day) AS cumulative_trader_count
-              FROM
-                  first_trade_day
+          daily_counts AS (
+            SELECT
+              day,
+              COUNT(DISTINCT account_id) AS daily_unique_traders
+            FROM
+              daily_traders
+            GROUP BY
+              day
+          ),
+          cumulative_counts AS (
+            SELECT
+              day AS ts,
+              SUM(daily_unique_traders) OVER (ORDER BY day) AS cumulative_trader_count
+            FROM
+              daily_counts
           )
           SELECT
-              ts,
-              cumulative_trader_count
+            ts,
+            cumulative_trader_count
           FROM
-              cumulative_trader_counts
+            cumulative_counts
           ORDER BY
-              ts;
+            ts;
         `, [chainToFetch]);
 
         result = result.rows.map(row => ({
           ts: row.ts,
-          cumulative_trader_count: row.cumulative_trader_count,
+          cumulative_trader_count: parseInt(row.cumulative_trader_count),
         }));
 
         await redisService.set(cacheKey, result, CACHE_TTL);
@@ -143,31 +150,29 @@ const getDailyNewUniqueTraders = async (chain) => {
       if (!result) {
         console.log('not from cache');
         result = await knex.raw(`
-          WITH first_trading_day AS (
-            SELECT
-              account_id,
-              MIN(DATE_TRUNC('day', ts)) AS first_day
+          WITH daily_traders AS (
+            SELECT DISTINCT
+              DATE_TRUNC('day', ts) AS date,
+              account_id
             FROM
               perp_account_stats
             WHERE
               chain = ?
-            GROUP BY
-              account_id
           )
           SELECT
-            first_day AS date,
-            COUNT(*) AS daily_new_unique_traders
+            date,
+            COUNT(DISTINCT account_id) AS daily_unique_traders
           FROM
-            first_trading_day
+            daily_traders
           GROUP BY
-            first_day
+            date
           ORDER BY
-            first_day;
+            date;
         `, [chainToFetch]);
 
         result = result.rows.map(row => ({
           ts: row.date,
-          daily_new_unique_traders: parseInt(row.daily_new_unique_traders),
+          daily_unique_traders: parseInt(row.daily_unique_traders),
         }));
 
         await redisService.set(cacheKey, result, CACHE_TTL);
@@ -183,7 +188,7 @@ const getDailyNewUniqueTraders = async (chain) => {
       return results.reduce((acc, result) => ({ ...acc, ...result }), {});
     }
   } catch (error) {
-    throw new Error('Error fetching daily new unique traders: ' + error.message);
+    throw new Error('Error fetching daily unique traders: ' + error.message);
   }
 };
 
