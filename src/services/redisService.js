@@ -86,6 +86,30 @@ class RedisService {
       throw error;
     }
   }
+
+  async del(key) {
+    if (!this.connected) {
+      throw new Error('Redis client is not connected');
+    }
+    try {
+      await this.client.del(key);
+    } catch (error) {
+      console.error('Redis Delete Error', error);
+      throw error;
+    }
+  }
+
+  async disconnect() {
+    if (this.connected) {
+      try {
+        await this.client.quit();
+        console.log('Redis client disconnected');
+        this.connected = false;
+      } catch (error) {
+        console.error('Error disconnecting Redis client:', error);
+      }
+    }
+  }
 }
 
 module.exports = new RedisService();

@@ -62,8 +62,11 @@ const getCumulativeTVLData = async (chain, collateralType) => {
       if (!result) {
         console.log('not from cache');
         const tableName = `prod_${chainToFetch}_mainnet.fct_core_vault_collateral_${chainToFetch}_mainnet`;
+        const startDate = new Date('2024-03-26');
+
         try {
           result = await troyDBKnex(tableName)
+            .where('ts', '>=', startDate)
             .where({
               pool_id: 1,
               collateral_type: collateralType
