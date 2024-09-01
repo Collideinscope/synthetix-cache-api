@@ -121,7 +121,7 @@ const getCumulativeExchangeFeesSummaryStats = async (chain) => {
 
 const fetchCumulativeData = async (chain, dataType) => {
   const cacheKey = `cumulativePerpStats:${chain}:${dataType}`;
-  let result = null//await redisService.get(cacheKey);
+  let result = await redisService.get(cacheKey);
 
   if (!result) {
     console.log('not from cache');
