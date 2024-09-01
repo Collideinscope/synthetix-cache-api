@@ -1,4 +1,4 @@
-const { knex } = require('../config/db');
+const { troyDBKnex } = require('../config/db');
 const redisService = require('./redisService');
 const { CHAINS } = require('../helpers');
 
@@ -11,61 +11,60 @@ const {
 const CACHE_TTL = 3600; // 1 hour
 
 const getOpenInterestData = async (chain) => {
-  try {
-    const fetchDataForChain = async (chainToFetch) => {
-      const cacheKey = `openInterestData:${chainToFetch}`;
-      let result = await redisService.get(cacheKey);
+  const fetchDataForChain = async (chainToFetch) => {
+    const cacheKey = `openInterestData:${chainToFetch}`;
+    let result = await redisService.get(cacheKey);
 
-      if (!result) {
-        console.log('not from cache');
-        result = await knex.raw(`
+    if (!result) {
+      console.log('not from cache');
+      const tableName = `prod_${chainToFetch}_mainnet.fct_perp_market_history_${chainToFetch}_mainnet`;
+      try {
+        const queryResult = await troyDBKnex.raw(`
           WITH daily_market_oi AS (
             SELECT
-              date_trunc('day', ts) AS day,
+              DATE_TRUNC('day', ts) AS day,
               market_symbol,
-              AVG(size * price) AS daily_market_oi,
-              chain
+              AVG(size_usd) AS daily_market_oi
             FROM
-              perp_market_history
-            WHERE
-              chain = ?
+              ${tableName}
             GROUP BY
-              date_trunc('day', ts),
-              market_symbol,
-              chain
+              DATE_TRUNC('day', ts),
+              market_symbol
           ),
           daily_oi AS (
             SELECT
               day,
-              SUM(daily_market_oi) AS daily_oi,
-              chain
+              SUM(daily_market_oi) AS daily_oi
             FROM
               daily_market_oi
             GROUP BY
-              day,
-              chain
+              day
           )
           SELECT
             day AS ts,
-            daily_oi,
-            chain
+            daily_oi
           FROM
             daily_oi
           ORDER BY
             ts ASC;
-        `, [chainToFetch]);
+        `);
 
-        result = result.rows.map(row => ({
+        result = queryResult.rows.map(row => ({
           ts: row.ts,
           daily_oi: parseFloat(row.daily_oi),
         }));
 
         await redisService.set(cacheKey, result, CACHE_TTL);
+      } catch (error) {
+        console.error(`Error fetching data for ${chainToFetch}:`, error.message);
+        result = [];
       }
+    }
 
-      return { [chainToFetch]: result };
-    };
+    return { [chainToFetch]: result };
+  };
 
+  try {
     if (chain) {
       return await fetchDataForChain(chain);
     } else {
@@ -76,90 +75,89 @@ const getOpenInterestData = async (chain) => {
       }, {});
     }
   } catch (error) {
-    throw new Error('Error fetching daily OI data: ' + error.message);
+    console.error('Error in getOpenInterestData:', error);
+    return {};
   }
 };
 
 const getDailyOpenInterestChangeData = async (chain) => {
-  try {
-    const fetchDataForChain = async (chainToFetch) => {
-      const cacheKey = `dailyOpenInterestChangeData:${chainToFetch}`;
-      let result = await redisService.get(cacheKey);
+  const fetchDataForChain = async (chainToFetch) => {
+    const cacheKey = `dailyOpenInterestChangeData:${chainToFetch}`;
+    let result = await redisService.get(cacheKey);
 
-      if (!result) {
-        console.log('not from cache');
-        result = await knex.raw(`
+    if (!result) {
+      console.log('not from cache');
+      const tableName = `prod_${chainToFetch}_mainnet.fct_perp_market_history_${chainToFetch}_mainnet`;
+      try {
+        const queryResult = await troyDBKnex.raw(`
           WITH daily_market_oi AS (
             SELECT
-              date_trunc('day', ts) AS day,
+              DATE_TRUNC('day', ts) AS day,
               market_symbol,
-              AVG(size * price) AS daily_market_oi,
-              chain
+              AVG(size_usd) AS daily_market_oi
             FROM
-              perp_market_history
-            WHERE
-              chain = ?
+              ${tableName}
             GROUP BY
-              date_trunc('day', ts),
-              market_symbol,
-              chain
+              DATE_TRUNC('day', ts),
+              market_symbol
           ),
           daily_oi AS (
             SELECT
               day,
-              SUM(daily_market_oi) AS daily_oi,
-              chain
+              SUM(daily_market_oi) AS daily_oi
             FROM
               daily_market_oi
             GROUP BY
-              day,
-              chain
+              day
           ),
           daily_oi_change AS (
             SELECT
               day AS ts,
               daily_oi,
-              daily_oi - LAG(daily_oi) OVER (ORDER BY day) AS daily_oi_change,
-              chain
+              daily_oi - LAG(daily_oi) OVER (ORDER BY day) AS daily_oi_change
             FROM
               daily_oi
           )
           SELECT
             ts,
             daily_oi,
-            daily_oi_change,
-            chain
+            daily_oi_change
           FROM
             daily_oi_change
           WHERE
             daily_oi_change IS NOT NULL
           ORDER BY
             ts ASC;
-        `, [chainToFetch]);
+        `);
 
-        result = result.rows.map(row => ({
+        result = queryResult.rows.map(row => ({
           ts: row.ts,
           daily_oi_change: parseFloat(row.daily_oi_change)
         }));
 
         await redisService.set(cacheKey, result, CACHE_TTL);
+      } catch (error) {
+        console.error(`Error fetching data for ${chainToFetch}:`, error.message);
+        result = [];
       }
+    }
 
-      return { [chainToFetch]: result };
-    };
+    return { [chainToFetch]: result };
+  };
 
+  try {
     if (chain) {
       return await fetchDataForChain(chain);
     } else {
       const results = await Promise.all(CHAINS.map(fetchDataForChain));
-      return results.reduce((acc, obj, index) => {
-        const chain = Object.keys(obj)[0];
-        acc[chain] = obj[chain] || [];
+      return CHAINS.reduce((acc, chain, index) => {
+        acc[chain] = results[index][chain] || [];
         return acc;
       }, {});
     }
   } catch (error) {
-    throw new Error('Error fetching daily open interest change data: ' + error.message);
+    console.error('Error in getDailyOpenInterestChangeData:', error);
+    return {};
   }
 };
 
@@ -222,7 +220,8 @@ const getOpenInterestSummaryStats = async (chain) => {
       return Object.fromEntries(CHAINS.map((chain, index) => [chain, results[index] || {}]));
     }
   } catch (error) {
-    throw new Error(`Error fetching open interest summary stats: ${error.message}`);
+    console.error('Error in getOpenInterestSummaryStats:', error);
+    return {};
   }
 };
 

@@ -1,4 +1,4 @@
-const { knex } = require('../config/db');
+const { troyDBKnex } = require('../config/db');
 const redisService = require('./redisService');
 const { CHAINS } = require('../helpers');
 
@@ -11,38 +11,30 @@ const {
 const CACHE_TTL = 3600; // 1 hour
 
 const getCumulativeUniqueTraders = async (chain) => {
-  try {
-    const fetchCumulativeData = async (chainToFetch) => {
-      const cacheKey = `cumulativeUniqueTraders:${chainToFetch}`;
-      let result = await redisService.get(cacheKey);
+  const fetchCumulativeData = async (chainToFetch) => {
+    const cacheKey = `cumulativeUniqueTraders:${chainToFetch}`;
+    let result = await redisService.get(cacheKey);
 
-      if (!result) {
-        console.log('not from cache');
-        result = await knex.raw(`
-          WITH daily_traders AS (
-            SELECT DISTINCT
-              DATE_TRUNC('day', ts) AS day,
-              account_id
-            FROM
-              perp_account_stats
-            WHERE
-              chain = ?
-          ),
-          daily_counts AS (
+    if (!result) {
+      console.log('not from cache');
+      const tableName = `prod_${chainToFetch}_mainnet.fct_perp_account_stats_daily_${chainToFetch}_mainnet`;
+      try {
+        const queryResult = await troyDBKnex.raw(`
+          WITH daily_unique_traders AS (
             SELECT
-              day,
-              COUNT(DISTINCT account_id) AS daily_unique_traders
+              ts,
+              COUNT(DISTINCT account_id) AS unique_traders
             FROM
-              daily_traders
+              ${tableName}
             GROUP BY
-              day
+              ts
           ),
           cumulative_counts AS (
             SELECT
-              day AS ts,
-              SUM(daily_unique_traders) OVER (ORDER BY day) AS cumulative_trader_count
+              ts,
+              SUM(unique_traders) OVER (ORDER BY ts) AS cumulative_trader_count
             FROM
-              daily_counts
+              daily_unique_traders
           )
           SELECT
             ts,
@@ -51,19 +43,24 @@ const getCumulativeUniqueTraders = async (chain) => {
             cumulative_counts
           ORDER BY
             ts;
-        `, [chainToFetch]);
+        `);
 
-        result = result.rows.map(row => ({
+        result = queryResult.rows.map(row => ({
           ts: row.ts,
           cumulative_trader_count: parseInt(row.cumulative_trader_count),
         }));
 
         await redisService.set(cacheKey, result, CACHE_TTL);
+      } catch (error) {
+        console.error(`Error fetching data for ${chainToFetch}:`, error.message);
+        result = []; // Return an empty array if there's an error
       }
+    }
 
-      return { [chainToFetch]: result };
-    };
+    return { [chainToFetch]: result };
+  };
 
+  try {
     if (chain) {
       return await fetchCumulativeData(chain);
     } else {
@@ -74,7 +71,8 @@ const getCumulativeUniqueTraders = async (chain) => {
       }, {});
     }
   } catch (error) {
-    throw new Error('Error fetching cumulative unique trader data: ' + error.message);
+    console.error('Error in getCumulativeUniqueTraders:', error);
+    return {}; // Return an empty object if there's an error at the top level
   }
 };
 
@@ -142,53 +140,54 @@ const getUniqueTradersSummaryStats = async (chain) => {
 };
 
 const getDailyNewUniqueTraders = async (chain) => {
-  try {
-    const fetchDailyData = async (chainToFetch) => {
-      const cacheKey = `dailyNewUniqueTraders:${chainToFetch}`;
-      let result = await redisService.get(cacheKey);
+  const fetchDailyData = async (chainToFetch) => {
+    const cacheKey = `dailyNewUniqueTraders:${chainToFetch}`;
+    let result = await redisService.get(cacheKey);
 
-      if (!result) {
-        console.log('not from cache');
-        result = await knex.raw(`
-          WITH daily_traders AS (
-            SELECT DISTINCT
-              DATE_TRUNC('day', ts) AS date,
-              account_id
-            FROM
-              perp_account_stats
-            WHERE
-              chain = ?
-          )
+    if (!result) {
+      console.log('not from cache');
+      const tableName = `prod_${chainToFetch}_mainnet.fct_perp_account_stats_daily_${chainToFetch}_mainnet`;
+      try {
+        const queryResult = await troyDBKnex.raw(`
           SELECT
-            date,
+            ts,
             COUNT(DISTINCT account_id) AS daily_unique_traders
           FROM
-            daily_traders
+            ${tableName}
           GROUP BY
-            date
+            ts
           ORDER BY
-            date;
-        `, [chainToFetch]);
+            ts;
+        `);
 
-        result = result.rows.map(row => ({
-          ts: row.date,
+        result = queryResult.rows.map(row => ({
+          ts: row.ts,
           daily_unique_traders: parseInt(row.daily_unique_traders),
         }));
 
         await redisService.set(cacheKey, result, CACHE_TTL);
+      } catch (error) {
+        console.error(`Error fetching data for ${chainToFetch}:`, error.message);
+        result = []; // Return an empty array if there's an error
       }
+    }
 
-      return { [chainToFetch]: result };
-    };
+    return { [chainToFetch]: result };
+  };
 
+  try {
     if (chain) {
       return await fetchDailyData(chain);
     } else {
       const results = await Promise.all(CHAINS.map(fetchDailyData));
-      return results.reduce((acc, result) => ({ ...acc, ...result }), {});
+      return CHAINS.reduce((acc, chain, index) => {
+        acc[chain] = results[index][chain] || [];
+        return acc;
+      }, {});
     }
   } catch (error) {
-    throw new Error('Error fetching daily unique traders: ' + error.message);
+    console.error('Error in getDailyNewUniqueTraders:', error);
+    return {}; // Return an empty object if there's an error at the top level
   }
 };
 
