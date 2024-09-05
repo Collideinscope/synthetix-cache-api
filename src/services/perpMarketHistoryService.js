@@ -10,16 +10,16 @@ const {
 
 const CACHE_TTL = 3600; // 1 hour
 
-const getOpenInterestData = async (chain) => {
+const getOpenInterestData = async (chain, bypassCache = false, trx = troyDBKnex) => {
   const fetchDataForChain = async (chainToFetch) => {
     const cacheKey = `openInterestData:${chainToFetch}`;
-    let result = await redisService.get(cacheKey);
+    let result = bypassCache ? null : await redisService.get(cacheKey);
 
     if (!result) {
       console.log('not from cache');
       const tableName = `prod_${chainToFetch}_mainnet.fct_perp_market_history_${chainToFetch}_mainnet`;
       try {
-        const queryResult = await troyDBKnex.raw(`
+        const queryResult = await trx.raw(`
           WITH daily_market_oi AS (
             SELECT
               DATE_TRUNC('day', ts) AS day,
@@ -80,16 +80,16 @@ const getOpenInterestData = async (chain) => {
   }
 };
 
-const getDailyOpenInterestChangeData = async (chain) => {
+const getDailyOpenInterestChangeData = async (chain, bypassCache = false, trx = troyDBKnex) => {
   const fetchDataForChain = async (chainToFetch) => {
     const cacheKey = `dailyOpenInterestChangeData:${chainToFetch}`;
-    let result = await redisService.get(cacheKey);
+    let result = bypassCache ? null : await redisService.get(cacheKey);
 
     if (!result) {
       console.log('not from cache');
       const tableName = `prod_${chainToFetch}_mainnet.fct_perp_market_history_${chainToFetch}_mainnet`;
       try {
-        const queryResult = await troyDBKnex.raw(`
+        const queryResult = await trx.raw(`
           WITH daily_market_oi AS (
             SELECT
               DATE_TRUNC('day', ts) AS day,
@@ -161,11 +161,11 @@ const getDailyOpenInterestChangeData = async (chain) => {
   }
 };
 
-const getOpenInterestSummaryStats = async (chain) => {
+const getOpenInterestSummaryStats = async (chain, bypassCache = false, trx = troyDBKnex) => {
   try {
     const processChainData = async (chainToProcess) => {
       const cacheKey = `openInterestSummaryStats:${chainToProcess}`;
-      let result = await redisService.get(cacheKey);
+      let result = bypassCache ? null : await redisService.get(cacheKey);
 
       if (!result) {
         console.log('Processing open interest summary stats');
@@ -225,8 +225,49 @@ const getOpenInterestSummaryStats = async (chain) => {
   }
 };
 
+const refreshAllPerpMarketHistoryData = async () => {
+  console.log('Starting to refresh Perp Market History data for all chains');
+  
+  for (const chain of CHAINS) {
+    console.log(`Refreshing Perp Market History data for chain: ${chain}`);
+    console.time(`${chain} total refresh time`);
+    
+    // Clear existing cache
+    await redisService.del(`openInterestData:${chain}`);
+    await redisService.del(`dailyOpenInterestChangeData:${chain}`);
+    await redisService.del(`openInterestSummaryStats:${chain}`);
+
+    // Use a separate transaction for each chain
+    await troyDBKnex.transaction(async (trx) => {
+      try {
+        // Fetch new data
+        console.time(`${chain} getOpenInterestData`);
+        await getOpenInterestData(chain, true, trx);
+        console.timeEnd(`${chain} getOpenInterestData`);
+
+        console.time(`${chain} getDailyOpenInterestChangeData`);
+        await getDailyOpenInterestChangeData(chain, true, trx);
+        console.timeEnd(`${chain} getDailyOpenInterestChangeData`);
+
+        console.time(`${chain} getOpenInterestSummaryStats`);
+        await getOpenInterestSummaryStats(chain, true, trx);
+        console.timeEnd(`${chain} getOpenInterestSummaryStats`);
+
+      } catch (error) {
+        console.error(`Error refreshing Perp Market History data for chain ${chain}:`, error);
+        // Don't throw the error, just log it and continue with the next chain
+      }
+    });
+
+    console.timeEnd(`${chain} total refresh time`);
+  }
+
+  console.log('Finished refreshing Perp Market History data for all chains');
+};
+
 module.exports = {
   getOpenInterestData,
   getDailyOpenInterestChangeData,
   getOpenInterestSummaryStats,
+  refreshAllPerpMarketHistoryData
 };

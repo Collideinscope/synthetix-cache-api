@@ -10,16 +10,16 @@ const {
 
 const CACHE_TTL = 3600; // 1 hour
 
-const getLatestPoolRewardsData = async (chain, collateralType) => {
+const getLatestPoolRewardsData = async (chain, collateralType, bypassCache = false, trx = troyDBKnex) => {
   const fetchLatest = async (chainToFetch) => {
     const cacheKey = `latestPoolRewards:${chainToFetch}:${collateralType}`;
-    let result = await redisService.get(cacheKey);
+    let result = bypassCache ? null : await redisService.get(cacheKey);
 
     if (!result) {
       console.log('not from cache');
       const tableName = `prod_${chainToFetch}_mainnet.fct_pool_rewards_hourly_${chainToFetch}_mainnet`;
       try {
-        result = await troyDBKnex(tableName)
+        result = await trx(tableName)
           .where({ collateral_type: collateralType })
           .orderBy('ts', 'desc')
           .limit(1);
@@ -54,16 +54,16 @@ const getLatestPoolRewardsData = async (chain, collateralType) => {
   }
 };
 
-const getCumulativePoolRewardsData = async (chain, collateralType) => {
+const getCumulativePoolRewardsData = async (chain, collateralType, bypassCache = false, trx = troyDBKnex) => {
   const fetchCumulative = async (chainToFetch) => {
     const cacheKey = `cumulativePoolRewards:${chainToFetch}:${collateralType}`;
-    let result = await redisService.get(cacheKey);
+    let result = bypassCache ? null : await redisService.get(cacheKey);
 
     if (!result) {
       console.log('not from cache');
       const tableName = `prod_${chainToFetch}_mainnet.fct_pool_rewards_hourly_${chainToFetch}_mainnet`;
       try {
-        result = await troyDBKnex(tableName)
+        result = await trx(tableName)
           .select('ts', 'pool_id', 'collateral_type', 'rewards_usd')
           .where({ collateral_type: collateralType })
           .orderBy('ts', 'asc');
@@ -107,14 +107,14 @@ const getCumulativePoolRewardsData = async (chain, collateralType) => {
   }
 };
 
-const getPoolRewardsSummaryStats = async (chain, collateralType) => {
+const getPoolRewardsSummaryStats = async (chain, collateralType, bypassCache = false, trx = troyDBKnex) => {
   const processChainData = async (chainToProcess) => {
     const cacheKey = `poolRewardsSummary:${chainToProcess}:${collateralType}`;
-    let result = await redisService.get(cacheKey);
+    let result = bypassCache ? null : await redisService.get(cacheKey);
 
     if (!result) {
       console.log('Processing pool rewards summary');
-      const allData = await getCumulativePoolRewardsData(chainToProcess, collateralType);
+      const allData = await getCumulativePoolRewardsData(chainToProcess, collateralType, bypassCache = false, trx = troyDBKnex);
       const chainData = allData[chainToProcess];
       
       if (chainData.length === 0) {
@@ -175,16 +175,16 @@ const getPoolRewardsSummaryStats = async (chain, collateralType) => {
   }
 };
 
-const getDailyPoolRewardsData = async (chain, collateralType) => {
+const getDailyPoolRewardsData = async (chain, collateralType, bypassCache = false, trx = troyDBKnex) => {
   const fetchDaily = async (chainToFetch) => {
     const cacheKey = `dailyPoolRewards:${chainToFetch}:${collateralType}`;
-    let result = await redisService.get(cacheKey);
+    let result = bypassCache ? null : await redisService.get(cacheKey);
 
     if (!result) {
       console.log('not from cache');
       const tableName = `prod_${chainToFetch}_mainnet.fct_pool_rewards_hourly_${chainToFetch}_mainnet`;
       try {
-        result = await troyDBKnex.raw(`
+        result = await trx.raw(`
           WITH daily_data AS (
             SELECT
               DATE_TRUNC('day', ts) AS date,
@@ -233,9 +233,55 @@ const getDailyPoolRewardsData = async (chain, collateralType) => {
   }
 };
 
+const refreshAllPoolRewardsData = async (collateralType) => {
+  console.log('Starting to refresh Pool Rewards data for all chains');
+  
+  for (const chain of CHAINS) {
+    console.log(`Refreshing Pool Rewards data for chain: ${chain}`);
+    console.time(`${chain} total refresh time`);
+    
+    // Clear existing cache
+    await redisService.del(`latestPoolRewards:${chain}:${collateralType}`);
+    await redisService.del(`cumulativePoolRewards:${chain}:${collateralType}`);
+    await redisService.del(`poolRewardsSummary:${chain}:${collateralType}`);
+    await redisService.del(`dailyPoolRewards:${chain}:${collateralType}`);
+
+    // Use a separate transaction for each chain
+    await troyDBKnex.transaction(async (trx) => {
+      try {
+        // Fetch new data
+        console.time(`${chain} getLatestPoolRewardsData`);
+        await getLatestPoolRewardsData(chain, collateralType, true, trx);
+        console.timeEnd(`${chain} getLatestPoolRewardsData`);
+
+        console.time(`${chain} getCumulativePoolRewardsData`);
+        await getCumulativePoolRewardsData(chain, collateralType, true, trx);
+        console.timeEnd(`${chain} getCumulativePoolRewardsData`);
+
+        console.time(`${chain} getPoolRewardsSummaryStats`);
+        await getPoolRewardsSummaryStats(chain, collateralType, true, trx);
+        console.timeEnd(`${chain} getPoolRewardsSummaryStats`);
+
+        console.time(`${chain} getDailyPoolRewardsData`);
+        await getDailyPoolRewardsData(chain, collateralType, true, trx);
+        console.timeEnd(`${chain} getDailyPoolRewardsData`);
+
+      } catch (error) {
+        console.error(`Error refreshing Pool Rewards data for chain ${chain}:`, error);
+        // Don't throw the error, just log it and continue with the next chain
+      }
+    });
+
+    console.timeEnd(`${chain} total refresh time`);
+  }
+
+  console.log('Finished refreshing Pool Rewards data for all chains');
+};
+
 module.exports = {
   getLatestPoolRewardsData,
   getCumulativePoolRewardsData,
   getPoolRewardsSummaryStats,
   getDailyPoolRewardsData,
+  refreshAllPoolRewardsData,
 };

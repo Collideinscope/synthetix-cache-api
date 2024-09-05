@@ -105,7 +105,7 @@ const getAPYSummaryStats = async (chain, collateralType, bypassCache = false, tr
         console.log('Processing APY summary for', chainToProcess);
 
         try {
-          const data = await getAllAPYData(chainToProcess, collateralType, false, trx);
+          const data = await getAllAPYData(chainToProcess, collateralType);
           const allData = data[chainToProcess];
 
           if (allData.length === 0) {
@@ -225,9 +225,12 @@ const getDailyAggregatedAPYData = async (chain, collateralType, bypassCache = fa
 };
 
 const refreshAllAPYData = async (collateralType) => {
+  console.log('Starting to refresh APY data for all chains');
+
   for (const chain of CHAINS) {
     console.log(`Refreshing APY data for chain: ${chain}`);
-    
+    console.time(`${chain} total refresh time`);
+
     // Clear existing cache
     await redisService.del(`latestAPY:${chain}:${collateralType}`);
     await redisService.del(`allAPY:${chain}:${collateralType}`);
@@ -238,18 +241,33 @@ const refreshAllAPYData = async (collateralType) => {
     await troyDBKnex.transaction(async (trx) => {
       try {
         // Fetch new data
+        console.time(`${chain} getLatestAPYData`);
         await getLatestAPYData(chain, collateralType, true, trx);
+        console.timeEnd(`${chain} getLatestAPYData`);
+
+        console.time(`${chain} getAllAPYData`);
         await getAllAPYData(chain, collateralType, true, trx);
+        console.timeEnd(`${chain} getAllAPYData`);
+
+        console.time(`${chain} getAPYSummaryStats`);
         await getAPYSummaryStats(chain, collateralType, true, trx);
+        console.timeEnd(`${chain} getAPYSummaryStats`);
+
+        console.time(`${chain} getDailyAggregatedAPYData`);
         await getDailyAggregatedAPYData(chain, collateralType, true, trx);
+        console.timeEnd(`${chain} getDailyAggregatedAPYData`);
+
       } catch (error) {
         console.error(`Error refreshing APY data for chain ${chain}:`, error);
-        throw error; 
+        throw error; // This will cause the transaction to rollback
       }
     });
 
+    console.timeEnd(`${chain} total refresh time`);
     console.log(`Finished refreshing APY data for chain: ${chain}`);
   }
+
+  console.log('Finished refreshing APY data for all chains');
 };
 
 module.exports = {

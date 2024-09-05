@@ -1,5 +1,6 @@
 const redisService = require('../services/redisService'); 
 const { refreshAllAPYData } = require('../services/apyService');
+const { troyDBKnex } = require('../config/db');
 
 const cronRefreshAPY = async () => {
   console.log('Starting cron job at:', new Date().toISOString());
@@ -21,6 +22,11 @@ const cronRefreshAPY = async () => {
       await redisService.disconnect();
       console.log('Redis disconnected');
     }
+    
+    // Destroy the Knex instance to close all database connections
+    await troyDBKnex.destroy();
+    console.log('Database connections closed');
+
     console.log('Cron job finished at:', new Date().toISOString());
     process.exit(0);
   }

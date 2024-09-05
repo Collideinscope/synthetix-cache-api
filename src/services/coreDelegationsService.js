@@ -10,7 +10,7 @@ const {
 
 const CACHE_TTL = 3600; // 1 hour
 
-const getLatestCoreDelegationsData = async (chain, collateralType) => {
+const getLatestCoreDelegationsData = async (chain, collateralType, bypassCache = false, trx = troyDBKnex) => {
   try {
     if (!collateralType) {
       throw new Error('collateralType is required');
@@ -18,13 +18,13 @@ const getLatestCoreDelegationsData = async (chain, collateralType) => {
 
     const fetchLatest = async (chainToFetch) => {
       const cacheKey = `latestCoreDelegations:${chainToFetch}:${collateralType}`;
-      let result = await redisService.get(cacheKey);
+      let result = bypassCache ? null : await redisService.get(cacheKey);
 
       if (!result) {
         console.log('not from cache');
         const tableName = `prod_${chainToFetch}_mainnet.fct_core_pool_delegation_${chainToFetch}_mainnet`;
         try {
-          result = await troyDBKnex(tableName)
+          result = await trx(tableName)
             .where('collateral_type', collateralType)
             .orderBy('ts', 'desc')
             .limit(1);
@@ -52,15 +52,15 @@ const getLatestCoreDelegationsData = async (chain, collateralType) => {
   }
 };
 
-const getCoreDelegationsData = async (chain, collateralType) => {
+const getCoreDelegationsData = async (chain, collateralType, bypassCache = false, trx = troyDBKnex) => {
   const cacheKey = `coreDelegationsData:${chain}:${collateralType}`;
-  let result = await redisService.get(cacheKey);
+  let result = bypassCache ? null : await redisService.get(cacheKey);
 
   if (!result) {
     console.log('Fetching core delegations data from database');
     const tableName = `prod_${chain}_mainnet.fct_core_pool_delegation_${chain}_mainnet`;
     try {
-      result = await troyDBKnex(tableName)
+      result = await trx(tableName)
         .where('collateral_type', collateralType)
         .orderBy('ts', 'asc')
     } catch (error) {
@@ -73,7 +73,7 @@ const getCoreDelegationsData = async (chain, collateralType) => {
   return result;
 };
 
-const getCumulativeCoreDelegationsData = async (chain, collateralType) => {
+const getCumulativeCoreDelegationsData = async (chain, collateralType, bypassCache = false, trx = troyDBKnex) => {
   try {
     if (!collateralType) {
       throw new Error('collateralType is required');
@@ -81,13 +81,13 @@ const getCumulativeCoreDelegationsData = async (chain, collateralType) => {
 
     const fetchCumulative = async (chainToFetch) => {
       const cacheKey = `cumulativeCoreDelegations:${chainToFetch}:${collateralType}`;
-      let result = await redisService.get(cacheKey);
+      let result = bypassCache ? null : await redisService.get(cacheKey);
 
       if (!result) {
         console.log('not from cache');
         const tableName = `prod_${chainToFetch}_mainnet.fct_core_pool_delegation_${chainToFetch}_mainnet`;
         try {
-          result = await troyDBKnex(tableName)
+          result = await trx(tableName)
             .where('collateral_type', collateralType)
             .orderBy('ts', 'asc');
         } catch (error) {
@@ -111,7 +111,7 @@ const getCumulativeCoreDelegationsData = async (chain, collateralType) => {
   }
 };
 
-const getCoreDelegationsSummaryStats = async (chain, collateralType) => {
+const getCoreDelegationsSummaryStats = async (chain, collateralType, bypassCache = false, trx = troyDBKnex) => {
   try {
     if (!collateralType) {
       throw new Error('collateralType is required');
@@ -119,7 +119,7 @@ const getCoreDelegationsSummaryStats = async (chain, collateralType) => {
 
     const processChainData = async (chainToProcess) => {
       const cacheKey = `coreDelegationsSummary:${chainToProcess}:${collateralType}`;
-      let result = await redisService.get(cacheKey);
+      let result = bypassCache ? null : await redisService.get(cacheKey);
 
       if (!result) {
         console.log('Processing core delegations summary');
@@ -177,7 +177,7 @@ const getCoreDelegationsSummaryStats = async (chain, collateralType) => {
   }
 };
 
-const getDailyCoreDelegationsData = async (chain, collateralType) => {
+const getDailyCoreDelegationsData = async (chain, collateralType, bypassCache = false, trx = troyDBKnex) => {
   try {
     if (!collateralType) {
       throw new Error('collateralType is required');
@@ -185,13 +185,13 @@ const getDailyCoreDelegationsData = async (chain, collateralType) => {
 
     const fetchDaily = async (chainToFetch) => {
       const cacheKey = `dailyCoreDelegations:${chainToFetch}:${collateralType}`;
-      let result = await redisService.get(cacheKey);
+      let result = bypassCache ? null : await redisService.get(cacheKey);
 
       if (!result) {
         console.log('not from cache');
         const tableName = `prod_${chainToFetch}_mainnet.fct_core_pool_delegation_${chainToFetch}_mainnet`;
         try {
-          const queryResult = await troyDBKnex.raw(`
+          const queryResult = await trx.raw(`
             WITH daily_data AS (
               SELECT
                 DATE_TRUNC('day', ts) AS date,
@@ -233,9 +233,61 @@ const getDailyCoreDelegationsData = async (chain, collateralType) => {
   }
 };
 
+const refreshAllCoreDelegationsData = async (collateralType) => {
+  console.log('Starting to refresh Core Delegations data for all chains');
+
+  for (const chain of CHAINS) {
+    console.log(`Refreshing core delegations data for chain: ${chain}`);
+    console.time(`${chain} total refresh time`);
+
+    // Clear existing cache
+    await redisService.del(`latestCoreDelegations:${chain}:${collateralType}`);
+    await redisService.del(`coreDelegationsData:${chain}:${collateralType}`);
+    await redisService.del(`cumulativeCoreDelegations:${chain}:${collateralType}`);
+    await redisService.del(`coreDelegationsSummary:${chain}:${collateralType}`);
+    await redisService.del(`dailyCoreDelegations:${chain}:${collateralType}`);
+
+    // Use a single transaction for all database operations
+    await troyDBKnex.transaction(async (trx) => {
+      try {
+        // Fetch new data
+        console.time(`${chain} getLatestCoreDelegationsData`);
+        await getLatestCoreDelegationsData(chain, collateralType, true, trx);
+        console.timeEnd(`${chain} getLatestCoreDelegationsData`);
+
+        console.time(`${chain} getCoreDelegationsData`);
+        await getCoreDelegationsData(chain, collateralType, true, trx);
+        console.timeEnd(`${chain} getCoreDelegationsData`);
+
+        console.time(`${chain} getCumulativeCoreDelegationsData`);
+        await getCumulativeCoreDelegationsData(chain, collateralType, true, trx);
+        console.timeEnd(`${chain} getCumulativeCoreDelegationsData`);
+
+        console.time(`${chain} getCoreDelegationsSummaryStats`);
+        await getCoreDelegationsSummaryStats(chain, collateralType, true, trx);
+        console.timeEnd(`${chain} getCoreDelegationsSummaryStats`);
+
+        console.time(`${chain} getDailyCoreDelegationsData`);
+        await getDailyCoreDelegationsData(chain, collateralType, true, trx);
+        console.timeEnd(`${chain} getDailyCoreDelegationsData`);
+
+      } catch (error) {
+        console.error(`Error refreshing core delegations data for chain ${chain}:`, error);
+        throw error; // This will cause the transaction to rollback
+      }
+    });
+
+    console.timeEnd(`${chain} total refresh time`);
+    console.log(`Finished refreshing core delegations data for chain: ${chain}`);
+  }
+
+  console.log('Finished refreshing Core Delegations data for all chains');
+};
+
 module.exports = {
   getLatestCoreDelegationsData,
   getCumulativeCoreDelegationsData,
   getCoreDelegationsSummaryStats,
   getDailyCoreDelegationsData,
+  refreshAllCoreDelegationsData,
 };

@@ -10,7 +10,7 @@ const {
 
 const CACHE_TTL = 3600; // 1 hour
 
-const getStakerCount = async (chain, collateralType) => {
+const getStakerCount = async (chain, collateralType, bypassCache = false, trx = troyDBKnex) => {
   try {
     if (!collateralType) {
       throw new Error('collateralType is required');
@@ -18,13 +18,13 @@ const getStakerCount = async (chain, collateralType) => {
 
     const fetchCount = async (chainToFetch) => {
       const cacheKey = `stakerCount:${chainToFetch}:${collateralType}`;
-      let result = await redisService.get(cacheKey);
+      let result = bypassCache ? null : await redisService.get(cacheKey);
 
       if (!result) {
         console.log('not from cache');
         const tableName = `prod_${chainToFetch}_mainnet.fct_core_account_delegation_${chainToFetch}_mainnet`;
         try {
-          const queryResult = await troyDBKnex(tableName)
+          const queryResult = await trx(tableName)
             .where('collateral_type', collateralType)
             .countDistinct('account_id as staker_count')
             .first();
@@ -50,7 +50,7 @@ const getStakerCount = async (chain, collateralType) => {
   }
 };
 
-const getCumulativeUniqueStakers = async (chain, collateralType) => {
+const getCumulativeUniqueStakers = async (chain, collateralType, bypassCache = false, trx = troyDBKnex) => {
   try {
     if (!collateralType) {
       throw new Error('collateralType is required');
@@ -58,13 +58,13 @@ const getCumulativeUniqueStakers = async (chain, collateralType) => {
 
     const fetchCumulativeData = async (chainToFetch) => {
       const cacheKey = `cumulativeUniqueStakers:${chainToFetch}:${collateralType}`;
-      let result = await redisService.get(cacheKey);
+      let result = bypassCache ? null : await redisService.get(cacheKey);
 
       if (!result) {
         console.log('not from cache');
         const tableName = `prod_${chainToFetch}_mainnet.fct_core_account_delegation_${chainToFetch}_mainnet`;
         try {
-          const queryResult = await troyDBKnex.raw(`
+          const queryResult = await trx.raw(`
             WITH daily_stakers AS (
               SELECT DISTINCT
                 DATE_TRUNC('day', ts) AS day,
@@ -137,7 +137,7 @@ const getCumulativeUniqueStakers = async (chain, collateralType) => {
   }
 };
 
-const getUniqueStakersSummaryStats = async (chain, collateralType) => {
+const getUniqueStakersSummaryStats = async (chain, collateralType, bypassCache = false, trx = troyDBKnex) => {
   try {
     if (!collateralType) {
       throw new Error('collateralType is required');
@@ -145,7 +145,7 @@ const getUniqueStakersSummaryStats = async (chain, collateralType) => {
 
     const processChainData = async (chainToProcess) => {
       const cacheKey = `uniqueStakersSummary:${chainToProcess}:${collateralType}`;
-      let result = await redisService.get(cacheKey);
+      let result = bypassCache ? null : await redisService.get(cacheKey);
 
       if (!result) {
         console.log('Processing unique stakers summary');
@@ -203,7 +203,7 @@ const getUniqueStakersSummaryStats = async (chain, collateralType) => {
   }
 };
 
-const getDailyNewUniqueStakers = async (chain, collateralType) => {
+const getDailyNewUniqueStakers = async (chain, collateralType, bypassCache = false, trx = troyDBKnex) => {
   try {
     if (!collateralType) {
       throw new Error('collateralType is required');
@@ -211,13 +211,13 @@ const getDailyNewUniqueStakers = async (chain, collateralType) => {
 
     const fetchDailyData = async (chainToFetch) => {
       const cacheKey = `dailyNewUniqueStakers:${chainToFetch}:${collateralType}`;
-      let result = await redisService.get(cacheKey);
+      let result = bypassCache ? null : await redisService.get(cacheKey);
 
       if (!result) {
         console.log('not from cache');
         const tableName = `prod_${chainToFetch}_mainnet.fct_core_account_delegation_${chainToFetch}_mainnet`;
         try {
-          result = await troyDBKnex.raw(`
+          result = await trx.raw(`
             WITH daily_stakers AS (
               SELECT DISTINCT
                 DATE_TRUNC('day', ts) AS date,
@@ -263,9 +263,56 @@ const getDailyNewUniqueStakers = async (chain, collateralType) => {
   }
 };
 
+const refreshAllCoreAccountDelegationsData = async (collateralType) => {
+  console.log('Starting to refresh Core Account Delegations data for all chains');
+
+  for (const chain of CHAINS) {
+    console.log(`Refreshing core account delegations data for chain: ${chain}`);
+    console.time(`${chain} total refresh time`);
+
+    // Clear existing cache
+    await redisService.del(`dailyNewUniqueStakers:${chain}:${collateralType}`);
+    await redisService.del(`cumulativeUniqueStakers:${chain}:${collateralType}`);
+    await redisService.del(`uniqueStakersSummary:${chain}:${collateralType}`);
+    await redisService.del(`stakerCount:${chain}:${collateralType}`);
+
+    // Use a single transaction for all database operations
+    await troyDBKnex.transaction(async (trx) => {
+      try {
+        // Fetch new data
+        console.time(`${chain} getDailyNewUniqueStakers`);
+        await getDailyNewUniqueStakers(chain, collateralType, true, trx);
+        console.timeEnd(`${chain} getDailyNewUniqueStakers`);
+
+        console.time(`${chain} getCumulativeUniqueStakers`);
+        await getCumulativeUniqueStakers(chain, collateralType, true, trx);
+        console.timeEnd(`${chain} getCumulativeUniqueStakers`);
+
+        console.time(`${chain} getUniqueStakersSummaryStats`);
+        await getUniqueStakersSummaryStats(chain, collateralType, true, trx);
+        console.timeEnd(`${chain} getUniqueStakersSummaryStats`);
+
+        console.time(`${chain} getStakerCount`);
+        await getStakerCount(chain, collateralType, true, trx);
+        console.timeEnd(`${chain} getStakerCount`);
+
+      } catch (error) {
+        console.error(`Error refreshing core account delegations data for chain ${chain}:`, error);
+        throw error; // This will cause the transaction to rollback
+      }
+    });
+
+    console.timeEnd(`${chain} total refresh time`);
+    console.log(`Finished refreshing core account delegations data for chain: ${chain}`);
+  }
+
+  console.log('Finished refreshing Core Account Delegations data for all chains');
+};
+
 module.exports = {
   getStakerCount,
   getCumulativeUniqueStakers,
   getUniqueStakersSummaryStats,
   getDailyNewUniqueStakers,
+  refreshAllCoreAccountDelegationsData,
 };

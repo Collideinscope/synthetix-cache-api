@@ -10,16 +10,16 @@ const {
 
 const CACHE_TTL = 3600; // 1 hour
 
-const getCumulativeUniqueTraders = async (chain) => {
+const getCumulativeUniqueTraders = async (chain, bypassCache = false, trx = troyDBKnex) => {
   const fetchCumulativeData = async (chainToFetch) => {
     const cacheKey = `cumulativeUniqueTraders:${chainToFetch}`;
-    let result = await redisService.get(cacheKey);
+    let result = bypassCache ? null : await redisService.get(cacheKey);
 
     if (!result) {
       console.log('not from cache');
       const tableName = `prod_${chainToFetch}_mainnet.fct_perp_account_stats_daily_${chainToFetch}_mainnet`;
       try {
-        const queryResult = await troyDBKnex.raw(`
+        const queryResult = await trx.raw(`
           WITH daily_unique_traders AS (
             SELECT
               ts,
@@ -76,11 +76,11 @@ const getCumulativeUniqueTraders = async (chain) => {
   }
 };
 
-const getUniqueTradersSummaryStats = async (chain) => {
+const getUniqueTradersSummaryStats = async (chain, bypassCache = false, trx = troyDBKnex) => {
   try {
     const processChainData = async (chainToProcess) => {
       const cacheKey = `uniqueTradersSummary:${chainToProcess}`;
-      let result = await redisService.get(cacheKey);
+      let result = bypassCache ? null : await redisService.get(cacheKey);
 
       if (!result) {
         console.log('Processing unique traders summary');
@@ -139,16 +139,16 @@ const getUniqueTradersSummaryStats = async (chain) => {
   }
 };
 
-const getDailyNewUniqueTraders = async (chain) => {
+const getDailyNewUniqueTraders = async (chain, bypassCache = false, trx = troyDBKnex) => {
   const fetchDailyData = async (chainToFetch) => {
     const cacheKey = `dailyNewUniqueTraders:${chainToFetch}`;
-    let result = await redisService.get(cacheKey);
+    let result = bypassCache ? null : await redisService.get(cacheKey);
 
     if (!result) {
       console.log('not from cache');
       const tableName = `prod_${chainToFetch}_mainnet.fct_perp_account_stats_daily_${chainToFetch}_mainnet`;
       try {
-        const queryResult = await troyDBKnex.raw(`
+        const queryResult = await trx.raw(`
           SELECT
             ts,
             COUNT(DISTINCT account_id) AS daily_unique_traders
@@ -191,8 +191,49 @@ const getDailyNewUniqueTraders = async (chain) => {
   }
 };
 
+const refreshAllPerpAccountStatsData = async () => {
+  console.log('Starting to refresh Perp Account Stats data for all chains');
+  
+  for (const chain of CHAINS) {
+    console.log(`Refreshing Perp Account Stats data for chain: ${chain}`);
+    console.time(`${chain} total refresh time`);
+
+    // Clear existing cache
+    await redisService.del(`cumulativeUniqueTraders:${chain}`);
+    await redisService.del(`uniqueTradersSummary:${chain}`);
+    await redisService.del(`dailyNewUniqueTraders:${chain}`);
+
+    // Use a separate transaction for each chain
+    await troyDBKnex.transaction(async (trx) => {
+      try {
+        // Fetch new data
+        console.time(`${chain} getCumulativeUniqueTraders`);
+        await getCumulativeUniqueTraders(chain, true, trx);
+        console.timeEnd(`${chain} getCumulativeUniqueTraders`);
+
+        console.time(`${chain} getUniqueTradersSummaryStats`);
+        await getUniqueTradersSummaryStats(chain, true, trx);
+        console.timeEnd(`${chain} getUniqueTradersSummaryStats`);
+
+        console.time(`${chain} getDailyNewUniqueTraders`);
+        await getDailyNewUniqueTraders(chain, true, trx);
+        console.timeEnd(`${chain} getDailyNewUniqueTraders`);
+
+      } catch (error) {
+        console.error(`Error refreshing Perp Account Stats data for chain ${chain}:`, error);
+        // Don't throw the error, just log it and continue with the next chain
+      }
+    });
+
+    console.timeEnd(`${chain} total refresh time`);
+  }
+
+  console.log('Finished refreshing Perp Account Stats data for all chains');
+};
+
 module.exports = {
   getCumulativeUniqueTraders,
   getUniqueTradersSummaryStats,
   getDailyNewUniqueTraders,
+  refreshAllPerpAccountStatsData
 };

@@ -10,7 +10,7 @@ const {
 
 const CACHE_TTL = 3600; // 1 hour
 
-const getLatestTVLData = async (chain, collateralType) => {
+const getLatestTVLData = async (chain, collateralType, bypassCache = false, trx = troyDBKnex) => {
   try {
     if (!collateralType) {
       throw new Error('collateralType is required');
@@ -18,13 +18,13 @@ const getLatestTVLData = async (chain, collateralType) => {
 
     const fetchLatest = async (chainToFetch) => {
       const cacheKey = `latestTVL:${chainToFetch}:${collateralType}`;
-      let result = await redisService.get(cacheKey);
+      let result = bypassCache ? null : await redisService.get(cacheKey);
 
       if (!result) {
         console.log('not from cache');
         const tableName = `prod_${chainToFetch}_mainnet.fct_core_vault_collateral_${chainToFetch}_mainnet`;
         try {
-          result = await troyDBKnex(tableName)
+          result = await trx(tableName)
             .where('collateral_type', collateralType)
             .orderBy('ts', 'desc')
             .limit(1);
@@ -49,7 +49,7 @@ const getLatestTVLData = async (chain, collateralType) => {
   }
 };
 
-const getCumulativeTVLData = async (chain, collateralType) => {
+const getCumulativeTVLData = async (chain, collateralType, bypassCache = false, trx = troyDBKnex) => {
   try {
     if (!collateralType) {
       throw new Error('collateralType is required');
@@ -57,7 +57,7 @@ const getCumulativeTVLData = async (chain, collateralType) => {
 
     const fetchAll = async (chainToFetch) => {
       const cacheKey = `cumulativeTVL:${chainToFetch}:${collateralType}`;
-      let result = await redisService.get(cacheKey);
+      let result = bypassCache ? null : await redisService.get(cacheKey);
 
       if (!result) {
         console.log('not from cache');
@@ -65,7 +65,7 @@ const getCumulativeTVLData = async (chain, collateralType) => {
         const startDate = new Date('2024-03-26');
 
         try {
-          result = await troyDBKnex(tableName)
+          result = await trx(tableName)
             .where('ts', '>=', startDate)
             .where({
               pool_id: 1,
@@ -93,7 +93,7 @@ const getCumulativeTVLData = async (chain, collateralType) => {
   }
 };
 
-const getTVLSummaryStats = async (chain, collateralType) => {
+const getTVLSummaryStats = async (chain, collateralType, bypassCache = false, trx = troyDBKnex) => {
   try {
     if (!collateralType) {
       throw new Error('collateralType is required');
@@ -101,7 +101,7 @@ const getTVLSummaryStats = async (chain, collateralType) => {
 
     const processChainData = async (chainToProcess) => {
       const cacheKey = `TVLSummary:${chainToProcess}:${collateralType}`;
-      let result = await redisService.get(cacheKey);
+      let result = bypassCache ? null : await redisService.get(cacheKey);
 
       if (!result) {
         console.log('Processing TVL summary');
@@ -160,7 +160,7 @@ const getTVLSummaryStats = async (chain, collateralType) => {
   }
 };
 
-const getDailyTVLData = async (chain, collateralType) => {
+const getDailyTVLData = async (chain, collateralType, bypassCache = false, trx = troyDBKnex) => {
   try {
     if (!collateralType) {
       throw new Error('collateralType is required');
@@ -168,13 +168,13 @@ const getDailyTVLData = async (chain, collateralType) => {
 
     const fetchDaily = async (chainToProcess) => {
       const cacheKey = `dailyTVL:${chainToProcess}:${collateralType}`;
-      let result = await redisService.get(cacheKey);
+      let result = bypassCache ? null : await redisService.get(cacheKey);
 
       if (!result) {
         console.log('not from cache');
         const tableName = `prod_${chainToProcess}_mainnet.fct_core_vault_collateral_${chainToProcess}_mainnet`;
         try {
-          const queryResult = await troyDBKnex.raw(`
+          const queryResult = await trx.raw(`
             WITH daily_data AS (
               SELECT
                 DATE_TRUNC('day', ts) AS date,
@@ -217,9 +217,55 @@ const getDailyTVLData = async (chain, collateralType) => {
   }
 };
 
+const refreshAllTVLData = async (collateralType) => {
+  console.log('Starting to refresh TVL data for all chains');
+  
+  for (const chain of CHAINS) {
+    console.log(`Refreshing TVL data for chain: ${chain}`);
+    console.time(`${chain} total refresh time`);
+    
+    // Clear existing cache
+    await redisService.del(`latestTVL:${chain}:${collateralType}`);
+    await redisService.del(`cumulativeTVL:${chain}:${collateralType}`);
+    await redisService.del(`TVLSummary:${chain}:${collateralType}`);
+    await redisService.del(`dailyTVL:${chain}:${collateralType}`);
+
+    // Use a separate transaction for each chain
+    await troyDBKnex.transaction(async (trx) => {
+      try {
+        // Fetch new data
+        console.time(`${chain} getLatestTVLData`);
+        await getLatestTVLData(chain, collateralType, true, trx);
+        console.timeEnd(`${chain} getLatestTVLData`);
+
+        console.time(`${chain} getCumulativeTVLData`);
+        await getCumulativeTVLData(chain, collateralType, true, trx);
+        console.timeEnd(`${chain} getCumulativeTVLData`);
+
+        console.time(`${chain} getTVLSummaryStats`);
+        await getTVLSummaryStats(chain, collateralType, true, trx);
+        console.timeEnd(`${chain} getTVLSummaryStats`);
+
+        console.time(`${chain} getDailyTVLData`);
+        await getDailyTVLData(chain, collateralType, true, trx);
+        console.timeEnd(`${chain} getDailyTVLData`);
+
+      } catch (error) {
+        console.error(`Error refreshing TVL data for chain ${chain}:`, error);
+        // Don't throw the error, just log it and continue with the next chain
+      }
+    });
+
+    console.timeEnd(`${chain} total refresh time`);
+  }
+
+  console.log('Finished refreshing TVL data for all chains');
+};
+
 module.exports = {
   getLatestTVLData,
   getCumulativeTVLData,
   getTVLSummaryStats,
   getDailyTVLData,
+  refreshAllTVLData
 };
