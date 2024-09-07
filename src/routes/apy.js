@@ -1,7 +1,6 @@
 const express = require('express');
 const router = express.Router();
 const {
-  getLatestAPYData,
   getAllAPYData,
   getAPYSummaryStats,
   getDailyAggregatedAPYData,
@@ -24,26 +23,6 @@ const transformDataByChain = (data) => {
     return acc;
   }, {});
 };
-
-router.get('/latest', async (req, res) => {
-  try {
-    let { chain, collateralType } = req.query;
-    validateParameters(chain, collateralType);
-    chain = chain?.toLowerCase();
-    collateralType = collateralType?.toLowerCase();
-    
-    const result = await getLatestAPYData(chain, collateralType);
-    if (Object.values(result).every(data => data.length === 0)) {
-      return res.status(404).json({ error: 'APY data not found' });
-    }
-
-    const transformedData = transformDataByChain(result);
-    return res.json(transformedData);
-  } catch (error) {
-    console.error('Error in /apy/latest route:', error);
-    return res.status(400).json({ error: error.message });
-  }
-});
 
 router.get('/all', async (req, res) => {
   try {

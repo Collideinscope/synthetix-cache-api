@@ -9,9 +9,9 @@ const cronRefreshAPY = async () => {
     await redisService.connect();
     console.log('Redis connection established successfully');
 
-    console.log(`Refreshing APY data for collateral type: ${'0xC74eA762cF06c9151cE074E6a569a5945b6302E7'}`);
-    await refreshAllAPYData('0xC74eA762cF06c9151cE074E6a569a5945b6302E7');
-    console.log(`APY data refreshed for collateral type: ${'0xC74eA762cF06c9151cE074E6a569a5945b6302E7'}`);
+    console.log(`Refreshing APY data for collateral type: ${'0xc74ea762cf06c9151ce074e6a569a5945b6302e7'}`);
+    await refreshAllAPYData('0xc74ea762cf06c9151ce074e6a569a5945b6302e7');
+    console.log(`APY data refreshed for collateral type: ${'0xc74ea762cf06c9151ce074e6a569a5945b6302e7'}`);
   
     console.log('Cron job APY Refresh completed for all collateral types');
   } catch (error) {

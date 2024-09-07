@@ -8,7 +8,7 @@ const {
   smoothData
 } = require('../helpers');
 
-const CACHE_TTL = 3600; // 1 hour
+const CACHE_TTL = 86400; // 24 hours
 
 const getLatestPoolRewardsData = async (chain, collateralType, bypassCache = false, trx = troyDBKnex) => {
   const fetchLatest = async (chainToFetch) => {
