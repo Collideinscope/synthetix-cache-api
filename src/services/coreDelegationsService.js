@@ -114,7 +114,7 @@ const getCoreDelegationsData = async (chain, collateralType, isRefresh = false, 
 
         if (!result || !cachedTimestamp || new Date(latestDbTimestamp.latest_ts) > new Date(cachedTimestamp)) {
           console.log('Fetching new core delegations data from database');
-          const startDate = cachedTimestamp ? new Date(cachedTimestamp) : new Date('2024-05-01');
+          const startDate = cachedTimestamp ? new Date(cachedTimestamp) : new Date('2024-03-25');
           console.log(`Fetching data from ${startDate.toISOString()} to ${latestDbTimestamp.latest_ts}`);
 
           const newData = await trx(tableName)
@@ -195,7 +195,7 @@ const getCumulativeCoreDelegationsData = async (chain, collateralType, isRefresh
 
           if (!result || !cachedTimestamp || new Date(latestDbTimestamp.latest_ts) > new Date(cachedTimestamp)) {
             console.log('Fetching new cumulative core delegations data from database');
-            const startDate = cachedTimestamp ? new Date(cachedTimestamp) : new Date('2024-05-01');
+            const startDate = cachedTimestamp ? new Date(cachedTimestamp) : new Date('2024-03-25');
             console.log(`Fetching data from ${startDate.toISOString()} to ${latestDbTimestamp.latest_ts}`);
 
             const newData = await trx(tableName)
@@ -376,7 +376,7 @@ const getDailyCoreDelegationsData = async (chain, collateralType, isRefresh = fa
 
           if (!result || !cachedTimestamp || new Date(latestDbTimestamp.latest_ts) > new Date(cachedTimestamp)) {
             console.log('Fetching new daily core delegations data from database');
-            const startDate = cachedTimestamp ? new Date(cachedTimestamp) : new Date('2024-05-01');
+            const startDate = cachedTimestamp ? new Date(cachedTimestamp) : new Date('2024-03-25');
             console.log(`Fetching data from ${startDate.toISOString()} to ${latestDbTimestamp.latest_ts}`);
 
             const queryResult = await trx.raw(`

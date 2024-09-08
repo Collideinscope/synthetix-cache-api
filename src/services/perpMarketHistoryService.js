@@ -31,7 +31,7 @@ const getOpenInterestData = async (chain, isRefresh = false, trx = troyDBKnex) =
 
         if (!result || !cachedTimestamp || new Date(latestDbTimestamp.latest_ts) > new Date(cachedTimestamp)) {
           console.log('Fetching new open interest data from database');
-          const startDate = cachedTimestamp ? new Date(cachedTimestamp) : new Date('2024-05-01');
+          const startDate = cachedTimestamp ? new Date(cachedTimestamp) : new Date('2024-02-03');
           console.log(`Fetching data from ${startDate.toISOString()} to ${latestDbTimestamp.latest_ts}`);
 
           const queryResult = await trx.raw(`
@@ -146,7 +146,7 @@ const getDailyOpenInterestChangeData = async (chain, isRefresh = false, trx = tr
 
         if (!result || !cachedTimestamp || new Date(latestDbTimestamp.latest_ts) > new Date(cachedTimestamp)) {
           console.log('Fetching new daily open interest change data from database');
-          const startDate = cachedTimestamp ? new Date(cachedTimestamp) : new Date('2024-05-01');
+          const startDate = cachedTimestamp ? new Date(cachedTimestamp) : new Date('2024-02-03');
           console.log(`Fetching data from ${startDate.toISOString()} to ${latestDbTimestamp.latest_ts}`);
 
           const queryResult = await trx.raw(`

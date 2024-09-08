@@ -114,7 +114,7 @@ const getCumulativePoolRewardsData = async (chain, collateralType, isRefresh = f
 
         if (!result || !cachedTimestamp || new Date(latestDbTimestamp.latest_ts) > new Date(cachedTimestamp)) {
           console.log('Fetching new cumulative pool rewards data from database');
-          const startDate = cachedTimestamp ? new Date(cachedTimestamp) : new Date('2024-05-01');
+          const startDate = cachedTimestamp ? new Date(cachedTimestamp) : new Date('2023-01-01');
           console.log(`Fetching data from ${startDate.toISOString()} to ${latestDbTimestamp.latest_ts}`);
 
           const newData = await trx(tableName)
@@ -304,7 +304,7 @@ const getDailyPoolRewardsData = async (chain, collateralType, isRefresh = false,
 
         if (!result || !cachedTimestamp || new Date(latestDbTimestamp.latest_ts) > new Date(cachedTimestamp)) {
           console.log('Fetching new daily pool rewards data from database');
-          const startDate = cachedTimestamp ? new Date(cachedTimestamp) : new Date('2024-05-01');
+          const startDate = cachedTimestamp ? new Date(cachedTimestamp) : new Date('2023-01-01');
           console.log(`Fetching data from ${startDate.toISOString()} to ${latestDbTimestamp.latest_ts}`);
 
           const queryResult = await trx.raw(`
