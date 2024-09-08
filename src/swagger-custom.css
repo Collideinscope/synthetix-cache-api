@@ -130,6 +130,7 @@ body {
 .swagger-ui .response-col_description pre {
   background-color: var(--synthetix-navy-800) !important; 
   color: var(--synthetix-gray-500) !important; 
+  font-size: 12px !important;
   border-radius: 4px;
   padding: 10px;
   border: 3px solid var(--synthetix-border-and-line-colour) !important;
