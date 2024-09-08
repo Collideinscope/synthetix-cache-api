@@ -1,67 +1,110 @@
 const { troyDBKnex } = require('../config/db');
 const redisService = require('./redisService');
 const { CHAINS } = require('../helpers');
+const { calculateDelta, calculatePercentage, smoothData } = require('../helpers');
 
-const {
-  calculateDelta,
-  calculatePercentage,
-  smoothData
-} = require('../helpers');
+const CACHE_TTL = 60 * 60 * 24 * 365; // 1 year in seconds
 
-const CACHE_TTL = 3600; // 1 hour
+const getOpenInterestData = async (chain, isRefresh = false, trx = troyDBKnex) => {
+  console.log(`getOpenInterestData called with chain: ${chain}, isRefresh: ${isRefresh}`);
 
-const getOpenInterestData = async (chain, bypassCache = false, trx = troyDBKnex) => {
   const fetchDataForChain = async (chainToFetch) => {
     const cacheKey = `openInterestData:${chainToFetch}`;
-    let result = bypassCache ? null : await redisService.get(cacheKey);
+    const tsKey = `${cacheKey}:timestamp`;
+    
+    console.log(`Attempting to get data from Redis for key: ${cacheKey}`);
+    let result = await redisService.get(cacheKey);
+    let cachedTimestamp = await redisService.get(tsKey);
 
-    if (!result) {
-      console.log('not from cache');
+    console.log(`Redis result: ${result ? 'Data found' : 'No data'}, Timestamp: ${cachedTimestamp}`);
+
+    if (isRefresh || !result) {
       const tableName = `prod_${chainToFetch}_mainnet.fct_perp_market_history_${chainToFetch}_mainnet`;
+      console.log(`Querying database table: ${tableName}`);
+
       try {
-        const queryResult = await trx.raw(`
-          WITH daily_market_oi AS (
-            SELECT
-              DATE_TRUNC('day', ts) AS day,
-              market_symbol,
-              AVG(size_usd) AS daily_market_oi
-            FROM
-              ${tableName}
-            GROUP BY
-              DATE_TRUNC('day', ts),
-              market_symbol
-          ),
-          daily_oi AS (
-            SELECT
-              day,
-              SUM(daily_market_oi) AS daily_oi
-            FROM
-              daily_market_oi
-            GROUP BY
-              day
-          )
-          SELECT
-            day AS ts,
-            daily_oi
-          FROM
-            daily_oi
-          ORDER BY
-            ts ASC;
-        `);
+        const latestDbTimestamp = await trx(tableName)
+          .max('ts as latest_ts')
+          .first();
 
-        result = queryResult.rows.map(row => ({
-          ts: row.ts,
-          daily_oi: parseFloat(row.daily_oi),
-        }));
+        console.log(`Latest DB timestamp: ${JSON.stringify(latestDbTimestamp)}`);
 
-        await redisService.set(cacheKey, result, CACHE_TTL);
-      } catch (error) {
-        console.error(`Error fetching data for ${chainToFetch}:`, error.message);
+        if (!result || !cachedTimestamp || new Date(latestDbTimestamp.latest_ts) > new Date(cachedTimestamp)) {
+          console.log('Fetching new open interest data from database');
+          const startDate = cachedTimestamp ? new Date(cachedTimestamp) : new Date('2024-05-01');
+          console.log(`Fetching data from ${startDate.toISOString()} to ${latestDbTimestamp.latest_ts}`);
+
+          const queryResult = await trx.raw(`
+            WITH daily_market_oi AS (
+              SELECT
+                DATE_TRUNC('day', ts) AS day,
+                market_symbol,
+                AVG(size_usd) AS daily_market_oi
+              FROM
+                ${tableName}
+              WHERE ts > ?
+              GROUP BY
+                DATE_TRUNC('day', ts),
+                market_symbol
+            ),
+            daily_oi AS (
+              SELECT
+                day,
+                SUM(daily_market_oi) AS daily_oi
+              FROM
+                daily_market_oi
+              GROUP BY
+                day
+            )
+            SELECT
+              day AS ts,
+              daily_oi
+            FROM
+              daily_oi
+            ORDER BY
+              ts ASC;
+          `, [startDate]);
+
+          const newResult = queryResult.rows.map(row => ({
+            ts: row.ts,
+            daily_oi: parseFloat(row.daily_oi),
+          }));
+
+          console.log(`Fetched ${newResult.length} new records from database`);
+
+          if (result) {
+            console.log('Parsing and concatenating existing result with new data');
+            result = result.concat(newResult);
+          } else {
+            console.log('Setting result to new data');
+            result = newResult;
+          }
+
+          if (result.length > 0) {
+            console.log(`Attempting to cache ${result.length} records in Redis`);
+            try {
+              await redisService.set(cacheKey, result, CACHE_TTL);
+              await redisService.set(tsKey, latestDbTimestamp.latest_ts, CACHE_TTL);
+              console.log('Data successfully cached in Redis');
+            } catch (redisError) {
+              console.error('Error caching data in Redis:', redisError);
+            }
+          } else {
+            console.log('No data to cache in Redis');
+          }
+        } else {
+          console.log('Using cached data, no need to fetch from database');
+        }
+      } catch (dbError) {
+        console.error('Error querying database:', dbError);
         result = [];
       }
+    } else {
+      console.log('Not refreshing, using cached result');
     }
 
-    return { [chainToFetch]: result };
+    console.log(`Returning result for ${chainToFetch}: ${result ? result.length + ' records' : 'No data'}`);
+    return { [chainToFetch]: result || [] };
   };
 
   try {
@@ -69,80 +112,125 @@ const getOpenInterestData = async (chain, bypassCache = false, trx = troyDBKnex)
       return await fetchDataForChain(chain);
     } else {
       const results = await Promise.all(CHAINS.map(fetchDataForChain));
-      return CHAINS.reduce((acc, chain, index) => {
-        acc[chain] = results[index][chain] || [];
-        return acc;
-      }, {});
+      return Object.assign({}, ...results);
     }
   } catch (error) {
     console.error('Error in getOpenInterestData:', error);
-    return {};
+    throw new Error('Error fetching open interest data: ' + error.message);
   }
 };
 
-const getDailyOpenInterestChangeData = async (chain, bypassCache = false, trx = troyDBKnex) => {
+const getDailyOpenInterestChangeData = async (chain, isRefresh = false, trx = troyDBKnex) => {
+  console.log(`getDailyOpenInterestChangeData called with chain: ${chain}, isRefresh: ${isRefresh}`);
+
   const fetchDataForChain = async (chainToFetch) => {
     const cacheKey = `dailyOpenInterestChangeData:${chainToFetch}`;
-    let result = bypassCache ? null : await redisService.get(cacheKey);
+    const tsKey = `${cacheKey}:timestamp`;
+    
+    console.log(`Attempting to get data from Redis for key: ${cacheKey}`);
+    let result = await redisService.get(cacheKey);
+    let cachedTimestamp = await redisService.get(tsKey);
 
-    if (!result) {
-      console.log('not from cache');
+    console.log(`Redis result: ${result ? 'Data found' : 'No data'}, Timestamp: ${cachedTimestamp}`);
+
+    if (isRefresh || !result) {
       const tableName = `prod_${chainToFetch}_mainnet.fct_perp_market_history_${chainToFetch}_mainnet`;
+      console.log(`Querying database table: ${tableName}`);
+
       try {
-        const queryResult = await trx.raw(`
-          WITH daily_market_oi AS (
+        const latestDbTimestamp = await trx(tableName)
+          .max('ts as latest_ts')
+          .first();
+
+        console.log(`Latest DB timestamp: ${JSON.stringify(latestDbTimestamp)}`);
+
+        if (!result || !cachedTimestamp || new Date(latestDbTimestamp.latest_ts) > new Date(cachedTimestamp)) {
+          console.log('Fetching new daily open interest change data from database');
+          const startDate = cachedTimestamp ? new Date(cachedTimestamp) : new Date('2024-05-01');
+          console.log(`Fetching data from ${startDate.toISOString()} to ${latestDbTimestamp.latest_ts}`);
+
+          const queryResult = await trx.raw(`
+            WITH daily_market_oi AS (
+              SELECT
+                DATE_TRUNC('day', ts) AS day,
+                market_symbol,
+                AVG(size_usd) AS daily_market_oi
+              FROM
+                ${tableName}
+              WHERE ts > ?
+              GROUP BY
+                DATE_TRUNC('day', ts),
+                market_symbol
+            ),
+            daily_oi AS (
+              SELECT
+                day,
+                SUM(daily_market_oi) AS daily_oi
+              FROM
+                daily_market_oi
+              GROUP BY
+                day
+            ),
+            daily_oi_change AS (
+              SELECT
+                day AS ts,
+                daily_oi,
+                daily_oi - LAG(daily_oi) OVER (ORDER BY day) AS daily_oi_change
+              FROM
+                daily_oi
+            )
             SELECT
-              DATE_TRUNC('day', ts) AS day,
-              market_symbol,
-              AVG(size_usd) AS daily_market_oi
-            FROM
-              ${tableName}
-            GROUP BY
-              DATE_TRUNC('day', ts),
-              market_symbol
-          ),
-          daily_oi AS (
-            SELECT
-              day,
-              SUM(daily_market_oi) AS daily_oi
-            FROM
-              daily_market_oi
-            GROUP BY
-              day
-          ),
-          daily_oi_change AS (
-            SELECT
-              day AS ts,
+              ts,
               daily_oi,
-              daily_oi - LAG(daily_oi) OVER (ORDER BY day) AS daily_oi_change
+              daily_oi_change
             FROM
-              daily_oi
-          )
-          SELECT
-            ts,
-            daily_oi,
-            daily_oi_change
-          FROM
-            daily_oi_change
-          WHERE
-            daily_oi_change IS NOT NULL
-          ORDER BY
-            ts ASC;
-        `);
+              daily_oi_change
+            WHERE
+              daily_oi_change IS NOT NULL
+            ORDER BY
+              ts ASC;
+          `, [startDate]);
 
-        result = queryResult.rows.map(row => ({
-          ts: row.ts,
-          daily_oi_change: parseFloat(row.daily_oi_change)
-        }));
+          const newResult = queryResult.rows.map(row => ({
+            ts: row.ts,
+            daily_oi_change: parseFloat(row.daily_oi_change)
+          }));
 
-        await redisService.set(cacheKey, result, CACHE_TTL);
-      } catch (error) {
-        console.error(`Error fetching data for ${chainToFetch}:`, error.message);
+          console.log(`Fetched ${newResult.length} new records from database`);
+
+          if (result) {
+            console.log('Parsing and concatenating existing result with new data');
+            result = result.concat(newResult);
+          } else {
+            console.log('Setting result to new data');
+            result = newResult;
+          }
+
+          if (result.length > 0) {
+            console.log(`Attempting to cache ${result.length} records in Redis`);
+            try {
+              await redisService.set(cacheKey, result, CACHE_TTL);
+              await redisService.set(tsKey, latestDbTimestamp.latest_ts, CACHE_TTL);
+              console.log('Data successfully cached in Redis');
+            } catch (redisError) {
+              console.error('Error caching data in Redis:', redisError);
+            }
+          } else {
+            console.log('No data to cache in Redis');
+          }
+        } else {
+          console.log('Using cached data, no need to fetch from database');
+        }
+      } catch (dbError) {
+        console.error('Error querying database:', dbError);
         result = [];
       }
+    } else {
+      console.log('Not refreshing, using cached result');
     }
 
-    return { [chainToFetch]: result };
+    console.log(`Returning result for ${chainToFetch}: ${result ? result.length + ' records' : 'No data'}`);
+    return { [chainToFetch]: result || [] };
   };
 
   try {
@@ -150,78 +238,99 @@ const getDailyOpenInterestChangeData = async (chain, bypassCache = false, trx = 
       return await fetchDataForChain(chain);
     } else {
       const results = await Promise.all(CHAINS.map(fetchDataForChain));
-      return CHAINS.reduce((acc, chain, index) => {
-        acc[chain] = results[index][chain] || [];
-        return acc;
-      }, {});
+      return Object.assign({}, ...results);
     }
   } catch (error) {
     console.error('Error in getDailyOpenInterestChangeData:', error);
-    return {};
+    throw new Error('Error fetching daily open interest change data: ' + error.message);
   }
 };
 
-const getOpenInterestSummaryStats = async (chain, bypassCache = false, trx = troyDBKnex) => {
+const getOpenInterestSummaryStats = async (chain, isRefresh = false, trx = troyDBKnex) => {
+  console.log(`getOpenInterestSummaryStats called with chain: ${chain}, isRefresh: ${isRefresh}`);
+
   try {
     const processChainData = async (chainToProcess) => {
-      const cacheKey = `openInterestSummaryStats:${chainToProcess}`;
-      let result = bypassCache ? null : await redisService.get(cacheKey);
+      const summaryCacheKey = `openInterestSummaryStats:${chainToProcess}`;
+      const summaryTsKey = `${summaryCacheKey}:timestamp`;
+      
+      const openInterestDataKey = `openInterestData:${chainToProcess}`;
+      const openInterestDataTsKey = `${openInterestDataKey}:timestamp`;
 
-      if (!result) {
-        console.log('Processing open interest summary stats');
-        const data = await getOpenInterestData(chainToProcess);
+      let summaryResult = await redisService.get(summaryCacheKey);
+      let summaryTimestamp = await redisService.get(summaryTsKey);
+      let openInterestDataTimestamp = await redisService.get(openInterestDataTsKey);
+
+      console.log(`Summary cache timestamp: ${summaryTimestamp}`);
+      console.log(`Open Interest data cache timestamp: ${openInterestDataTimestamp}`);
+
+      if (isRefresh || !summaryResult || !summaryTimestamp || 
+          (openInterestDataTimestamp && new Date(openInterestDataTimestamp) > new Date(summaryTimestamp))) {
+        console.log('Processing open interest summary stats for', chainToProcess);
+
+        const data = await getOpenInterestData(chainToProcess, false, trx);
         const chainData = data[chainToProcess];
         
         if (chainData.length === 0) {
-          result = {};
-        } else {
-          const smoothedData = smoothData(chainData, 'daily_oi');
-          const latestData = smoothedData[smoothedData.length - 1];
-          const latestTs = new Date(latestData.ts);
-          
-          const findValueAtDate = (days) => {
-            const targetDate = new Date(latestTs.getTime() - days * 24 * 60 * 60 * 1000);
-            return smoothedData.findLast(item => new Date(item.ts) <= targetDate);
-          };
-          
-          const value24h = findValueAtDate(1);
-          const value7d = findValueAtDate(7);
-          const value28d = findValueAtDate(28);
-          const valueYtd = smoothedData.find(item => new Date(item.ts) >= new Date(latestTs.getFullYear(), 0, 1)) || smoothedData[0];
-          
-          const current = parseFloat(latestData.daily_oi);
-          const oiValues = smoothedData.map(item => parseFloat(item.daily_oi));
-          
-          result = {
-            current,
-            delta_24h: calculateDelta(current, value24h ? parseFloat(value24h.daily_oi) : null),
-            delta_7d: calculateDelta(current, value7d ? parseFloat(value7d.daily_oi) : null),
-            delta_28d: calculateDelta(current, value28d ? parseFloat(value28d.daily_oi) : null),
-            delta_ytd: calculateDelta(current, valueYtd ? parseFloat(valueYtd.daily_oi) : null),
-            ath: Math.max(...oiValues),
-            atl: Math.min(...oiValues),
-          };
-          
-          result.ath_percentage = calculatePercentage(current, result.ath);
-          result.atl_percentage = result.atl === 0 ? 100 : calculatePercentage(current, result.atl);
+          console.log('No data found for', chainToProcess);
+          return null;
         }
+
+        const smoothedData = smoothData(chainData, 'daily_oi');
+        const latestData = smoothedData[smoothedData.length - 1];
+        const latestTs = new Date(latestData.ts);
         
-        await redisService.set(cacheKey, result, CACHE_TTL);
+        const findValueAtDate = (days) => {
+          const targetDate = new Date(latestTs.getTime() - days * 24 * 60 * 60 * 1000);
+          return smoothedData.findLast(item => new Date(item.ts) <= targetDate);
+        };
+        
+        const value24h = findValueAtDate(1);
+        const value7d = findValueAtDate(7);
+        const value28d = findValueAtDate(28);
+        const valueYtd = smoothedData.find(item => new Date(item.ts) >= new Date(latestTs.getFullYear(), 0, 1)) || smoothedData[0];
+        
+        const current = parseFloat(latestData.daily_oi);
+        const oiValues = smoothedData.map(item => parseFloat(item.daily_oi));
+        
+        summaryResult = {
+          current,
+          delta_24h: calculateDelta(current, value24h ? parseFloat(value24h.daily_oi) : null),
+          delta_7d: calculateDelta(current, value7d ? parseFloat(value7d.daily_oi) : null),
+          delta_28d: calculateDelta(current, value28d ? parseFloat(value28d.daily_oi) : null),
+          delta_ytd: calculateDelta(current, valueYtd ? parseFloat(valueYtd.daily_oi) : null),
+          ath: Math.max(...oiValues),
+          atl: Math.min(...oiValues),
+        };
+        
+        summaryResult.ath_percentage = calculatePercentage(current, summaryResult.ath);
+        summaryResult.atl_percentage = summaryResult.atl === 0 ? 100 : calculatePercentage(current, summaryResult.atl);
+
+        console.log('Attempting to cache summary stats in Redis');
+        try {
+          await redisService.set(summaryCacheKey, summaryResult, CACHE_TTL);
+          await redisService.set(summaryTsKey, openInterestDataTimestamp || new Date().toISOString(), CACHE_TTL);
+          console.log('Summary stats successfully cached in Redis');
+        } catch (redisError) {
+          console.error('Error caching summary stats in Redis:', redisError);
+        }
+      } else {
+        console.log('Using cached summary stats');
       }
       
-      return result;
+      return summaryResult;
     };
     
     if (chain) {
       const result = await processChainData(chain);
-      return { [chain]: result };
+      return result ? { [chain]: result } : {};
     } else {
       const results = await Promise.all(CHAINS.map(processChainData));
       return Object.fromEntries(CHAINS.map((chain, index) => [chain, results[index] || {}]));
     }
   } catch (error) {
     console.error('Error in getOpenInterestSummaryStats:', error);
-    return {};
+    throw new Error(`Error fetching open interest summary stats: ${error.message}`);
   }
 };
 
@@ -231,11 +340,6 @@ const refreshAllPerpMarketHistoryData = async () => {
   for (const chain of CHAINS) {
     console.log(`Refreshing Perp Market History data for chain: ${chain}`);
     console.time(`${chain} total refresh time`);
-    
-    // Clear existing cache
-    await redisService.del(`openInterestData:${chain}`);
-    await redisService.del(`dailyOpenInterestChangeData:${chain}`);
-    await redisService.del(`openInterestSummaryStats:${chain}`);
 
     // Use a separate transaction for each chain
     await troyDBKnex.transaction(async (trx) => {
@@ -255,11 +359,12 @@ const refreshAllPerpMarketHistoryData = async () => {
 
       } catch (error) {
         console.error(`Error refreshing Perp Market History data for chain ${chain}:`, error);
-        // Don't throw the error, just log it and continue with the next chain
+        throw error; // This will cause the transaction to rollback
       }
     });
 
     console.timeEnd(`${chain} total refresh time`);
+    console.log(`Finished refreshing Perp Market History data for chain: ${chain}`);
   }
 
   console.log('Finished refreshing Perp Market History data for all chains');

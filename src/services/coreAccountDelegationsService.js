@@ -1,41 +1,72 @@
 const { troyDBKnex } = require('../config/db');
 const redisService = require('./redisService');
 const { CHAINS } = require('../helpers');
+const { calculateDelta, calculatePercentage, smoothData } = require('../helpers');
 
-const {
-  calculateDelta,
-  calculatePercentage,
-  smoothData
-} = require('../helpers');
+const CACHE_TTL = 60 * 60 * 24 * 365; // 1 year in seconds
 
-const CACHE_TTL = 3600; // 1 hour
-
-const getStakerCount = async (chain, collateralType, bypassCache = false, trx = troyDBKnex) => {
+const getStakerCount = async (chain, collateralType, isRefresh = false, trx = troyDBKnex) => {
   try {
     if (!collateralType) {
       throw new Error('collateralType is required');
     }
 
+    console.log(`getStakerCount called with chain: ${chain}, collateralType: ${collateralType}, isRefresh: ${isRefresh}`);
+
     const fetchCount = async (chainToFetch) => {
       const cacheKey = `stakerCount:${chainToFetch}:${collateralType}`;
-      let result = bypassCache ? null : await redisService.get(cacheKey);
+      const tsKey = `${cacheKey}:timestamp`;
+      
+      console.log(`Attempting to get data from Redis for key: ${cacheKey}`);
+      let result = await redisService.get(cacheKey);
+      let cachedTimestamp = await redisService.get(tsKey);
 
-      if (!result) {
-        console.log('not from cache');
+      console.log(`Redis result: ${result ? 'Data found' : 'No data'}, Timestamp: ${cachedTimestamp}`);
+
+      if (isRefresh || !result) {
         const tableName = `prod_${chainToFetch}_mainnet.fct_core_account_delegation_${chainToFetch}_mainnet`;
+        console.log(`Querying database table: ${tableName}`);
+
         try {
-          const queryResult = await trx(tableName)
+          const latestDbTimestamp = await trx(tableName)
             .where('collateral_type', collateralType)
-            .countDistinct('account_id as staker_count')
+            .max('ts as latest_ts')
             .first();
-          result = parseInt(queryResult.staker_count);
-        } catch (error) {
-          console.error(`Error fetching data for ${chainToFetch}:`, error);
+
+          console.log(`Latest DB timestamp: ${JSON.stringify(latestDbTimestamp)}`);
+
+          if (!result || !cachedTimestamp || new Date(latestDbTimestamp.latest_ts) > new Date(cachedTimestamp)) {
+            console.log('Fetching new staker count data from database');
+            
+            const queryResult = await trx(tableName)
+              .where('collateral_type', collateralType)
+              .countDistinct('account_id as staker_count')
+              .first();
+            
+            result = parseInt(queryResult.staker_count);
+
+            console.log(`Fetched new staker count: ${result}`);
+
+            console.log('Attempting to cache new data in Redis');
+            try {
+              await redisService.set(cacheKey, result, CACHE_TTL);
+              await redisService.set(tsKey, latestDbTimestamp.latest_ts, CACHE_TTL);
+              console.log('Data successfully cached in Redis');
+            } catch (redisError) {
+              console.error('Error caching data in Redis:', redisError);
+            }
+          } else {
+            console.log('Using cached data, no need to fetch from database');
+          }
+        } catch (dbError) {
+          console.error('Error querying database:', dbError);
           result = 0;
         }
-        await redisService.set(cacheKey, result, CACHE_TTL);
+      } else {
+        console.log('Not refreshing, using cached result');
       }
 
+      console.log(`Returning result for ${chainToFetch}: ${result}`);
       return { [chainToFetch]: result };
     };
 
@@ -43,223 +74,351 @@ const getStakerCount = async (chain, collateralType, bypassCache = false, trx = 
       return await fetchCount(chain);
     } else {
       const results = await Promise.all(CHAINS.map(fetchCount));
-      return results.reduce((acc, curr) => ({ ...acc, ...curr }), {});
+      return Object.assign({}, ...results);
     }
   } catch (error) {
+    console.error('Error in getStakerCount:', error);
     throw new Error('Error fetching staker count: ' + error.message);
   }
 };
 
-const getCumulativeUniqueStakers = async (chain, collateralType, bypassCache = false, trx = troyDBKnex) => {
+const getCumulativeUniqueStakers = async (chain, collateralType, isRefresh = false, trx = troyDBKnex) => {
   try {
     if (!collateralType) {
       throw new Error('collateralType is required');
     }
 
+    console.log(`getCumulativeUniqueStakers called with chain: ${chain}, collateralType: ${collateralType}, isRefresh: ${isRefresh}`);
+
     const fetchCumulativeData = async (chainToFetch) => {
       const cacheKey = `cumulativeUniqueStakers:${chainToFetch}:${collateralType}`;
-      let result = bypassCache ? null : await redisService.get(cacheKey);
+      const tsKey = `${cacheKey}:timestamp`;
+      
+      console.log(`Attempting to get data from Redis for key: ${cacheKey}`);
+      let result = await redisService.get(cacheKey);
+      let cachedTimestamp = await redisService.get(tsKey);
 
-      if (!result) {
-        console.log('not from cache');
+      console.log(`Redis result: ${result ? 'Data found' : 'No data'}, Timestamp: ${cachedTimestamp}`);
+
+      if (isRefresh || !result) {
         const tableName = `prod_${chainToFetch}_mainnet.fct_core_account_delegation_${chainToFetch}_mainnet`;
-        try {
-          const queryResult = await trx.raw(`
-            WITH daily_stakers AS (
-              SELECT DISTINCT
-                DATE_TRUNC('day', ts) AS day,
-                account_id,
-                pool_id,
-                collateral_type
-              FROM
-                ${tableName}
-              WHERE
-                collateral_type = ?
-            ),
-            daily_counts AS (
-              SELECT
-                day,
-                pool_id,
-                collateral_type,
-                COUNT(DISTINCT account_id) AS daily_unique_stakers
-              FROM
-                daily_stakers
-              GROUP BY
-                day, pool_id, collateral_type
-            ),
-            cumulative_counts AS (
-              SELECT
-                day,
-                pool_id,
-                collateral_type,
-                SUM(daily_unique_stakers) OVER (PARTITION BY pool_id, collateral_type ORDER BY day) AS cumulative_staker_count
-              FROM
-                daily_counts
-            )
-            SELECT
-              day AS ts,
-              pool_id,
-              collateral_type,
-              cumulative_staker_count
-            FROM
-              cumulative_counts
-            ORDER BY
-              ts, pool_id, collateral_type;
-          `, [collateralType]);
+        console.log(`Querying database table: ${tableName}`);
 
-          result = queryResult.rows.map(row => ({
-            ts: row.ts,
-            cumulative_staker_count: parseInt(row.cumulative_staker_count),
-            pool_id: row.pool_id,
-            collateral_type: row.collateral_type,
-          }));
-        } catch (error) {
-          console.error(`Error fetching data for ${chainToFetch}:`, error);
+        try {
+          const latestDbTimestamp = await trx(tableName)
+            .where('collateral_type', collateralType)
+            .max('ts as latest_ts')
+            .first();
+
+          console.log(`Latest DB timestamp: ${JSON.stringify(latestDbTimestamp)}`);
+
+          if (!result || !cachedTimestamp || new Date(latestDbTimestamp.latest_ts) > new Date(cachedTimestamp)) {
+            console.log('Fetching new cumulative unique stakers data from database');
+            const startDate = cachedTimestamp ? new Date(cachedTimestamp) : new Date('2024-05-01');
+            console.log(`Fetching data from ${startDate.toISOString()} to ${latestDbTimestamp.latest_ts}`);
+
+            const queryResult = await trx.raw(`
+              WITH daily_stakers AS (
+                SELECT DISTINCT
+                  DATE_TRUNC('day', ts) AS day,
+                  account_id,
+                  pool_id,
+                  collateral_type
+                FROM
+                  ${tableName}
+                WHERE
+                  collateral_type = ? AND ts > ?
+              ),
+              daily_counts AS (
+                SELECT
+                  day,
+                  pool_id,
+                  collateral_type,
+                  COUNT(DISTINCT account_id) AS daily_unique_stakers
+                FROM
+                  daily_stakers
+                GROUP BY
+                  day, pool_id, collateral_type
+              ),
+              cumulative_counts AS (
+                SELECT
+                  day,
+                  pool_id,
+                  collateral_type,
+                  SUM(daily_unique_stakers) OVER (PARTITION BY pool_id, collateral_type ORDER BY day) AS cumulative_staker_count
+                FROM
+                  daily_counts
+              )
+              SELECT
+                day AS ts,
+                pool_id,
+                collateral_type,
+                cumulative_staker_count
+              FROM
+                cumulative_counts
+              ORDER BY
+                ts, pool_id, collateral_type;
+            `, [collateralType, startDate]);
+
+            const newResult = queryResult.rows.map(row => ({
+              ts: row.ts,
+              cumulative_staker_count: parseInt(row.cumulative_staker_count),
+              pool_id: row.pool_id,
+              collateral_type: row.collateral_type,
+            }));
+
+            console.log(`Fetched ${newResult.length} new records from database`);
+
+            if (result) {
+              console.log('Parsing and concatenating existing result with new data');
+              result = result.concat(newResult);
+            } else {
+              console.log('Setting result to new data');
+              result = newResult;
+            }
+
+            if (result.length > 0) {
+              console.log(`Attempting to cache ${result.length} records in Redis`);
+              try {
+                await redisService.set(cacheKey, result, CACHE_TTL);
+                await redisService.set(tsKey, latestDbTimestamp.latest_ts, CACHE_TTL);
+                console.log('Data successfully cached in Redis');
+              } catch (redisError) {
+                console.error('Error caching data in Redis:', redisError);
+              }
+            } else {
+              console.log('No data to cache in Redis');
+            }
+          } else {
+            console.log('Using cached data, no need to fetch from database');
+          }
+        } catch (dbError) {
+          console.error('Error querying database:', dbError);
           result = [];
         }
-        await redisService.set(cacheKey, result, CACHE_TTL);
+      } else {
+        console.log('Not refreshing, parsing cached result');
+        result = result;
       }
 
-      return { [chainToFetch]: result };
+      console.log(`Returning result for ${chainToFetch}: ${result ? result.length + ' records' : 'No data'}`);
+      return { [chainToFetch]: result || [] };
     };
 
     if (chain) {
       return await fetchCumulativeData(chain);
     } else {
       const results = await Promise.all(CHAINS.map(fetchCumulativeData));
-      return CHAINS.reduce((acc, chain) => {
-        acc[chain] = results.find(r => r[chain])?.[chain] || [];
-        return acc;
-      }, {});
+      return Object.assign({}, ...results);
     }
   } catch (error) {
+    console.error('Error in getCumulativeUniqueStakers:', error);
     throw new Error('Error fetching cumulative unique staker data: ' + error.message);
   }
 };
 
-const getUniqueStakersSummaryStats = async (chain, collateralType, bypassCache = false, trx = troyDBKnex) => {
+const getUniqueStakersSummaryStats = async (chain, collateralType, isRefresh = false, trx = troyDBKnex) => {
   try {
     if (!collateralType) {
       throw new Error('collateralType is required');
     }
 
-    const processChainData = async (chainToProcess) => {
-      const cacheKey = `uniqueStakersSummary:${chainToProcess}:${collateralType}`;
-      let result = bypassCache ? null : await redisService.get(cacheKey);
+    console.log(`getUniqueStakersSummaryStats called with chain: ${chain}, collateralType: ${collateralType}, isRefresh: ${isRefresh}`);
 
-      if (!result) {
-        console.log('Processing unique stakers summary');
-        const data = await getCumulativeUniqueStakers(chainToProcess, collateralType);
-        
-        if (data[chainToProcess].length === 0) {
-          result = {};
-        } else {
-          const smoothedData = smoothData(data[chainToProcess], 'cumulative_staker_count');
+    const processChainData = async (chainToProcess) => {
+      const summaryCacheKey = `uniqueStakersSummary:${chainToProcess}:${collateralType}`;
+      const summaryTsKey = `${summaryCacheKey}:timestamp`;
+      
+      const cumulativeDataKey = `cumulativeUniqueStakers:${chainToProcess}:${collateralType}`;
+      const cumulativeDataTsKey = `${cumulativeDataKey}:timestamp`;
+
+      let summaryResult = await redisService.get(summaryCacheKey);
+      let summaryTimestamp = await redisService.get(summaryTsKey);
+      let cumulativeDataTimestamp = await redisService.get(cumulativeDataTsKey);
+
+      console.log(`Summary cache timestamp: ${summaryTimestamp}`);
+      console.log(`Cumulative data cache timestamp: ${cumulativeDataTimestamp}`);
+
+      if (isRefresh || !summaryResult || !summaryTimestamp || 
+          (cumulativeDataTimestamp && new Date(cumulativeDataTimestamp) > new Date(summaryTimestamp))) {
+        console.log('Processing unique stakers summary for', chainToProcess);
+
+        try {
+          const cumulativeData = await getCumulativeUniqueStakers(chainToProcess, collateralType, false, trx);
+          const data = cumulativeData[chainToProcess];
+
+          if (data.length === 0) {
+            console.log('No data found for', chainToProcess);
+            return null;
+          }
+
+          const smoothedData = smoothData(data, 'cumulative_staker_count');
           const latestData = smoothedData[smoothedData.length - 1];
           const latestTs = new Date(latestData.ts);
-          
+
           const findValueAtDate = (days) => {
             const targetDate = new Date(latestTs.getTime() - days * 24 * 60 * 60 * 1000);
             return smoothedData.findLast(item => new Date(item.ts) <= targetDate);
           };
-          
+
           const value24h = findValueAtDate(1);
           const value7d = findValueAtDate(7);
           const value28d = findValueAtDate(28);
           const valueYtd = smoothedData.find(item => new Date(item.ts) >= new Date(latestTs.getFullYear(), 0, 1)) || smoothedData[0];
-          
-          const current = parseFloat(latestData.cumulative_staker_count);
+
           const stakerValues = smoothedData.map(item => parseFloat(item.cumulative_staker_count));
-          
-          result = {
+          const current = parseFloat(latestData.cumulative_staker_count);
+          const ath = Math.max(...stakerValues);
+          const atl = Math.min(...stakerValues);
+
+          summaryResult = {
             current,
             delta_24h: calculateDelta(current, value24h ? parseFloat(value24h.cumulative_staker_count) : null),
             delta_7d: calculateDelta(current, value7d ? parseFloat(value7d.cumulative_staker_count) : null),
             delta_28d: calculateDelta(current, value28d ? parseFloat(value28d.cumulative_staker_count) : null),
             delta_ytd: calculateDelta(current, valueYtd ? parseFloat(valueYtd.cumulative_staker_count) : null),
-            ath: Math.max(...stakerValues),
-            atl: Math.min(...stakerValues),
+            ath,
+            atl,
+            ath_percentage: calculatePercentage(current, ath),
+            atl_percentage: atl === 0 ? 100 : calculatePercentage(current, atl),
           };
-          
-          result.ath_percentage = calculatePercentage(current, result.ath);
-          result.atl_percentage = result.atl === 0 ? 100 : calculatePercentage(current, result.atl);
+
+          await redisService.set(summaryCacheKey, summaryResult, CACHE_TTL);
+          await redisService.set(summaryTsKey, cumulativeDataTimestamp || new Date().toISOString(), CACHE_TTL);
+
+          console.log('Unique stakers summary updated and cached');
+        } catch (error) {
+          console.error(`Error processing data for ${chainToProcess}:`, error);
+          return null;
         }
-        
-        await redisService.set(cacheKey, result, CACHE_TTL);
+      } else {
+        console.log('Using cached unique stakers summary data');
       }
-      
-      return result;
+
+      return summaryResult ? summaryResult : null;
     };
-    
+
     if (chain) {
       const result = await processChainData(chain);
-      return { [chain]: result };
+      return result ? { [chain]: result } : {};
     } else {
       const results = await Promise.all(CHAINS.map(processChainData));
       return Object.fromEntries(CHAINS.map((chain, index) => [chain, results[index] || {}]));
     }
   } catch (error) {
-    throw new Error(`Error fetching unique stakers summary stats: ${error.message}`);
+    console.error('Error in getUniqueStakersSummaryStats:', error);
+    throw new Error('Error fetching unique stakers summary stats: ' + error.message);
   }
 };
 
-const getDailyNewUniqueStakers = async (chain, collateralType, bypassCache = false, trx = troyDBKnex) => {
+const getDailyNewUniqueStakers = async (chain, collateralType, isRefresh = false, trx = troyDBKnex) => {
   try {
     if (!collateralType) {
       throw new Error('collateralType is required');
     }
 
+    console.log(`getDailyNewUniqueStakers called with chain: ${chain}, collateralType: ${collateralType}, isRefresh: ${isRefresh}`);
+
     const fetchDailyData = async (chainToFetch) => {
       const cacheKey = `dailyNewUniqueStakers:${chainToFetch}:${collateralType}`;
-      let result = bypassCache ? null : await redisService.get(cacheKey);
+      const tsKey = `${cacheKey}:timestamp`;
+      
+      console.log(`Attempting to get data from Redis for key: ${cacheKey}`);
+      let result = await redisService.get(cacheKey);
+      let cachedTimestamp = await redisService.get(tsKey);
 
-      if (!result) {
-        console.log('not from cache');
+      console.log(`Redis result: ${result ? 'Data found' : 'No data'}, Timestamp: ${cachedTimestamp}`);
+
+      if (isRefresh || !result) {
         const tableName = `prod_${chainToFetch}_mainnet.fct_core_account_delegation_${chainToFetch}_mainnet`;
-        try {
-          result = await trx.raw(`
-            WITH daily_stakers AS (
-              SELECT DISTINCT
-                DATE_TRUNC('day', ts) AS date,
-                account_id
-              FROM
-                ${tableName}
-              WHERE
-                collateral_type = ?
-            )
-            SELECT
-              date,
-              COUNT(DISTINCT account_id) AS daily_unique_stakers
-            FROM
-              daily_stakers
-            GROUP BY
-              date
-            ORDER BY
-              date;
-          `, [collateralType]);
+        console.log(`Querying database table: ${tableName}`);
 
-          result = result.rows.map(row => ({
-            ts: row.date,
-            daily_unique_stakers: parseInt(row.daily_unique_stakers),
-          }));
-        } catch (error) {
-          console.error(`Error fetching data for ${chainToFetch}:`, error);
+        try {
+          const latestDbTimestamp = await trx(tableName)
+            .where('collateral_type', collateralType)
+            .max('ts as latest_ts')
+            .first();
+
+          console.log(`Latest DB timestamp: ${JSON.stringify(latestDbTimestamp)}`);
+
+          if (!result || !cachedTimestamp || new Date(latestDbTimestamp.latest_ts) > new Date(cachedTimestamp)) {
+            console.log('Fetching new daily unique stakers data from database');
+            const startDate = cachedTimestamp ? new Date(cachedTimestamp) : new Date('2024-05-01');
+            console.log(`Fetching data from ${startDate.toISOString()} to ${latestDbTimestamp.latest_ts}`);
+
+            const queryResult = await trx.raw(`
+              WITH daily_stakers AS (
+                SELECT DISTINCT
+                  DATE_TRUNC('day', ts) AS date,
+                  account_id
+                FROM
+                  ${tableName}
+                WHERE
+                  collateral_type = ? AND ts > ?
+              )
+              SELECT
+                date,
+                COUNT(DISTINCT account_id) AS daily_unique_stakers
+              FROM
+                daily_stakers
+              GROUP BY
+                date
+              ORDER BY
+                date;
+            `, [collateralType, startDate]);
+
+            const newResult = queryResult.rows.map(row => ({
+              ts: row.date,
+              daily_unique_stakers: parseInt(row.daily_unique_stakers),
+            }));
+
+            console.log(`Fetched ${newResult.length} new records from database`);
+
+            if (result) {
+              console.log('Parsing and concatenating existing result with new data');
+              result = result.concat(newResult);
+            } else {
+              console.log('Setting result to new data');
+              result = newResult;
+            }
+
+            if (result.length > 0) {
+              console.log(`Attempting to cache ${result.length} records in Redis`);
+              try {
+                await redisService.set(cacheKey, result, CACHE_TTL);
+                await redisService.set(tsKey, latestDbTimestamp.latest_ts, CACHE_TTL);
+                console.log('Data successfully cached in Redis');
+              } catch (redisError) {
+                console.error('Error caching data in Redis:', redisError);
+              }
+            } else {
+              console.log('No data to cache in Redis');
+            }
+          } else {
+            console.log('Using cached data, no need to fetch from database');
+          }
+        } catch (dbError) {
+          console.error('Error querying database:', dbError);
           result = [];
         }
-        await redisService.set(cacheKey, result, CACHE_TTL);
+      } else {
+        console.log('Not refreshing, parsing cached result');
+        result = result;
       }
 
-      return { [chainToFetch]: result };
+      console.log(`Returning result for ${chainToFetch}: ${result ? result.length + ' records' : 'No data'}`);
+      return { [chainToFetch]: result || [] };
     };
 
     if (chain) {
       return await fetchDailyData(chain);
     } else {
       const results = await Promise.all(CHAINS.map(chainToFetch => fetchDailyData(chainToFetch)));
-      return results.reduce((acc, curr) => ({ ...acc, ...curr }), {});
+      return Object.assign({}, ...results);
     }
   } catch (error) {
-    throw new Error('Error fetching daily unique stakers: ' + error.message);
+    console.error('Error in getDailyNewUniqueStakers:', error);
+    throw new Error('Error fetching daily new unique stakers: ' + error.message);
   }
 };
 
@@ -270,19 +429,13 @@ const refreshAllCoreAccountDelegationsData = async (collateralType) => {
     console.log(`Refreshing core account delegations data for chain: ${chain}`);
     console.time(`${chain} total refresh time`);
 
-    // Clear existing cache
-    await redisService.del(`dailyNewUniqueStakers:${chain}:${collateralType}`);
-    await redisService.del(`cumulativeUniqueStakers:${chain}:${collateralType}`);
-    await redisService.del(`uniqueStakersSummary:${chain}:${collateralType}`);
-    await redisService.del(`stakerCount:${chain}:${collateralType}`);
-
     // Use a single transaction for all database operations
     await troyDBKnex.transaction(async (trx) => {
       try {
         // Fetch new data
-        console.time(`${chain} getDailyNewUniqueStakers`);
-        await getDailyNewUniqueStakers(chain, collateralType, true, trx);
-        console.timeEnd(`${chain} getDailyNewUniqueStakers`);
+        console.time(`${chain} getStakerCount`);
+        await getStakerCount(chain, collateralType, true, trx);
+        console.timeEnd(`${chain} getStakerCount`);
 
         console.time(`${chain} getCumulativeUniqueStakers`);
         await getCumulativeUniqueStakers(chain, collateralType, true, trx);
@@ -292,9 +445,9 @@ const refreshAllCoreAccountDelegationsData = async (collateralType) => {
         await getUniqueStakersSummaryStats(chain, collateralType, true, trx);
         console.timeEnd(`${chain} getUniqueStakersSummaryStats`);
 
-        console.time(`${chain} getStakerCount`);
-        await getStakerCount(chain, collateralType, true, trx);
-        console.timeEnd(`${chain} getStakerCount`);
+        console.time(`${chain} getDailyNewUniqueStakers`);
+        await getDailyNewUniqueStakers(chain, collateralType, true, trx);
+        console.timeEnd(`${chain} getDailyNewUniqueStakers`);
 
       } catch (error) {
         console.error(`Error refreshing core account delegations data for chain ${chain}:`, error);

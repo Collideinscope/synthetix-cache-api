@@ -1,35 +1,67 @@
 const { troyDBKnex } = require('../config/db');
 const redisService = require('./redisService');
 const { CHAINS } = require('../helpers');
+const { calculateDelta, calculatePercentage, smoothData } = require('../helpers');
 
-const {
-  calculateDelta,
-  calculatePercentage,
-  smoothData
-} = require('../helpers');
+const CACHE_TTL = 60 * 60 * 24 * 365; // 1 year in seconds
 
-const CACHE_TTL = 3600; // 1 hour
+const getLatestPerpStatsData = async (chain, isRefresh = false, trx = troyDBKnex) => {
+  console.log(`getLatestPerpStatsData called with chain: ${chain}, isRefresh: ${isRefresh}`);
 
-const getLatestPerpStatsData = async (chain, bypassCache = false, trx = troyDBKnex) => {
   const fetchLatest = async (chainToFetch) => {
     const cacheKey = `latestPerpStats:${chainToFetch}`;
-    let result = bypassCache ? null : await redisService.get(cacheKey);
+    const tsKey = `${cacheKey}:timestamp`;
+    
+    console.log(`Attempting to get data from Redis for key: ${cacheKey}`);
+    let result = await redisService.get(cacheKey);
+    let cachedTimestamp = await redisService.get(tsKey);
 
-    if (!result) {
-      console.log('not from cache');
+    console.log(`Redis result: ${result ? 'Data found' : 'No data'}, Timestamp: ${cachedTimestamp}`);
+
+    if (isRefresh || !result) {
       const tableName = `prod_${chainToFetch}_mainnet.fct_perp_stats_daily_${chainToFetch}_mainnet`;
+      console.log(`Querying database table: ${tableName}`);
+
       try {
-        result = await trx(tableName)
-          .orderBy('ts', 'desc')
-          .limit(1);
-        await redisService.set(cacheKey, result, CACHE_TTL);
-      } catch (error) {
-        console.error(`Error fetching latest perp stats data for ${chainToFetch}:`, error.message);
+        const latestDbTimestamp = await trx(tableName)
+          .max('ts as latest_ts')
+          .first();
+
+        console.log(`Latest DB timestamp: ${JSON.stringify(latestDbTimestamp)}`);
+
+        if (!result || !cachedTimestamp || new Date(latestDbTimestamp.latest_ts) > new Date(cachedTimestamp)) {
+          console.log('Fetching new latest perp stats data from database');
+          result = await trx(tableName)
+            .orderBy('ts', 'desc')
+            .limit(1);
+
+          console.log(`Fetched ${result.length} new records from database`);
+
+          if (result.length > 0) {
+            console.log('Attempting to cache new data in Redis');
+            try {
+              await redisService.set(cacheKey, result, CACHE_TTL);
+              await redisService.set(tsKey, latestDbTimestamp.latest_ts, CACHE_TTL);
+              console.log('Data successfully cached in Redis');
+            } catch (redisError) {
+              console.error('Error caching data in Redis:', redisError);
+            }
+          } else {
+            console.log('No data to cache in Redis');
+          }
+        } else {
+          console.log('Using cached data, no need to fetch from database');
+        }
+      } catch (dbError) {
+        console.error('Error querying database:', dbError);
         result = [];
       }
+    } else {
+      console.log('Not refreshing, using cached result');
     }
 
-    return { [chainToFetch]: result };
+    console.log(`Returning result for ${chainToFetch}: ${result ? result.length + ' records' : 'No data'}`);
+    return { [chainToFetch]: result || [] };
   };
 
   try {
@@ -37,235 +69,358 @@ const getLatestPerpStatsData = async (chain, bypassCache = false, trx = troyDBKn
       return await fetchLatest(chain);
     } else {
       const results = await Promise.all(CHAINS.map(fetchLatest));
-      return CHAINS.reduce((acc, chain, index) => {
-        acc[chain] = results[index][chain] || [];
-        return acc;
-      }, {});
+      return Object.assign({}, ...results);
     }
   } catch (error) {
     console.error('Error in getLatestPerpStatsData:', error);
-    return {};
+    throw new Error('Error fetching latest perp stats data: ' + error.message);
   }
 };
 
-const getSummaryStats = async (chain, column, bypassCache = false, trx = troyDBKnex) => {
+const getSummaryStats = async (chain, column, isRefresh = false, trx = troyDBKnex) => {
+  console.log(`getSummaryStats called with chain: ${chain}, column: ${column}, isRefresh: ${isRefresh}`);
+
   const processChainData = async (chainToProcess) => {
-    const cacheKey = `perpStatsSummary:${chainToProcess}:${column}`;
-    let result = bypassCache ? null : await redisService.get(cacheKey);
+    const summaryCacheKey = `perpStatsSummary:${chainToProcess}:${column}`;
+    const summaryTsKey = `${summaryCacheKey}:timestamp`;
     
-    if (!result) {
-      console.log('Processing perp stats summary');
-      const data = await fetchCumulativeData(chainToProcess, column);
+    const cumulativeDataKey = `cumulativePerpStats:${chainToProcess}:${column}`;
+    const cumulativeDataTsKey = `${cumulativeDataKey}:timestamp`;
+
+    let summaryResult = await redisService.get(summaryCacheKey);
+    let summaryTimestamp = await redisService.get(summaryTsKey);
+    let cumulativeDataTimestamp = await redisService.get(cumulativeDataTsKey);
+
+    console.log(`Summary cache timestamp: ${summaryTimestamp}`);
+    console.log(`Cumulative data cache timestamp: ${cumulativeDataTimestamp}`);
+
+    if (isRefresh || !summaryResult || !summaryTimestamp || 
+        (cumulativeDataTimestamp && new Date(cumulativeDataTimestamp) > new Date(summaryTimestamp))) {
+      console.log('Processing perp stats summary for', chainToProcess);
+
+      const data = await fetchCumulativeData(chainToProcess, column, false, trx);
       
       if (data.length === 0) {
-        result = {};
-      } else {
-        const smoothedData = smoothData(data, column);
-        const latestData = smoothedData[smoothedData.length - 1];
-        const latestTs = new Date(latestData.ts);
-        
-        const findValueAtDate = (days) => {
-          const targetDate = new Date(latestTs.getTime() - days * 24 * 60 * 60 * 1000);
-          return smoothedData.findLast(item => new Date(item.ts) <= targetDate);
-        };
-        
-        const value24h = findValueAtDate(1);
-        const value7d = findValueAtDate(7);
-        const value28d = findValueAtDate(28);
-        const valueYtd = smoothedData.find(item => new Date(item.ts) >= new Date(latestTs.getFullYear(), 0, 1)) || smoothedData[0];
-        
-        const current = parseFloat(latestData[column]);
-        const columnValues = smoothedData.map(item => parseFloat(item[column]));
-        
-        result = {
-          current,
-          delta_24h: calculateDelta(current, value24h ? parseFloat(value24h[column]) : null),
-          delta_7d: calculateDelta(current, value7d ? parseFloat(value7d[column]) : null),
-          delta_28d: calculateDelta(current, value28d ? parseFloat(value28d[column]) : null),
-          delta_ytd: calculateDelta(current, valueYtd ? parseFloat(valueYtd[column]) : null),
-          ath: Math.max(...columnValues),
-          atl: Math.min(...columnValues),
-        };
-        
-        result.ath_percentage = calculatePercentage(current, result.ath);
-        result.atl_percentage = result.atl === 0 ? 100 : calculatePercentage(current, result.atl);
+        console.log('No data found for', chainToProcess);
+        return null;
       }
+
+      const smoothedData = smoothData(data, column);
+      const latestData = smoothedData[smoothedData.length - 1];
+      const latestTs = new Date(latestData.ts);
       
-      await redisService.set(cacheKey, result, CACHE_TTL);
+      const findValueAtDate = (days) => {
+        const targetDate = new Date(latestTs.getTime() - days * 24 * 60 * 60 * 1000);
+        return smoothedData.findLast(item => new Date(item.ts) <= targetDate);
+      };
+      
+      const value24h = findValueAtDate(1);
+      const value7d = findValueAtDate(7);
+      const value28d = findValueAtDate(28);
+      const valueYtd = smoothedData.find(item => new Date(item.ts) >= new Date(latestTs.getFullYear(), 0, 1)) || smoothedData[0];
+      
+      const current = parseFloat(latestData[column]);
+      const columnValues = smoothedData.map(item => parseFloat(item[column]));
+      
+      summaryResult = {
+        current,
+        delta_24h: calculateDelta(current, value24h ? parseFloat(value24h[column]) : null),
+        delta_7d: calculateDelta(current, value7d ? parseFloat(value7d[column]) : null),
+        delta_28d: calculateDelta(current, value28d ? parseFloat(value28d[column]) : null),
+        delta_ytd: calculateDelta(current, valueYtd ? parseFloat(valueYtd[column]) : null),
+        ath: Math.max(...columnValues),
+        atl: Math.min(...columnValues),
+      };
+      
+      summaryResult.ath_percentage = calculatePercentage(current, summaryResult.ath);
+      summaryResult.atl_percentage = summaryResult.atl === 0 ? 100 : calculatePercentage(current, summaryResult.atl);
+
+      console.log('Attempting to cache summary stats in Redis');
+      try {
+        await redisService.set(summaryCacheKey, summaryResult, CACHE_TTL);
+        await redisService.set(summaryTsKey, cumulativeDataTimestamp || new Date().toISOString(), CACHE_TTL);
+        console.log('Summary stats successfully cached in Redis');
+      } catch (redisError) {
+        console.error('Error caching summary stats in Redis:', redisError);
+      }
+    } else {
+      console.log('Using cached summary stats');
     }
     
-    return result;
+    return summaryResult;
   };
   
   try {
     if (chain) {
       const result = await processChainData(chain);
-      return { [chain]: result };
+      return result ? { [chain]: result } : {};
     } else {
       const results = await Promise.all(CHAINS.map(processChainData));
       return Object.fromEntries(CHAINS.map((chain, index) => [chain, results[index] || {}]));
     }
   } catch (error) {
     console.error(`Error in getSummaryStats for ${column}:`, error);
-    return {};
+    throw new Error(`Error fetching summary stats for ${column}: ${error.message}`);
   }
 };
 
-const getCumulativeVolumeSummaryStats = async (chain, bypassCache = false, trx = troyDBKnex) => {
-  return getSummaryStats(chain, 'cumulative_volume', bypassCache, trx);
+const getCumulativeVolumeSummaryStats = async (chain, isRefresh = false, trx = troyDBKnex) => {
+  console.log(`getCumulativeVolumeSummaryStats called with chain: ${chain}, isRefresh: ${isRefresh}`);
+  return getSummaryStats(chain, 'cumulative_volume', isRefresh, trx);
 };
 
-const getCumulativeExchangeFeesSummaryStats = async (chain, bypassCache = false, trx = troyDBKnex) => {
-  return getSummaryStats(chain, 'cumulative_exchange_fees', bypassCache, trx);
+const getCumulativeExchangeFeesSummaryStats = async (chain, isRefresh = false, trx = troyDBKnex) => {
+  console.log(`getCumulativeExchangeFeesSummaryStats called with chain: ${chain}, isRefresh: ${isRefresh}`);
+  return getSummaryStats(chain, 'cumulative_exchange_fees', isRefresh, trx);
 };
 
-const fetchCumulativeData = async (chain, dataType, bypassCache = false, trx = troyDBKnex) => {
+const fetchCumulativeData = async (chain, dataType, isRefresh = false, trx = troyDBKnex) => {
+  console.log(`fetchCumulativeData called with chain: ${chain}, dataType: ${dataType}, isRefresh: ${isRefresh}`);
+
   const cacheKey = `cumulativePerpStats:${chain}:${dataType}`;
-  let result = bypassCache ? null : await redisService.get(cacheKey);
+  const tsKey = `${cacheKey}:timestamp`;
+  
+  console.log(`Attempting to get data from Redis for key: ${cacheKey}`);
+  let result = await redisService.get(cacheKey);
+  let cachedTimestamp = await redisService.get(tsKey);
 
-  if (!result) {
-    console.log('not from cache');
+  console.log(`Redis result: ${result ? 'Data found' : 'No data'}, Timestamp: ${cachedTimestamp}`);
+
+  if (isRefresh || !result) {
     const tableName = `prod_${chain}_mainnet.fct_perp_stats_daily_${chain}_mainnet`;
+    console.log(`Querying database table: ${tableName}`);
+
     try {
-      result = await trx.raw(`
-        SELECT 
-          ts,
-          ${dataType}
-        FROM 
-          ${tableName}
-        ORDER BY 
-          ts;
-      `);
+      const latestDbTimestamp = await trx(tableName)
+        .max('ts as latest_ts')
+        .first();
 
-      result = result.rows.map(row => ({
-        ts: row.ts,
-        [dataType]: parseFloat(row[dataType]),
-      }));
+      console.log(`Latest DB timestamp: ${JSON.stringify(latestDbTimestamp)}`);
 
-      await redisService.set(cacheKey, result, CACHE_TTL);
-    } catch (error) {
-      console.error(`Error fetching cumulative data for ${chain}:`, error.message);
+      if (!result || !cachedTimestamp || new Date(latestDbTimestamp.latest_ts) > new Date(cachedTimestamp)) {
+        console.log('Fetching new cumulative data from database');
+        const startDate = cachedTimestamp ? new Date(cachedTimestamp) : new Date('2024-05-01');
+        console.log(`Fetching data from ${startDate.toISOString()} to ${latestDbTimestamp.latest_ts}`);
+
+        const queryResult = await trx.raw(`
+          SELECT 
+            ts,
+            ${dataType}
+          FROM 
+            ${tableName}
+          WHERE ts > ?
+          ORDER BY 
+            ts;
+        `, [startDate]);
+
+        const newResult = queryResult.rows.map(row => ({
+          ts: row.ts,
+          [dataType]: parseFloat(row[dataType]),
+        }));
+
+        console.log(`Fetched ${newResult.length} new records from database`);
+
+        if (result) {
+          console.log('Parsing and concatenating existing result with new data');
+          result = result.concat(newResult);
+        } else {
+          console.log('Setting result to new data');
+          result = newResult;
+        }
+
+        if (result.length > 0) {
+          console.log(`Attempting to cache ${result.length} records in Redis`);
+          try {
+            await redisService.set(cacheKey, result, CACHE_TTL);
+            await redisService.set(tsKey, latestDbTimestamp.latest_ts, CACHE_TTL);
+            console.log('Data successfully cached in Redis');
+          } catch (redisError) {
+            console.error('Error caching data in Redis:', redisError);
+          }
+        } else {
+          console.log('No data to cache in Redis');
+        }
+      } else {
+        console.log('Using cached data, no need to fetch from database');
+      }
+    } catch (dbError) {
+      console.error('Error querying database:', dbError);
       result = [];
     }
+  } else {
+    console.log('Not refreshing, using cached result');
   }
 
-  return result;
+  console.log(`Returning result: ${result ? result.length + ' records' : 'No data'}`);
+  return result || [];
 };
 
-const getCumulativeVolumeData = async (chain, bypassCache = false, trx = troyDBKnex) => {
+const getCumulativeVolumeData = async (chain, isRefresh = false, trx = troyDBKnex) => {
+  console.log(`getCumulativeVolumeData called with chain: ${chain}, isRefresh: ${isRefresh}`);
   try {
     if (chain) {
-      const data = await fetchCumulativeData(chain, 'cumulative_volume', bypassCache, trx);
+      const data = await fetchCumulativeData(chain, 'cumulative_volume', isRefresh, trx);
       return { [chain]: data };
     } else {
       const results = await Promise.all(CHAINS.map(async (chain) => {
-        const data = await fetchCumulativeData(chain, 'cumulative_volume', bypassCache, trx);
+        const data = await fetchCumulativeData(chain, 'cumulative_volume', isRefresh, trx);
         return { [chain]: data };
       }));
       return results.reduce((acc, curr) => ({ ...acc, ...curr }), {});
     }
   } catch (error) {
     console.error('Error in getCumulativeVolumeData:', error);
-    return {};
+    throw new Error('Error fetching cumulative volume data: ' + error.message);
   }
 };
 
-const getCumulativeExchangeFeesData = async (chain, bypassCache = false, trx = troyDBKnex) => {
+const getCumulativeExchangeFeesData = async (chain, isRefresh = false, trx = troyDBKnex) => {
+  console.log(`getCumulativeExchangeFeesData called with chain: ${chain}, isRefresh: ${isRefresh}`);
   try {
     if (chain) {
-      const data = await fetchCumulativeData(chain, 'cumulative_exchange_fees', bypassCache, trx);
+      const data = await fetchCumulativeData(chain, 'cumulative_exchange_fees', isRefresh, trx);
       return { [chain]: data };
     } else {
       const results = await Promise.all(CHAINS.map(async (chain) => {
-        const data = await fetchCumulativeData(chain, 'cumulative_exchange_fees', bypassCache, trx);
+        const data = await fetchCumulativeData(chain, 'cumulative_exchange_fees', isRefresh, trx);
         return { [chain]: data };
       }));
       return results.reduce((acc, curr) => ({ ...acc, ...curr }), {});
     }
   } catch (error) {
     console.error('Error in getCumulativeExchangeFeesData:', error);
-    return {};
+    throw new Error('Error fetching cumulative exchange fees data: ' + error.message);
   }
 };
 
-const fetchDailyData = async (chain, dataType, bypassCache = false, trx = troyDBKnex) => {
+const fetchDailyData = async (chain, dataType, isRefresh = false, trx = troyDBKnex) => {
+  console.log(`fetchDailyData called with chain: ${chain}, dataType: ${dataType}, isRefresh: ${isRefresh}`);
+
   const cacheKey = `dailyPerpStats:${chain}:${dataType}`;
-  let result = bypassCache ? null : await redisService.get(cacheKey);
+  const tsKey = `${cacheKey}:timestamp`;
+  
+  console.log(`Attempting to get data from Redis for key: ${cacheKey}`);
+  let result = await redisService.get(cacheKey);
+  let cachedTimestamp = await redisService.get(tsKey);
 
-  if (!result) {
-    console.log('not from cache');
+  console.log(`Redis result: ${result ? 'Data found' : 'No data'}, Timestamp: ${cachedTimestamp}`);
+
+  if (isRefresh || !result) {
     const tableName = `prod_${chain}_mainnet.fct_perp_stats_daily_${chain}_mainnet`;
+    console.log(`Querying database table: ${tableName}`);
+
     try {
-      result = await trx.raw(`
-        WITH daily_data AS (
+      const latestDbTimestamp = await trx(tableName)
+        .max('ts as latest_ts')
+        .first();
+
+      console.log(`Latest DB timestamp: ${JSON.stringify(latestDbTimestamp)}`);
+
+      if (!result || !cachedTimestamp || new Date(latestDbTimestamp.latest_ts) > new Date(cachedTimestamp)) {
+        console.log('Fetching new daily data from database');
+        const startDate = cachedTimestamp ? new Date(cachedTimestamp) : new Date('2024-05-01');
+        console.log(`Fetching data from ${startDate.toISOString()} to ${latestDbTimestamp.latest_ts}`);
+
+        const queryResult = await trx.raw(`
+          WITH daily_data AS (
+            SELECT 
+              ts AS date,
+              ${dataType},
+              LAG(${dataType}) OVER (ORDER BY ts) AS prev_${dataType}
+            FROM 
+              ${tableName}
+            WHERE ts > ?
+            ORDER BY 
+              ts
+          )
           SELECT 
-            ts AS date,
-            ${dataType},
-            LAG(${dataType}) OVER (ORDER BY ts) AS prev_${dataType}
+            date,
+            COALESCE(${dataType} - prev_${dataType}, ${dataType}) AS daily_${dataType}
           FROM 
-            ${tableName}
+            daily_data
+          WHERE
+            prev_${dataType} IS NOT NULL OR date = (SELECT MIN(date) FROM daily_data)
           ORDER BY 
-            ts
-        )
-        SELECT 
-          date,
-          COALESCE(${dataType} - prev_${dataType}, ${dataType}) AS daily_${dataType}
-        FROM 
-          daily_data
-        WHERE
-          prev_${dataType} IS NOT NULL OR date = (SELECT MIN(date) FROM daily_data)
-        ORDER BY 
-          date;
-      `);
+            date;
+        `, [startDate]);
 
-      result = result.rows.map(row => ({
-        ts: row.date,
-        [`daily_${dataType}`]: parseFloat(row[`daily_${dataType}`]),
-      }));
+        const newResult = queryResult.rows.map(row => ({
+          ts: row.date,
+          [`daily_${dataType}`]: parseFloat(row[`daily_${dataType}`]),
+        }));
 
-      await redisService.set(cacheKey, result, CACHE_TTL);
-    } catch (error) {
-      console.error(`Error fetching daily data for ${chain}:`, error.message);
+        console.log(`Fetched ${newResult.length} new records from database`);
+
+        if (result) {
+          console.log('Parsing and concatenating existing result with new data');
+          result = result.concat(newResult);
+        } else {
+          console.log('Setting result to new data');
+          result = newResult;
+        }
+
+        if (result.length > 0) {
+          console.log(`Attempting to cache ${result.length} records in Redis`);
+          try {
+            await redisService.set(cacheKey, result, CACHE_TTL);
+            await redisService.set(tsKey, latestDbTimestamp.latest_ts, CACHE_TTL);
+            console.log('Data successfully cached in Redis');
+          } catch (redisError) {
+            console.error('Error caching data in Redis:', redisError);
+          }
+        } else {
+          console.log('No data to cache in Redis');
+        }
+      } else {
+        console.log('Using cached data, no need to fetch from database');
+      }
+    } catch (dbError) {
+      console.error('Error querying database:', dbError);
       result = [];
     }
+  } else {
+    console.log('Not refreshing, using cached result');
   }
 
-  return result;
+  console.log(`Returning result: ${result ? result.length + ' records' : 'No data'}`);
+  return result || [];
 };
 
-const getDailyVolumeData = async (chain, bypassCache = false, trx = troyDBKnex) => {
+const getDailyVolumeData = async (chain, isRefresh = false, trx = troyDBKnex) => {
+  console.log(`getDailyVolumeData called with chain: ${chain}, isRefresh: ${isRefresh}`);
   try {
     if (chain) {
-      const data = await fetchDailyData(chain, 'cumulative_volume', bypassCache, trx);
+      const data = await fetchDailyData(chain, 'cumulative_volume', isRefresh, trx);
       return { [chain]: data };
     } else {
       const results = await Promise.all(CHAINS.map(async (chain) => {
-        const data = await fetchDailyData(chain, 'cumulative_volume', bypassCache, trx);
+        const data = await fetchDailyData(chain, 'cumulative_volume', isRefresh, trx);
         return { [chain]: data };
       }));
       return results.reduce((acc, curr) => ({ ...acc, ...curr }), {});
     }
   } catch (error) {
     console.error('Error in getDailyVolumeData:', error);
-    return {};
+    throw new Error('Error fetching daily volume data: ' + error.message);
   }
 };
 
-const getDailyExchangeFeesData = async (chain, bypassCache = false, trx = troyDBKnex) => {
+const getDailyExchangeFeesData = async (chain, isRefresh = false, trx = troyDBKnex) => {
+  console.log(`getDailyExchangeFeesData called with chain: ${chain}, isRefresh: ${isRefresh}`);
   try {
     if (chain) {
-      const data = await fetchDailyData(chain, 'cumulative_exchange_fees', bypassCache, trx);
+      const data = await fetchDailyData(chain, 'cumulative_exchange_fees', isRefresh, trx);
       return { [chain]: data };
     } else {
       const results = await Promise.all(CHAINS.map(async (chain) => {
-        const data = await fetchDailyData(chain, 'cumulative_exchange_fees', bypassCache, trx);
+        const data = await fetchDailyData(chain, 'cumulative_exchange_fees', isRefresh, trx);
         return { [chain]: data };
       }));
       return results.reduce((acc, curr) => ({ ...acc, ...curr }), {});
     }
   } catch (error) {
     console.error('Error in getDailyExchangeFeesData:', error);
-    return {};
+    throw new Error('Error fetching daily exchange fees data: ' + error.message);
   }
 };
 
@@ -275,15 +430,6 @@ const refreshAllPerpStatsData = async () => {
   for (const chain of CHAINS) {
     console.log(`Refreshing Perp Stats data for chain: ${chain}`);
     console.time(`${chain} total refresh time`);
-    
-    // Clear existing cache
-    await redisService.del(`latestPerpStats:${chain}`);
-    await redisService.del(`perpStatsSummary:${chain}:cumulative_volume`);
-    await redisService.del(`perpStatsSummary:${chain}:cumulative_exchange_fees`);
-    await redisService.del(`cumulativePerpStats:${chain}:cumulative_volume`);
-    await redisService.del(`cumulativePerpStats:${chain}:cumulative_exchange_fees`);
-    await redisService.del(`dailyPerpStats:${chain}:cumulative_volume`);
-    await redisService.del(`dailyPerpStats:${chain}:cumulative_exchange_fees`);
 
     // Use a separate transaction for each chain
     await troyDBKnex.transaction(async (trx) => {
@@ -319,11 +465,12 @@ const refreshAllPerpStatsData = async () => {
 
       } catch (error) {
         console.error(`Error refreshing Perp Stats data for chain ${chain}:`, error);
-        // Don't throw the error, just log it and continue with the next chain
+        throw error; // This will cause the transaction to rollback
       }
     });
 
     console.timeEnd(`${chain} total refresh time`);
+    console.log(`Finished refreshing Perp Stats data for chain: ${chain}`);
   }
 
   console.log('Finished refreshing Perp Stats data for all chains');

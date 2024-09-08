@@ -1,63 +1,106 @@
 const { troyDBKnex } = require('../config/db');
 const redisService = require('./redisService');
 const { CHAINS } = require('../helpers');
+const { calculateDelta, calculatePercentage, smoothData } = require('../helpers');
 
-const {
-  calculateDelta,
-  calculatePercentage,
-  smoothData
-} = require('../helpers');
+const CACHE_TTL = 60 * 60 * 24 * 365; // 1 year in seconds
 
-const CACHE_TTL = 3600; // 1 hour
+const getCumulativeUniqueTraders = async (chain, isRefresh = false, trx = troyDBKnex) => {
+  console.log(`getCumulativeUniqueTraders called with chain: ${chain}, isRefresh: ${isRefresh}`);
 
-const getCumulativeUniqueTraders = async (chain, bypassCache = false, trx = troyDBKnex) => {
   const fetchCumulativeData = async (chainToFetch) => {
     const cacheKey = `cumulativeUniqueTraders:${chainToFetch}`;
-    let result = bypassCache ? null : await redisService.get(cacheKey);
+    const tsKey = `${cacheKey}:timestamp`;
+    
+    console.log(`Attempting to get data from Redis for key: ${cacheKey}`);
+    let result = await redisService.get(cacheKey);
+    let cachedTimestamp = await redisService.get(tsKey);
 
-    if (!result) {
-      console.log('not from cache');
+    console.log(`Redis result: ${result ? 'Data found' : 'No data'}, Timestamp: ${cachedTimestamp}`);
+
+    if (isRefresh || !result) {
       const tableName = `prod_${chainToFetch}_mainnet.fct_perp_account_stats_daily_${chainToFetch}_mainnet`;
+      console.log(`Querying database table: ${tableName}`);
+
       try {
-        const queryResult = await trx.raw(`
-          WITH daily_unique_traders AS (
+        const latestDbTimestamp = await trx(tableName)
+          .max('ts as latest_ts')
+          .first();
+
+        console.log(`Latest DB timestamp: ${JSON.stringify(latestDbTimestamp)}`);
+
+        if (!result || !cachedTimestamp || new Date(latestDbTimestamp.latest_ts) > new Date(cachedTimestamp)) {
+          console.log('Fetching new cumulative unique traders data from database');
+          const startDate = cachedTimestamp ? new Date(cachedTimestamp) : new Date('2024-05-01');
+          console.log(`Fetching data from ${startDate.toISOString()} to ${latestDbTimestamp.latest_ts}`);
+
+          const queryResult = await trx.raw(`
+            WITH daily_unique_traders AS (
+              SELECT
+                ts,
+                COUNT(DISTINCT account_id) AS unique_traders
+              FROM
+                ${tableName}
+              WHERE ts > ?
+              GROUP BY
+                ts
+            ),
+            cumulative_counts AS (
+              SELECT
+                ts,
+                SUM(unique_traders) OVER (ORDER BY ts) AS cumulative_trader_count
+              FROM
+                daily_unique_traders
+            )
             SELECT
               ts,
-              COUNT(DISTINCT account_id) AS unique_traders
+              cumulative_trader_count
             FROM
-              ${tableName}
-            GROUP BY
-              ts
-          ),
-          cumulative_counts AS (
-            SELECT
-              ts,
-              SUM(unique_traders) OVER (ORDER BY ts) AS cumulative_trader_count
-            FROM
-              daily_unique_traders
-          )
-          SELECT
-            ts,
-            cumulative_trader_count
-          FROM
-            cumulative_counts
-          ORDER BY
-            ts;
-        `);
+              cumulative_counts
+            ORDER BY
+              ts;
+          `, [startDate]);
 
-        result = queryResult.rows.map(row => ({
-          ts: row.ts,
-          cumulative_trader_count: parseInt(row.cumulative_trader_count),
-        }));
+          const newResult = queryResult.rows.map(row => ({
+            ts: row.ts,
+            cumulative_trader_count: parseInt(row.cumulative_trader_count),
+          }));
 
-        await redisService.set(cacheKey, result, CACHE_TTL);
-      } catch (error) {
-        console.error(`Error fetching data for ${chainToFetch}:`, error.message);
-        result = []; // Return an empty array if there's an error
+          console.log(`Fetched ${newResult.length} new records from database`);
+
+          if (result) {
+            console.log('Parsing and concatenating existing result with new data');
+            result = result.concat(newResult);
+          } else {
+            console.log('Setting result to new data');
+            result = newResult;
+          }
+
+          if (result.length > 0) {
+            console.log(`Attempting to cache ${result.length} records in Redis`);
+            try {
+              await redisService.set(cacheKey, result, CACHE_TTL);
+              await redisService.set(tsKey, latestDbTimestamp.latest_ts, CACHE_TTL);
+              console.log('Data successfully cached in Redis');
+            } catch (redisError) {
+              console.error('Error caching data in Redis:', redisError);
+            }
+          } else {
+            console.log('No data to cache in Redis');
+          }
+        } else {
+          console.log('Using cached data, no need to fetch from database');
+        }
+      } catch (dbError) {
+        console.error('Error querying database:', dbError);
+        result = [];
       }
+    } else {
+      console.log('Not refreshing, using cached result');
     }
 
-    return { [chainToFetch]: result };
+    console.log(`Returning result for ${chainToFetch}: ${result ? result.length + ' records' : 'No data'}`);
+    return { [chainToFetch]: result || [] };
   };
 
   try {
@@ -65,114 +108,184 @@ const getCumulativeUniqueTraders = async (chain, bypassCache = false, trx = troy
       return await fetchCumulativeData(chain);
     } else {
       const results = await Promise.all(CHAINS.map(fetchCumulativeData));
-      return CHAINS.reduce((acc, chain, index) => {
-        acc[chain] = results[index][chain] || [];
-        return acc;
-      }, {});
+      return Object.assign({}, ...results);
     }
   } catch (error) {
     console.error('Error in getCumulativeUniqueTraders:', error);
-    return {}; // Return an empty object if there's an error at the top level
+    throw new Error('Error fetching cumulative unique traders data: ' + error.message);
   }
 };
 
-const getUniqueTradersSummaryStats = async (chain, bypassCache = false, trx = troyDBKnex) => {
+const getUniqueTradersSummaryStats = async (chain, isRefresh = false, trx = troyDBKnex) => {
+  console.log(`getUniqueTradersSummaryStats called with chain: ${chain}, isRefresh: ${isRefresh}`);
+
   try {
     const processChainData = async (chainToProcess) => {
-      const cacheKey = `uniqueTradersSummary:${chainToProcess}`;
-      let result = bypassCache ? null : await redisService.get(cacheKey);
+      const summaryCacheKey = `uniqueTradersSummary:${chainToProcess}`;
+      const summaryTsKey = `${summaryCacheKey}:timestamp`;
+      
+      const cumulativeDataKey = `cumulativeUniqueTraders:${chainToProcess}`;
+      const cumulativeDataTsKey = `${cumulativeDataKey}:timestamp`;
 
-      if (!result) {
-        console.log('Processing unique traders summary');
-        const cumulativeData = await getCumulativeUniqueTraders(chainToProcess);
-        const allData = cumulativeData[chainToProcess] || [];
+      let summaryResult = await redisService.get(summaryCacheKey);
+      let summaryTimestamp = await redisService.get(summaryTsKey);
+      let cumulativeDataTimestamp = await redisService.get(cumulativeDataTsKey);
+
+      console.log(`Summary cache timestamp: ${summaryTimestamp}`);
+      console.log(`Cumulative data cache timestamp: ${cumulativeDataTimestamp}`);
+
+      if (isRefresh || !summaryResult || !summaryTimestamp || 
+          (cumulativeDataTimestamp && new Date(cumulativeDataTimestamp) > new Date(summaryTimestamp))) {
+        console.log('Processing unique traders summary for', chainToProcess);
+
+        const cumulativeData = await getCumulativeUniqueTraders(chainToProcess, false, trx);
+        const allData = cumulativeData[chainToProcess];
 
         if (allData.length === 0) {
-          result = {};
-        } else {
-          const smoothedData = smoothData(allData, 'cumulative_trader_count');
-          const latestData = smoothedData[smoothedData.length - 1];
-          const latestTs = new Date(latestData.ts);
-          
-          const findValueAtDate = (days) => {
-            const targetDate = new Date(latestTs.getTime() - days * 24 * 60 * 60 * 1000);
-            return smoothedData.findLast(item => new Date(item.ts) <= targetDate);
-          };
-          
-          const value24h = findValueAtDate(1);
-          const value7d = findValueAtDate(7);
-          const value28d = findValueAtDate(28);
-          const valueYtd = smoothedData.find(item => new Date(item.ts) >= new Date(latestTs.getFullYear(), 0, 1)) || smoothedData[0];
-          
-          const current = parseFloat(latestData.cumulative_trader_count);
-          const traderValues = smoothedData.map(item => parseFloat(item.cumulative_trader_count));
-          
-          result = {
-            current,
-            delta_24h: calculateDelta(current, value24h ? parseFloat(value24h.cumulative_trader_count) : null),
-            delta_7d: calculateDelta(current, value7d ? parseFloat(value7d.cumulative_trader_count) : null),
-            delta_28d: calculateDelta(current, value28d ? parseFloat(value28d.cumulative_trader_count) : null),
-            delta_ytd: calculateDelta(current, valueYtd ? parseFloat(valueYtd.cumulative_trader_count) : null),
-            ath: Math.max(...traderValues),
-            atl: Math.min(...traderValues),
-          };
-          
-          result.ath_percentage = calculatePercentage(current, result.ath);
-          result.atl_percentage = result.atl === 0 ? 100 : calculatePercentage(current, result.atl);
+          console.log('No data found for', chainToProcess);
+          return null;
         }
-        
-        await redisService.set(cacheKey, result, CACHE_TTL);
+
+        const smoothedData = smoothData(allData, 'cumulative_trader_count');
+        const latestData = smoothedData[smoothedData.length - 1];
+        const latestTs = new Date(latestData.ts);
+
+        const findValueAtDate = (days) => {
+          const targetDate = new Date(latestTs.getTime() - days * 24 * 60 * 60 * 1000);
+          return smoothedData.findLast(item => new Date(item.ts) <= targetDate);
+        };
+
+        const value24h = findValueAtDate(1);
+        const value7d = findValueAtDate(7);
+        const value28d = findValueAtDate(28);
+        const valueYtd = smoothedData.find(item => new Date(item.ts) >= new Date(latestTs.getFullYear(), 0, 1)) || smoothedData[0];
+
+        const current = parseFloat(latestData.cumulative_trader_count);
+        const traderValues = smoothedData.map(item => parseFloat(item.cumulative_trader_count));
+
+        summaryResult = {
+          current,
+          delta_24h: calculateDelta(current, value24h ? parseFloat(value24h.cumulative_trader_count) : null),
+          delta_7d: calculateDelta(current, value7d ? parseFloat(value7d.cumulative_trader_count) : null),
+          delta_28d: calculateDelta(current, value28d ? parseFloat(value28d.cumulative_trader_count) : null),
+          delta_ytd: calculateDelta(current, valueYtd ? parseFloat(valueYtd.cumulative_trader_count) : null),
+          ath: Math.max(...traderValues),
+          atl: Math.min(...traderValues),
+        };
+
+        summaryResult.ath_percentage = calculatePercentage(current, summaryResult.ath);
+        summaryResult.atl_percentage = summaryResult.atl === 0 ? 100 : calculatePercentage(current, summaryResult.atl);
+
+        console.log('Attempting to cache summary data in Redis');
+        try {
+          await redisService.set(summaryCacheKey, summaryResult, CACHE_TTL);
+          await redisService.set(summaryTsKey, cumulativeDataTimestamp || new Date().toISOString(), CACHE_TTL);
+          console.log('Summary data successfully cached in Redis');
+        } catch (redisError) {
+          console.error('Error caching summary data in Redis:', redisError);
+        }
+      } else {
+        console.log('Using cached summary data');
       }
-      
-      return result;
+
+      return summaryResult;
     };
     
     if (chain) {
       const result = await processChainData(chain);
-      return { [chain]: result };
+      return result ? { [chain]: result } : {};
     } else {
       const results = await Promise.all(CHAINS.map(processChainData));
       return Object.fromEntries(CHAINS.map((chain, index) => [chain, results[index] || {}]));
     }
   } catch (error) {
+    console.error('Error in getUniqueTradersSummaryStats:', error);
     throw new Error(`Error fetching unique traders summary stats: ${error.message}`);
   }
 };
 
-const getDailyNewUniqueTraders = async (chain, bypassCache = false, trx = troyDBKnex) => {
+const getDailyNewUniqueTraders = async (chain, isRefresh = false, trx = troyDBKnex) => {
+  console.log(`getDailyNewUniqueTraders called with chain: ${chain}, isRefresh: ${isRefresh}`);
+
   const fetchDailyData = async (chainToFetch) => {
     const cacheKey = `dailyNewUniqueTraders:${chainToFetch}`;
-    let result = bypassCache ? null : await redisService.get(cacheKey);
+    const tsKey = `${cacheKey}:timestamp`;
+    
+    console.log(`Attempting to get data from Redis for key: ${cacheKey}`);
+    let result = await redisService.get(cacheKey);
+    let cachedTimestamp = await redisService.get(tsKey);
 
-    if (!result) {
-      console.log('not from cache');
+    console.log(`Redis result: ${result ? 'Data found' : 'No data'}, Timestamp: ${cachedTimestamp}`);
+
+    if (isRefresh || !result) {
       const tableName = `prod_${chainToFetch}_mainnet.fct_perp_account_stats_daily_${chainToFetch}_mainnet`;
+      console.log(`Querying database table: ${tableName}`);
+
       try {
-        const queryResult = await trx.raw(`
-          SELECT
-            ts,
-            COUNT(DISTINCT account_id) AS daily_unique_traders
-          FROM
-            ${tableName}
-          GROUP BY
-            ts
-          ORDER BY
-            ts;
-        `);
+        const latestDbTimestamp = await trx(tableName)
+          .max('ts as latest_ts')
+          .first();
 
-        result = queryResult.rows.map(row => ({
-          ts: row.ts,
-          daily_unique_traders: parseInt(row.daily_unique_traders),
-        }));
+        console.log(`Latest DB timestamp: ${JSON.stringify(latestDbTimestamp)}`);
 
-        await redisService.set(cacheKey, result, CACHE_TTL);
-      } catch (error) {
-        console.error(`Error fetching data for ${chainToFetch}:`, error.message);
-        result = []; // Return an empty array if there's an error
+        if (!result || !cachedTimestamp || new Date(latestDbTimestamp.latest_ts) > new Date(cachedTimestamp)) {
+          console.log('Fetching new daily new unique traders data from database');
+          const startDate = cachedTimestamp ? new Date(cachedTimestamp) : new Date('2024-05-01');
+          console.log(`Fetching data from ${startDate.toISOString()} to ${latestDbTimestamp.latest_ts}`);
+
+          const queryResult = await trx.raw(`
+            SELECT
+              ts,
+              COUNT(DISTINCT account_id) AS daily_unique_traders
+            FROM
+              ${tableName}
+            WHERE ts > ?
+            GROUP BY
+              ts
+            ORDER BY
+              ts;
+          `, [startDate]);
+
+          const newResult = queryResult.rows.map(row => ({
+            ts: row.ts,
+            daily_unique_traders: parseInt(row.daily_unique_traders),
+          }));
+
+          console.log(`Fetched ${newResult.length} new records from database`);
+
+          if (result) {
+            console.log('Parsing and concatenating existing result with new data');
+            result = result.concat(newResult);
+          } else {
+            console.log('Setting result to new data');
+            result = newResult;
+          }
+
+          if (result.length > 0) {
+            console.log(`Attempting to cache ${result.length} records in Redis`);
+            try {
+              await redisService.set(cacheKey, result, CACHE_TTL);
+              await redisService.set(tsKey, latestDbTimestamp.latest_ts, CACHE_TTL);
+              console.log('Data successfully cached in Redis');
+            } catch (redisError) {
+              console.error('Error caching data in Redis:', redisError);
+            }
+          } else {
+            console.log('No data to cache in Redis');
+          }
+        } else {
+          console.log('Using cached data, no need to fetch from database');
+        }
+      } catch (dbError) {
+        console.error('Error querying database:', dbError);
+        result = [];
       }
+    } else {
+      console.log('Not refreshing, using cached result');
     }
 
-    return { [chainToFetch]: result };
+    console.log(`Returning result for ${chainToFetch}: ${result ? result.length + ' records' : 'No data'}`);
+    return { [chainToFetch]: result || [] };
   };
 
   try {
@@ -180,14 +293,11 @@ const getDailyNewUniqueTraders = async (chain, bypassCache = false, trx = troyDB
       return await fetchDailyData(chain);
     } else {
       const results = await Promise.all(CHAINS.map(fetchDailyData));
-      return CHAINS.reduce((acc, chain, index) => {
-        acc[chain] = results[index][chain] || [];
-        return acc;
-      }, {});
+      return Object.assign({}, ...results);
     }
   } catch (error) {
     console.error('Error in getDailyNewUniqueTraders:', error);
-    return {}; // Return an empty object if there's an error at the top level
+    throw new Error('Error fetching daily new unique traders data: ' + error.message);
   }
 };
 
@@ -197,11 +307,6 @@ const refreshAllPerpAccountStatsData = async () => {
   for (const chain of CHAINS) {
     console.log(`Refreshing Perp Account Stats data for chain: ${chain}`);
     console.time(`${chain} total refresh time`);
-
-    // Clear existing cache
-    await redisService.del(`cumulativeUniqueTraders:${chain}`);
-    await redisService.del(`uniqueTradersSummary:${chain}`);
-    await redisService.del(`dailyNewUniqueTraders:${chain}`);
 
     // Use a separate transaction for each chain
     await troyDBKnex.transaction(async (trx) => {
@@ -221,11 +326,12 @@ const refreshAllPerpAccountStatsData = async () => {
 
       } catch (error) {
         console.error(`Error refreshing Perp Account Stats data for chain ${chain}:`, error);
-        // Don't throw the error, just log it and continue with the next chain
+        throw error; // This will cause the transaction to rollback
       }
     });
 
     console.timeEnd(`${chain} total refresh time`);
+    console.log(`Finished refreshing Perp Account Stats data for chain: ${chain}`);
   }
 
   console.log('Finished refreshing Perp Account Stats data for all chains');
