@@ -5,84 +5,6 @@ const { calculateDelta, calculatePercentage, smoothData } = require('../helpers'
 
 const CACHE_TTL = 60 * 60 * 24 * 365; // 1 year in seconds
 
-const getLatestPoolRewardsData = async (chain, collateralType, isRefresh = false, trx = troyDBKnex) => {
-  console.log(`getLatestPoolRewardsData called with chain: ${chain}, collateralType: ${collateralType}, isRefresh: ${isRefresh}`);
-
-  if (!collateralType) {
-    throw new Error('collateralType is required');
-  }
-
-  const fetchLatest = async (chainToFetch) => {
-    const cacheKey = `latestPoolRewards:${chainToFetch}:${collateralType}`;
-    const tsKey = `${cacheKey}:timestamp`;
-    
-    console.log(`Attempting to get data from Redis for key: ${cacheKey}`);
-    let result = await redisService.get(cacheKey);
-    let cachedTimestamp = await redisService.get(tsKey);
-
-    console.log(`Redis result: ${result ? 'Data found' : 'No data'}, Timestamp: ${cachedTimestamp}`);
-
-    if (isRefresh || !result) {
-      const tableName = `prod_${chainToFetch}_mainnet.fct_pool_rewards_hourly_${chainToFetch}_mainnet`;
-      console.log(`Querying database table: ${tableName}`);
-
-      try {
-        const latestDbTimestamp = await trx(tableName)
-          .where({ collateral_type: collateralType })
-          .max('ts as latest_ts')
-          .first();
-
-        console.log(`Latest DB timestamp: ${JSON.stringify(latestDbTimestamp)}`);
-
-        if (!result || !cachedTimestamp || new Date(latestDbTimestamp.latest_ts) > new Date(cachedTimestamp)) {
-          console.log('Fetching new latest pool rewards data from database');
-          result = await trx(tableName)
-            .where({ collateral_type: collateralType })
-            .orderBy('ts', 'desc')
-            .limit(1);
-
-          console.log(`Fetched ${result.length} new records from database`);
-
-          if (result.length > 0) {
-            console.log('Attempting to cache new data in Redis');
-            try {
-              await redisService.set(cacheKey, result, CACHE_TTL);
-              await redisService.set(tsKey, latestDbTimestamp.latest_ts, CACHE_TTL);
-              console.log('Data successfully cached in Redis');
-            } catch (redisError) {
-              console.error('Error caching data in Redis:', redisError);
-            }
-          } else {
-            console.log('No data to cache in Redis');
-          }
-        } else {
-          console.log('Using cached data, no need to fetch from database');
-        }
-      } catch (dbError) {
-        console.error('Error querying database:', dbError);
-        result = [];
-      }
-    } else {
-      console.log('Not refreshing, using cached result');
-    }
-
-    console.log(`Returning result for ${chainToFetch}: ${result ? result.length + ' records' : 'No data'}`);
-    return { [chainToFetch]: result || [] };
-  };
-
-  try {
-    if (chain) {
-      return await fetchLatest(chain);
-    } else {
-      const results = await Promise.all(CHAINS.map(fetchLatest));
-      return Object.assign({}, ...results);
-    }
-  } catch (error) {
-    console.error('Error in getLatestPoolRewardsData:', error);
-    throw new Error('Error fetching latest pool rewards data: ' + error.message);
-  }
-};
-
 const getCumulativePoolRewardsData = async (chain, collateralType, isRefresh = false, trx = troyDBKnex) => {
   console.log(`getCumulativePoolRewardsData called with chain: ${chain}, collateralType: ${collateralType}, isRefresh: ${isRefresh}`);
 
@@ -181,6 +103,7 @@ const getCumulativePoolRewardsData = async (chain, collateralType, isRefresh = f
     throw new Error('Error fetching cumulative pool rewards data: ' + error.message);
   }
 };
+
 const getPoolRewardsSummaryStats = async (chain, collateralType, isRefresh = false, trx = troyDBKnex) => {
   console.log(`getPoolRewardsSummaryStats called with chain: ${chain}, collateralType: ${collateralType}, isRefresh: ${isRefresh}`);
 
@@ -382,7 +305,7 @@ const getDailyPoolRewardsData = async (chain, collateralType, isRefresh = false,
 const refreshAllPoolRewardsData = async (collateralType) => {
   console.log('Starting to refresh Pool Rewards data for all chains');
   
-  for (const chain of CHAINS) {
+  for (const chain of CHAINS['pool_rewards']) {
     console.log(`Refreshing Pool Rewards data for chain: ${chain}`);
     console.time(`${chain} total refresh time`);
 
@@ -390,10 +313,6 @@ const refreshAllPoolRewardsData = async (collateralType) => {
     await troyDBKnex.transaction(async (trx) => {
       try {
         // Fetch new data
-        console.time(`${chain} getLatestPoolRewardsData`);
-        await getLatestPoolRewardsData(chain, collateralType, true, trx);
-        console.timeEnd(`${chain} getLatestPoolRewardsData`);
-
         console.time(`${chain} getCumulativePoolRewardsData`);
         await getCumulativePoolRewardsData(chain, collateralType, true, trx);
         console.timeEnd(`${chain} getCumulativePoolRewardsData`);
@@ -420,7 +339,6 @@ const refreshAllPoolRewardsData = async (collateralType) => {
 };
 
 module.exports = {
-  getLatestPoolRewardsData,
   getCumulativePoolRewardsData,
   getPoolRewardsSummaryStats,
   getDailyPoolRewardsData,

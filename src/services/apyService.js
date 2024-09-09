@@ -275,7 +275,7 @@ const getDailyAggregatedAPYData = async (chain, collateralType, isRefresh = fals
 const refreshAllAPYData = async (collateralType) => {
   console.log('Starting to refresh APY data for all chains');
 
-  for (const chain of CHAINS) {
+  for (const chain of CHAINS['apy']) {
     console.log(`Refreshing APY data for chain: ${chain}`);
     console.time(`${chain} total refresh time`);
 

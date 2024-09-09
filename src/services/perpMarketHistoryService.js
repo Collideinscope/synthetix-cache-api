@@ -337,7 +337,7 @@ const getOpenInterestSummaryStats = async (chain, isRefresh = false, trx = troyD
 const refreshAllPerpMarketHistoryData = async () => {
   console.log('Starting to refresh Perp Market History data for all chains');
   
-  for (const chain of CHAINS) {
+  for (const chain of CHAINS['perp_market_history']) {
     console.log(`Refreshing Perp Market History data for chain: ${chain}`);
     console.time(`${chain} total refresh time`);
 

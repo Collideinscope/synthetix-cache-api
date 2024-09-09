@@ -1,7 +1,6 @@
 const express = require('express');
 const router = express.Router();
 const {
-  getLatestPoolRewardsData,
   getCumulativePoolRewardsData,
   getPoolRewardsSummaryStats,
   getDailyPoolRewardsData,
@@ -16,25 +15,6 @@ const validateParameters = (chain, collateralType) => {
     throw new Error("Invalid chain parameter");
   }
 };
-
-router.get('/latest', async (req, res) => {
-  try {
-    let { chain, collateralType } = req.query;
-    validateParameters(chain, collateralType);
-    chain = chain?.toLowerCase();
-    collateralType = collateralType?.toLowerCase();
-    
-    const result = await getLatestPoolRewardsData(chain, collateralType);
-    console.log(result)
-    if (Object.values(result).every(data => data.length === 0)) {
-      return res.status(404).json({ error: 'Pool rewards data not found' });
-    }
-    return res.json(result);
-  } catch (error) {
-    console.error('Error in /pool-rewards/latest route:', error);
-    return res.status(400).json({ error: error.message });
-  }
-});
 
 router.get('/cumulative', async (req, res) => {
   try {

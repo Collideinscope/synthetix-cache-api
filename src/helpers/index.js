@@ -6,10 +6,34 @@ const TIMEFRAMES = [
   'year',
 ];
 
-const CHAINS = [
-  'base',
-  'arbitrum'
-];
+const CHAINS = {
+  'apy': [
+    'base',
+    'arbitrum',
+  ],
+  'tvl': [
+    'base',
+  ],
+  'core_account_delegations': [
+    'base',
+    'arbitrum',
+  ],
+  'core_delegations': [
+    'base',
+    'arbitrum',
+  ],
+  'perp_account_stats': [
+    'base',
+    'arbitrum',
+  ],
+  'perp_market_history': [
+    'base',
+    'arbitrum',
+  ],
+  'pool_rewards': [
+    'base',
+  ],
+};
 
 function calculateAPY(apy, timeframe) {
   const periods = {

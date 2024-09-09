@@ -1,7 +1,6 @@
 const express = require('express');
 const router = express.Router();
 const {
-  getLatestCoreDelegationsData,
   getCumulativeCoreDelegationsData,
   getCoreDelegationsSummaryStats,
   getDailyCoreDelegationsData,
@@ -16,21 +15,6 @@ const validateParameters = (chain, collateralType) => {
     throw new Error("Invalid chain parameter");
   }
 };
-
-router.get('/latest', async (req, res) => {
-  try {
-    const { chain, collateralType } = req.query;
-    validateParameters(chain, collateralType);
-    const result = await getLatestCoreDelegationsData(chain, collateralType);
-    if (Object.values(result).every(data => data.length === 0)) {
-      return res.status(404).json({ error: 'Core delegations data not found' });
-    }
-    return res.json(result);
-  } catch (error) {
-    console.error('Error in /core-delegations/latest route:', error);
-    return res.status(400).json({ error: error.message });
-  }
-});
 
 router.get('/cumulative', async (req, res) => {
   try {

@@ -1,7 +1,6 @@
 const express = require('express');
 const router = express.Router();
 const {
-  getLatestPerpStatsData,
   getCumulativeVolumeSummaryStats,
   getCumulativeExchangeFeesSummaryStats,
   getCumulativeVolumeData,
@@ -16,21 +15,6 @@ const validateOptionalChain = (chain) => {
     throw new Error("Invalid chain parameter");
   }
 };
-
-router.get('/latest', async (req, res) => {
-  try {
-    const { chain } = req.query;
-    validateOptionalChain(chain);
-    const result = await getLatestPerpStatsData(chain);
-    if (!result || result.length === 0) {
-      return res.status(404).send('Perp stats data not found');
-    }
-    return res.json(result);
-  } catch (error) {
-    console.error('Error in /perp-stats/latest route:', error);
-    return res.status(400).json({ error: error.message });
-  }
-});
 
 router.get('/volume/cumulative', async (req, res) => {
   try {

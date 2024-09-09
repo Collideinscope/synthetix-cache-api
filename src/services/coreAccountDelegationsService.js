@@ -425,7 +425,7 @@ const getDailyNewUniqueStakers = async (chain, collateralType, isRefresh = false
 const refreshAllCoreAccountDelegationsData = async (collateralType) => {
   console.log('Starting to refresh Core Account Delegations data for all chains');
 
-  for (const chain of CHAINS) {
+  for (const chain of CHAINS['core_account_delegations']) {
     console.log(`Refreshing core account delegations data for chain: ${chain}`);
     console.time(`${chain} total refresh time`);
 

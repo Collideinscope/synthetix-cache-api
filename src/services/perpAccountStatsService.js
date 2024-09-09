@@ -304,7 +304,7 @@ const getDailyNewUniqueTraders = async (chain, isRefresh = false, trx = troyDBKn
 const refreshAllPerpAccountStatsData = async () => {
   console.log('Starting to refresh Perp Account Stats data for all chains');
   
-  for (const chain of CHAINS) {
+  for (const chain of CHAINS['perp_account_stats']) {
     console.log(`Refreshing Perp Account Stats data for chain: ${chain}`);
     console.time(`${chain} total refresh time`);
 

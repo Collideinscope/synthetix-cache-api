@@ -5,84 +5,6 @@ const { calculateDelta, calculatePercentage, smoothData } = require('../helpers'
 
 const CACHE_TTL = 60 * 60 * 24 * 365; // 1 year in seconds
 
-const getLatestCoreDelegationsData = async (chain, collateralType, isRefresh = false, trx = troyDBKnex) => {
-  try {
-    if (!collateralType) {
-      throw new Error('collateralType is required');
-    }
-
-    console.log(`getLatestCoreDelegationsData called with chain: ${chain}, collateralType: ${collateralType}, isRefresh: ${isRefresh}`);
-
-    const fetchLatest = async (chainToFetch) => {
-      const cacheKey = `latestCoreDelegations:${chainToFetch}:${collateralType}`;
-      const tsKey = `${cacheKey}:timestamp`;
-      
-      console.log(`Attempting to get data from Redis for key: ${cacheKey}`);
-      let result = await redisService.get(cacheKey);
-      let cachedTimestamp = await redisService.get(tsKey);
-
-      console.log(`Redis result: ${result ? 'Data found' : 'No data'}, Timestamp: ${cachedTimestamp}`);
-
-      if (isRefresh || !result) {
-        const tableName = `prod_${chainToFetch}_mainnet.fct_core_pool_delegation_${chainToFetch}_mainnet`;
-        console.log(`Querying database table: ${tableName}`);
-
-        try {
-          const latestDbTimestamp = await trx(tableName)
-            .where('collateral_type', collateralType)
-            .max('ts as latest_ts')
-            .first();
-
-          console.log(`Latest DB timestamp: ${JSON.stringify(latestDbTimestamp)}`);
-
-          if (!result || !cachedTimestamp || new Date(latestDbTimestamp.latest_ts) > new Date(cachedTimestamp)) {
-            console.log('Fetching new latest core delegations data from database');
-            result = await trx(tableName)
-              .where('collateral_type', collateralType)
-              .orderBy('ts', 'desc')
-              .limit(1);
-
-            console.log(`Fetched ${result.length} new records from database`);
-
-            if (result.length > 0) {
-              console.log('Attempting to cache new data in Redis');
-              try {
-                await redisService.set(cacheKey, result, CACHE_TTL);
-                await redisService.set(tsKey, latestDbTimestamp.latest_ts, CACHE_TTL);
-                console.log('Data successfully cached in Redis');
-              } catch (redisError) {
-                console.error('Error caching data in Redis:', redisError);
-              }
-            } else {
-              console.log('No data to cache in Redis');
-            }
-          } else {
-            console.log('Using cached data, no need to fetch from database');
-          }
-        } catch (dbError) {
-          console.error('Error querying database:', dbError);
-          result = [];
-        }
-      } else {
-        console.log('Not refreshing, using cached result');
-      }
-
-      console.log(`Returning result for ${chainToFetch}: ${result ? result.length + ' records' : 'No data'}`);
-      return { [chainToFetch]: result || [] };
-    };
-
-    if (chain) {
-      return await fetchLatest(chain);
-    } else {
-      const results = await Promise.all(CHAINS.map(fetchLatest));
-      return Object.assign({}, ...results);
-    }
-  } catch (error) {
-    console.error('Error in getLatestCoreDelegationsData:', error);
-    throw new Error('Error fetching latest core delegations data: ' + error.message);
-  }
-};
-
 const getCoreDelegationsData = async (chain, collateralType, isRefresh = false, trx = troyDBKnex) => {
   try {
     if (!collateralType) {
@@ -453,7 +375,7 @@ const getDailyCoreDelegationsData = async (chain, collateralType, isRefresh = fa
 const refreshAllCoreDelegationsData = async (collateralType) => {
   console.log('Starting to refresh Core Delegations data for all chains');
 
-  for (const chain of CHAINS) {
+  for (const chain of CHAINS['core_delegations']) {
     console.log(`Refreshing core delegations data for chain: ${chain}`);
     console.time(`${chain} total refresh time`);
 
@@ -495,7 +417,6 @@ const refreshAllCoreDelegationsData = async (collateralType) => {
 };
 
 module.exports = {
-  getLatestCoreDelegationsData,
   getCoreDelegationsData,
   getCumulativeCoreDelegationsData,
   getCoreDelegationsSummaryStats,

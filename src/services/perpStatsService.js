@@ -5,78 +5,6 @@ const { calculateDelta, calculatePercentage, smoothData } = require('../helpers'
 
 const CACHE_TTL = 60 * 60 * 24 * 365; // 1 year in seconds
 
-const getLatestPerpStatsData = async (chain, isRefresh = false, trx = troyDBKnex) => {
-  console.log(`getLatestPerpStatsData called with chain: ${chain}, isRefresh: ${isRefresh}`);
-
-  const fetchLatest = async (chainToFetch) => {
-    const cacheKey = `latestPerpStats:${chainToFetch}`;
-    const tsKey = `${cacheKey}:timestamp`;
-    
-    console.log(`Attempting to get data from Redis for key: ${cacheKey}`);
-    let result = await redisService.get(cacheKey);
-    let cachedTimestamp = await redisService.get(tsKey);
-
-    console.log(`Redis result: ${result ? 'Data found' : 'No data'}, Timestamp: ${cachedTimestamp}`);
-
-    if (isRefresh || !result) {
-      const tableName = `prod_${chainToFetch}_mainnet.fct_perp_stats_daily_${chainToFetch}_mainnet`;
-      console.log(`Querying database table: ${tableName}`);
-
-      try {
-        const latestDbTimestamp = await trx(tableName)
-          .max('ts as latest_ts')
-          .first();
-
-        console.log(`Latest DB timestamp: ${JSON.stringify(latestDbTimestamp)}`);
-
-        if (!result || !cachedTimestamp || new Date(latestDbTimestamp.latest_ts) > new Date(cachedTimestamp)) {
-          console.log('Fetching new latest perp stats data from database');
-          result = await trx(tableName)
-            .orderBy('ts', 'desc')
-            .limit(1);
-
-          console.log(`Fetched ${result.length} new records from database`);
-
-          if (result.length > 0) {
-            console.log('Attempting to cache new data in Redis');
-            try {
-              await redisService.set(cacheKey, result, CACHE_TTL);
-              await redisService.set(tsKey, latestDbTimestamp.latest_ts, CACHE_TTL);
-              console.log('Data successfully cached in Redis');
-            } catch (redisError) {
-              console.error('Error caching data in Redis:', redisError);
-            }
-          } else {
-            console.log('No data to cache in Redis');
-          }
-        } else {
-          console.log('Using cached data, no need to fetch from database');
-        }
-      } catch (dbError) {
-        console.error('Error querying database:', dbError);
-        result = [];
-      }
-    } else {
-      console.log('Not refreshing, using cached result');
-    }
-
-    console.log(`Returning result for ${chainToFetch}: ${result ? result.length + ' records' : 'No data'}`);
-    return { [chainToFetch]: result || [] };
-  };
-
-  try {
-    if (chain) {
-      return await fetchLatest(chain);
-    } else {
-      const results = await Promise.all(CHAINS.map(fetchLatest));
-      return Object.assign({}, ...results);
-    }
-  } catch (error) {
-    console.error('Error in getLatestPerpStatsData:', error);
-    throw new Error('Error fetching latest perp stats data: ' + error.message);
-  }
-};
-
 const getSummaryStats = async (chain, column, isRefresh = false, trx = troyDBKnex) => {
   console.log(`getSummaryStats called with chain: ${chain}, column: ${column}, isRefresh: ${isRefresh}`);
 
@@ -427,7 +355,7 @@ const getDailyExchangeFeesData = async (chain, isRefresh = false, trx = troyDBKn
 const refreshAllPerpStatsData = async () => {
   console.log('Starting to refresh Perp Stats data for all chains');
   
-  for (const chain of CHAINS) {
+  for (const chain of CHAINS['perp_stats']) {
     console.log(`Refreshing Perp Stats data for chain: ${chain}`);
     console.time(`${chain} total refresh time`);
 
@@ -435,10 +363,6 @@ const refreshAllPerpStatsData = async () => {
     await troyDBKnex.transaction(async (trx) => {
       try {
         // Fetch new data
-        console.time(`${chain} getLatestPerpStatsData`);
-        await getLatestPerpStatsData(chain, true, trx);
-        console.timeEnd(`${chain} getLatestPerpStatsData`);
-
         console.time(`${chain} getCumulativeVolumeSummaryStats`);
         await getCumulativeVolumeSummaryStats(chain, true, trx);
         console.timeEnd(`${chain} getCumulativeVolumeSummaryStats`);
@@ -477,7 +401,6 @@ const refreshAllPerpStatsData = async () => {
 };
 
 module.exports = {
-  getLatestPerpStatsData,
   getCumulativeVolumeSummaryStats,
   getCumulativeExchangeFeesSummaryStats,
   getCumulativeVolumeData,
