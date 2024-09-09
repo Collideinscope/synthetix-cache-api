@@ -9,7 +9,7 @@ const cronRefreshTVL = async () => {
     await redisService.connect();
     console.log('Redis connection established successfully');
 
-    const collateralType = '0xC74eA762cF06c9151cE074E6a569a5945b6302E7';
+    const collateralType = '0xc74ea762cf06c9151ce074e6a569a5945b6302e7';
     console.log(`Refreshing TVL data for collateral type: ${collateralType}`);
     console.time('Total refresh time');
     await refreshAllTVLData(collateralType);
