@@ -4,6 +4,7 @@ const { CHAINS } = require('../helpers');
 const { calculateDelta, calculatePercentage, smoothData } = require('../helpers');
 
 const CACHE_TTL = 60 * 60 * 24 * 365; // 1 year in seconds
+const SERVICE_CHAINS = CHAINS['perp_stats'];
 
 const getSummaryStats = async (chain, column, isRefresh = false, trx = troyDBKnex) => {
   console.log(`getSummaryStats called with chain: ${chain}, column: ${column}, isRefresh: ${isRefresh}`);
@@ -83,8 +84,8 @@ const getSummaryStats = async (chain, column, isRefresh = false, trx = troyDBKne
       const result = await processChainData(chain);
       return result ? { [chain]: result } : {};
     } else {
-      const results = await Promise.all(CHAINS.map(processChainData));
-      return Object.fromEntries(CHAINS.map((chain, index) => [chain, results[index] || {}]));
+      const results = await Promise.all(SERVICE_CHAINS.map(processChainData));
+      return Object.fromEntries(SERVICE_CHAINS.map((chain, index) => [chain, results[index] || {}]));
     }
   } catch (error) {
     console.error(`Error in getSummaryStats for ${column}:`, error);
@@ -190,7 +191,7 @@ const getCumulativeVolumeData = async (chain, isRefresh = false, trx = troyDBKne
       const data = await fetchCumulativeData(chain, 'cumulative_volume', isRefresh, trx);
       return { [chain]: data };
     } else {
-      const results = await Promise.all(CHAINS.map(async (chain) => {
+      const results = await Promise.all(SERVICE_CHAINS.map(async (chain) => {
         const data = await fetchCumulativeData(chain, 'cumulative_volume', isRefresh, trx);
         return { [chain]: data };
       }));
@@ -209,7 +210,7 @@ const getCumulativeExchangeFeesData = async (chain, isRefresh = false, trx = tro
       const data = await fetchCumulativeData(chain, 'cumulative_exchange_fees', isRefresh, trx);
       return { [chain]: data };
     } else {
-      const results = await Promise.all(CHAINS.map(async (chain) => {
+      const results = await Promise.all(SERVICE_CHAINS.map(async (chain) => {
         const data = await fetchCumulativeData(chain, 'cumulative_exchange_fees', isRefresh, trx);
         return { [chain]: data };
       }));
@@ -321,7 +322,7 @@ const getDailyVolumeData = async (chain, isRefresh = false, trx = troyDBKnex) =>
       const data = await fetchDailyData(chain, 'cumulative_volume', isRefresh, trx);
       return { [chain]: data };
     } else {
-      const results = await Promise.all(CHAINS.map(async (chain) => {
+      const results = await Promise.all(SERVICE_CHAINS.map(async (chain) => {
         const data = await fetchDailyData(chain, 'cumulative_volume', isRefresh, trx);
         return { [chain]: data };
       }));
@@ -340,7 +341,7 @@ const getDailyExchangeFeesData = async (chain, isRefresh = false, trx = troyDBKn
       const data = await fetchDailyData(chain, 'cumulative_exchange_fees', isRefresh, trx);
       return { [chain]: data };
     } else {
-      const results = await Promise.all(CHAINS.map(async (chain) => {
+      const results = await Promise.all(SERVICE_CHAINS.map(async (chain) => {
         const data = await fetchDailyData(chain, 'cumulative_exchange_fees', isRefresh, trx);
         return { [chain]: data };
       }));
@@ -355,7 +356,7 @@ const getDailyExchangeFeesData = async (chain, isRefresh = false, trx = troyDBKn
 const refreshAllPerpStatsData = async () => {
   console.log('Starting to refresh Perp Stats data for all chains');
   
-  for (const chain of CHAINS['perp_stats']) {
+  for (const chain of SERVICE_CHAINS) {
     console.log(`Refreshing Perp Stats data for chain: ${chain}`);
     console.time(`${chain} total refresh time`);
 

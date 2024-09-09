@@ -4,6 +4,7 @@ const { CHAINS } = require('../helpers');
 const { calculateDelta, calculatePercentage, smoothData } = require('../helpers');
 
 const CACHE_TTL = 60 * 60 * 24 * 365; // 1 year in seconds
+const SERVICE_CHAINS = CHAINS['pool_rewards'];
 
 const getCumulativePoolRewardsData = async (chain, collateralType, isRefresh = false, trx = troyDBKnex) => {
   console.log(`getCumulativePoolRewardsData called with chain: ${chain}, collateralType: ${collateralType}, isRefresh: ${isRefresh}`);
@@ -95,7 +96,7 @@ const getCumulativePoolRewardsData = async (chain, collateralType, isRefresh = f
     if (chain) {
       return await fetchCumulative(chain);
     } else {
-      const results = await Promise.all(CHAINS.map(fetchCumulative));
+      const results = await Promise.all(SERVICE_CHAINS.map(fetchCumulative));
       return Object.assign({}, ...results);
     }
   } catch (error) {
@@ -187,8 +188,8 @@ const getPoolRewardsSummaryStats = async (chain, collateralType, isRefresh = fal
       const result = await processChainData(chain);
       return result ? { [chain]: result } : {};
     } else {
-      const results = await Promise.all(CHAINS.map(processChainData));
-      return Object.fromEntries(CHAINS.map((chain, index) => [chain, results[index] || {}]));
+      const results = await Promise.all(SERVICE_CHAINS.map(processChainData));
+      return Object.fromEntries(SERVICE_CHAINS.map((chain, index) => [chain, results[index] || {}]));
     }
   } catch (error) {
     console.error('Error in getPoolRewardsSummaryStats:', error);
@@ -293,7 +294,7 @@ const getDailyPoolRewardsData = async (chain, collateralType, isRefresh = false,
     if (chain) {
       return await fetchDaily(chain);
     } else {
-      const results = await Promise.all(CHAINS.map(fetchDaily));
+      const results = await Promise.all(SERVICE_CHAINS.map(fetchDaily));
       return Object.assign({}, ...results);
     }
   } catch (error) {
@@ -305,7 +306,7 @@ const getDailyPoolRewardsData = async (chain, collateralType, isRefresh = false,
 const refreshAllPoolRewardsData = async (collateralType) => {
   console.log('Starting to refresh Pool Rewards data for all chains');
   
-  for (const chain of CHAINS['pool_rewards']) {
+  for (const chain of SERVICE_CHAINS) {
     console.log(`Refreshing Pool Rewards data for chain: ${chain}`);
     console.time(`${chain} total refresh time`);
 

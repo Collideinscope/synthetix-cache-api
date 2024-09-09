@@ -4,6 +4,7 @@ const { CHAINS } = require('../helpers');
 const { calculateDelta, calculatePercentage, smoothData } = require('../helpers');
 
 const CACHE_TTL = 60 * 60 * 24 * 365; // 1 year in seconds
+const SERVICE_CHAINS = CHAINS['apy'];
 
 const getAllAPYData = async (chain, collateralType, isRefresh = false, trx = troyDBKnex) => {
   if (!collateralType) {
@@ -94,7 +95,7 @@ const getAllAPYData = async (chain, collateralType, isRefresh = false, trx = tro
   if (chain) {
     return await fetchAll(chain);
   } else {
-    const results = await Promise.all(CHAINS.map(fetchAll));
+    const results = await Promise.all(SERVICE_CHAINS.map(fetchAll));
     return Object.assign({}, ...results);
   }
 };
@@ -183,8 +184,8 @@ const getAPYSummaryStats = async (chain, collateralType, isRefresh = false, trx 
       const result = await processChainData(chain);
       return result ? { [chain]: result } : {};
     } else {
-      const results = await Promise.all(CHAINS.map(processChainData));
-      return Object.fromEntries(CHAINS.map((chain, index) => [chain, results[index] || {}]));
+      const results = await Promise.all(SERVICE_CHAINS.map(processChainData));
+      return Object.fromEntries(SERVICE_CHAINS.map((chain, index) => [chain, results[index] || {}]));
     }
   } catch (error) {
     console.error('Error in getAPYSummaryStats:', error);
@@ -264,7 +265,7 @@ const getDailyAggregatedAPYData = async (chain, collateralType, isRefresh = fals
     if (chain) {
       return await fetchDaily(chain);
     } else {
-      const results = await Promise.all(CHAINS.map(chain => fetchDaily(chain)));
+      const results = await Promise.all(SERVICE_CHAINS.map(chain => fetchDaily(chain)));
       return results.reduce((acc, curr) => ({ ...acc, ...curr }), {});
     }
   } catch (error) {
@@ -275,7 +276,7 @@ const getDailyAggregatedAPYData = async (chain, collateralType, isRefresh = fals
 const refreshAllAPYData = async (collateralType) => {
   console.log('Starting to refresh APY data for all chains');
 
-  for (const chain of CHAINS['apy']) {
+  for (const chain of SERVICE_CHAINS) {
     console.log(`Refreshing APY data for chain: ${chain}`);
     console.time(`${chain} total refresh time`);
 

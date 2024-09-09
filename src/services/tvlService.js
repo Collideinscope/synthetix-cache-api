@@ -4,6 +4,7 @@ const { CHAINS } = require('../helpers');
 const { calculateDelta, calculatePercentage, smoothData } = require('../helpers');
 
 const CACHE_TTL = 60 * 60 * 24 * 365; // 1 year in seconds
+const SERVICE_CHAINS = CHAINS['tvl'];
 
 const getCumulativeTVLData = async (chain, collateralType, isRefresh = false, trx = troyDBKnex) => {
   console.log(`getCumulativeTVLData called with chain: ${chain}, collateralType: ${collateralType}, isRefresh: ${isRefresh}`);
@@ -88,7 +89,7 @@ const getCumulativeTVLData = async (chain, collateralType, isRefresh = false, tr
     if (chain) {
       return await fetchAll(chain);
     } else {
-      const results = await Promise.all(CHAINS.map(fetchAll));
+      const results = await Promise.all(SERVICE_CHAINS.map(fetchAll));
       return Object.assign({}, ...results);
     }
   } catch (error) {
@@ -180,8 +181,8 @@ const getTVLSummaryStats = async (chain, collateralType, isRefresh = false, trx 
       const result = await processChainData(chain);
       return result ? { [chain]: result } : {};
     } else {
-      const results = await Promise.all(CHAINS.map(processChainData));
-      return Object.fromEntries(CHAINS.map((chain, index) => [chain, results[index] || {}]));
+      const results = await Promise.all(SERVICE_CHAINS.map(processChainData));
+      return Object.fromEntries(SERVICE_CHAINS.map((chain, index) => [chain, results[index] || {}]));
     }
   } catch (error) {
     console.error('Error in getTVLSummaryStats:', error);
@@ -288,7 +289,7 @@ const getDailyTVLData = async (chain, collateralType, isRefresh = false, trx = t
     if (chain) {
       return await fetchDaily(chain);
     } else {
-      const results = await Promise.all(CHAINS.map(fetchDaily));
+      const results = await Promise.all(SERVICE_CHAINS.map(fetchDaily));
       return Object.assign({}, ...results);
     }
   } catch (error) {
@@ -300,7 +301,7 @@ const getDailyTVLData = async (chain, collateralType, isRefresh = false, trx = t
 const refreshAllTVLData = async (collateralType) => {
   console.log('Starting to refresh TVL data for all chains');
   
-  for (const chain of CHAINS['tvl']) {
+  for (const chain of SERVICE_CHAINS) {
     console.log(`Refreshing TVL data for chain: ${chain}`);
     console.time(`${chain} total refresh time`);
 

@@ -4,6 +4,7 @@ const { CHAINS } = require('../helpers');
 const { calculateDelta, calculatePercentage, smoothData } = require('../helpers');
 
 const CACHE_TTL = 60 * 60 * 24 * 365; // 1 year in seconds
+const SERVICE_CHAINS = CHAINS['core_delegations'];
 
 const getCoreDelegationsData = async (chain, collateralType, isRefresh = false, trx = troyDBKnex) => {
   try {
@@ -165,7 +166,7 @@ const getCumulativeCoreDelegationsData = async (chain, collateralType, isRefresh
     if (chain) {
       return await fetchCumulative(chain);
     } else {
-      const results = await Promise.all(CHAINS.map(fetchCumulative));
+      const results = await Promise.all(SERVICE_CHAINS.map(fetchCumulative));
       return Object.assign({}, ...results);
     }
   } catch (error) {
@@ -257,8 +258,8 @@ const getCoreDelegationsSummaryStats = async (chain, collateralType, isRefresh =
       const result = await processChainData(chain);
       return result ? { [chain]: result } : {};
     } else {
-      const results = await Promise.all(CHAINS.map(processChainData));
-      return Object.fromEntries(CHAINS.map((chain, index) => [chain, results[index] || {}]));
+      const results = await Promise.all(SERVICE_CHAINS.map(processChainData));
+      return Object.fromEntries(SERVICE_CHAINS.map((chain, index) => [chain, results[index] || {}]));
     }
   } catch (error) {
     console.error('Error in getCoreDelegationsSummaryStats:', error);
@@ -363,7 +364,7 @@ const getDailyCoreDelegationsData = async (chain, collateralType, isRefresh = fa
     if (chain) {
       return await fetchDaily(chain);
     } else {
-      const results = await Promise.all(CHAINS.map(fetchDaily));
+      const results = await Promise.all(SERVICE_CHAINS.map(fetchDaily));
       return Object.assign({}, ...results);
     }
   } catch (error) {
@@ -375,7 +376,7 @@ const getDailyCoreDelegationsData = async (chain, collateralType, isRefresh = fa
 const refreshAllCoreDelegationsData = async (collateralType) => {
   console.log('Starting to refresh Core Delegations data for all chains');
 
-  for (const chain of CHAINS['core_delegations']) {
+  for (const chain of SERVICE_CHAINS) {
     console.log(`Refreshing core delegations data for chain: ${chain}`);
     console.time(`${chain} total refresh time`);
 

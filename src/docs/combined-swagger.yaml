@@ -9,143 +9,6 @@ info:
 
     **Base Path**: `/api/v1`
 paths:
-  /apy/latest:
-    get:
-      summary: Get the latest APY data
-      tags:
-        - APY
-      parameters:
-        - in: query
-          name: chain
-          schema:
-            type: string
-          required: false
-          description: The chain to get the APY data for
-        - in: query
-          name: collateralType
-          schema:
-            type: string
-          required: true
-          description: The collateral type to get the APY data for
-      responses:
-        200:
-          description: The latest APY data
-          content:
-            application/json:
-              schema:
-                type: object
-                additionalProperties:
-                  type: array
-                  items:
-                    type: object
-                    properties:
-                      id:
-                        type: integer
-                        example: 1
-                      created_at:
-                        type: string
-                        format: date-time
-                        example: '2023-06-24T12:34:56Z'
-                      updated_at:
-                        type: string
-                        format: date-time
-                        example: '2023-06-24T12:34:56Z'
-                      ts:
-                        type: string
-                        format: date-time
-                        example: '2023-06-24T12:34:56Z'
-                      chain:
-                        type: string
-                        example: 'mainnet'
-                      pool_id:
-                        type: integer
-                        example: 1
-                      collateral_type:
-                        type: string
-                        example: '0x1234567890abcdef'
-                      collateral_value:
-                        type: number
-                        format: double
-                        example: 1000.0
-                      apys:
-                        type: object
-                        properties:
-                          apy_24h:
-                            type: object
-                            properties:
-                              minute:
-                                type: number
-                                format: double
-                                example: 0.00000011
-                              hour:
-                                type: number
-                                format: double
-                                example: 0.00000640
-                              week:
-                                type: number
-                                format: double
-                                example: 0.00107918
-                              month:
-                                type: number
-                                format: double
-                                example: 0.00468485
-                              year:
-                                type: number
-                                format: double
-                                example: 0.05768958
-                          apy_7d:
-                            type: object
-                            properties:
-                              minute:
-                                type: number
-                                format: double
-                                example: 0.00000026
-                              hour:
-                                type: number
-                                format: double
-                                example: 0.00001536
-                              week:
-                                type: number
-                                format: double
-                                example: 0.00259109
-                              month:
-                                type: number
-                                format: double
-                                example: 0.01127665
-                              year:
-                                type: number
-                                format: double
-                                example: 0.14403616
-                          apy_28d:
-                            type: object
-                            properties:
-                              minute:
-                                type: number
-                                format: double
-                                example: 0.00000043
-                              hour:
-                                type: number
-                                format: double
-                                example: 0.00002573
-                              week:
-                                type: number
-                                format: double
-                                example: 0.00434311
-                              month:
-                                type: number
-                                format: double
-                                example: 0.01895681
-                              year:
-                                type: number
-                                format: double
-                                example: 0.25276421
-        400:
-          description: Bad request (invalid parameters)
-        404:
-          description: APY data not found
-        500:
-          description: Server error
-
   /apy/all:
     get:
       summary: Get all APY data
@@ -157,7 +20,7 @@ paths:
           schema:
             type: string
           required: false
-          description: The chain to get the APY data for
+          description: The chain to get the APY data for (optional)
         - in: query
           name: collateralType
           schema:
@@ -176,112 +39,65 @@ paths:
                   items:
                     type: object
                     properties:
-                      id:
-                        type: integer
-                        example: 1
-                      created_at:
-                        type: string
-                        format: date-time
-                        example: '2023-06-24T12:34:56Z'
-                      updated_at:
-                        type: string
-                        format: date-time
-                        example: '2023-06-24T12:34:56Z'
                       ts:
                         type: string
                         format: date-time
                         example: '2023-06-24T12:34:56Z'
-                      chain:
-                        type: string
-                        example: 'mainnet'
-                      pool_id:
-                        type: integer
-                        example: 1
-                      collateral_type:
-                        type: string
-                        example: '0x1234567890abcdef'
-                      collateral_value:
+                      apy_24h:
                         type: number
                         format: double
-                        example: 1000.0
-                      apys:
+                        example: 0.05768958
+                      apy_7d:
+                        type: number
+                        format: double
+                        example: 0.14403616
+                      apy_28d:
+                        type: number
+                        format: double
+                        example: 0.25276421
+                      timeframes:
                         type: object
                         properties:
-                          apy_24h:
-                            type: object
-                            properties:
-                              minute:
-                                type: number
-                                format: double
-                                example: 0.00000011
-                              hour:
-                                type: number
-                                format: double
-                                example: 0.00000640
-                              week:
-                                type: number
-                                format: double
-                                example: 0.00107918
-                              month:
-                                type: number
-                                format: double
-                                example: 0.00468485
-                              year:
-                                type: number
-                                format: double
-                                example: 0.05768958
-                          apy_7d:
-                            type: object
-                            properties:
-                              minute:
-                                type: number
-                                format: double
-                                example: 0.00000026
-                              hour:
-                                type: number
-                                format: double
-                                example: 0.00001536
-                              week:
-                                type: number
-                                format: double
-                                example: 0.00259109
-                              month:
-                                type: number
-                                format: double
-                                example: 0.01127665
-                              year:
-                                type: number
-                                format: double
-                                example: 0.14403616
-                          apy_28d:
-                            type: object
-                            properties:
-                              minute:
-                                type: number
-                                format: double
-                                example: 0.00000043
-                              hour:
-                                type: number
-                                format: double
-                                example: 0.00002573
-                              week:
-                                type: number
-                                format: double
-                                example: 0.00434311
-                              month:
-                                type: number
-                                format: double
-                                example: 0.01895681
-                              year:
-                                type: number
-                                format: double
-                                example: 0.25276421
+                          minute:
+                            type: number
+                            format: double
+                            example: 0.00000011
+                          hour:
+                            type: number
+                            format: double
+                            example: 0.00000640
+                          week:
+                            type: number
+                            format: double
+                            example: 0.00107918
+                          month:
+                            type: number
+                            format: double
+                            example: 0.00468485
+                          year:
+                            type: number
+                            format: double
+                            example: 0.05768958
         400:
           description: Bad request (invalid parameters)
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  error:
+                    type: string
+                    example: "collateralType is required"
         404:
           description: APY data not found
-        500:
-          description: Server error
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  error:
+                    type: string
+                    example: "APY data not found for the specified chain"
 
   /apy/summary:
     get:
@@ -294,7 +110,7 @@ paths:
           schema:
             type: string
           required: false
-          description: The chain to get the APY summary statistics for
+          description: The chain to get the APY summary statistics for (optional)
         - in: query
           name: collateralType
           schema:
@@ -347,16 +163,26 @@ paths:
                       type: number
                       format: double
                       example: 0.2
-                    standard_deviation:
-                      type: number
-                      format: double
-                      example: 0.03
         400:
           description: Bad request (invalid parameters)
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  error:
+                    type: string
+                    example: "collateralType is required"
         404:
           description: APY summary statistics not found
-        500:
-          description: Server error
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  error:
+                    type: string
+                    example: "APY summary stats not found"
 
   /apy/daily:
     get:
@@ -369,7 +195,7 @@ paths:
           schema:
             type: string
           required: false
-          description: The chain to get the daily aggregated APY data for
+          description: The chain to get the daily aggregated APY data for (optional)
         - in: query
           name: collateralType
           schema:
@@ -399,82 +225,24 @@ paths:
                         nullable: true
         400:
           description: Bad request (invalid parameters)
-        404:
-          description: Daily aggregated APY data not found
-        500:
-          description: Server error
-            
-  /tvl/latest:
-    get:
-      summary: Get the latest TVL data
-      tags:
-        - TVL
-      parameters:
-        - in: query
-          name: chain
-          schema:
-            type: string
-          required: false
-          description: The chain to get the TVL data for
-      responses:
-        200:
-          description: The latest TVL data
           content:
             application/json:
               schema:
                 type: object
-                additionalProperties:
-                  type: array
-                  items:
-                    type: object
-                    properties:
-                      id:
-                        type: integer
-                        example: 1
-                      created_at:
-                        type: string
-                        format: date-time
-                        example: '2024-06-25T15:44:39.678Z'
-                      updated_at:
-                        type: string
-                        format: date-time
-                        example: '2024-06-25T15:44:39.678Z'
-                      ts:
-                        type: string
-                        format: date-time
-                        example: '2024-06-25T13:00:00.000Z'
-                      chain:
-                        type: string
-                        example: base
-                      pool_id:
-                        type: integer
-                        example: 1
-                      collateral_type:
-                        type: string
-                        example: '0xc74ea762cf06c9151ce074e6a569a5945b6302e7'
-                      amount:
-                        type: number
-                        format: double
-                        example: 25611607.372685123
-                      collateral_value:
-                        type: number
-                        format: double
-                        example: 25611607.372685123
-                      block_ts:
-                        type: string
-                        format: date-time
-                        example: '2024-06-25T13:15:47.000Z'
-                      block_number:
-                        type: integer
-                        example: 16266000
-                      contract_address:
-                        type: string
-                        example: '0x32c222a9a159782afd7529c87fa34b96ca72c696'
+                properties:
+                  error:
+                    type: string
+                    example: "collateralType is required"
         404:
-          description: TVL data not found
-        500:
-          description: Server error
-
+          description: Daily aggregated APY data not found
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  error:
+                    type: string
+                    example: "Daily aggregated APY data not found for the specified chain"
   /tvl/cumulative:
     get:
       summary: Get cumulative TVL data
@@ -486,7 +254,13 @@ paths:
           schema:
             type: string
           required: false
-          description: The chain to get the TVL data for
+          description: The chain to get the TVL data for (optional)
+        - in: query
+          name: collateralType
+          schema:
+            type: string
+          required: true
+          description: The collateral type to get the TVL data for
       responses:
         200:
           description: Cumulative TVL data
@@ -499,24 +273,13 @@ paths:
                   items:
                     type: object
                     properties:
-                      id:
-                        type: integer
-                        example: 2531
-                      created_at:
-                        type: string
-                        format: date-time
-                        example: '2024-06-25T15:44:41.072Z'
-                      updated_at:
-                        type: string
-                        format: date-time
-                        example: '2024-06-25T15:44:41.072Z'
                       ts:
                         type: string
                         format: date-time
                         example: '2024-06-25T14:00:00.000Z'
                       chain:
                         type: string
-                        example: arbitrum
+                        example: 'arbitrum'
                       pool_id:
                         type: integer
                         example: 1
@@ -541,10 +304,26 @@ paths:
                       contract_address:
                         type: string
                         example: '0xffffffaeff0b96ea8e4f94b2253f31abdd875847'
+        400:
+          description: Bad request (invalid parameters)
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  error:
+                    type: string
+                    example: "collateralType is required"
         404:
           description: TVL data not found
-        500:
-          description: Server error
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  error:
+                    type: string
+                    example: "TVL data not found for the specified chain"
 
   /tvl/summary:
     get:
@@ -557,7 +336,13 @@ paths:
           schema:
             type: string
           required: false
-          description: The chain to get the TVL summary statistics for
+          description: The chain to get the TVL summary statistics for (optional)
+        - in: query
+          name: collateralType
+          schema:
+            type: string
+          required: true
+          description: The collateral type to get the TVL summary statistics for
       responses:
         200:
           description: The TVL summary statistics
@@ -604,16 +389,26 @@ paths:
                       type: number
                       format: double
                       example: 128.06
-                    standard_deviation:
-                      type: number
-                      format: double
-                      example: 1500000.25
         400:
-          description: Bad request (invalid chain parameter)
+          description: Bad request (invalid parameters)
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  error:
+                    type: string
+                    example: "collateralType is required"
         404:
           description: TVL summary statistics not found
-        500:
-          description: Server error
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  error:
+                    type: string
+                    example: "TVL summary not found for the specified chain"
 
   /tvl/daily:
     get:
@@ -626,7 +421,13 @@ paths:
           schema:
             type: string
           required: false
-          description: The chain to get the daily TVL data for
+          description: The chain to get the daily TVL data for (optional)
+        - in: query
+          name: collateralType
+          schema:
+            type: string
+          required: true
+          description: The collateral type to get the daily TVL data for
       responses:
         200:
           description: Daily TVL data
@@ -648,75 +449,26 @@ paths:
                         format: double
                         example: 1000000.5
         400:
-          description: Bad request (invalid chain parameter)
-        404:
-          description: Daily TVL data not found
-        500:
-          description: Server error
-            
-  /core-delegations/latest:
-    get:
-      summary: Get the latest core delegations data
-      tags:
-        - Core Delegations
-      parameters:
-        - in: query
-          name: chain
-          schema:
-            type: string
-          required: false
-          description: The chain to get the core delegations data for
-      responses:
-        200:
-          description: The latest core delegations data
+          description: Bad request (invalid parameters)
           content:
             application/json:
               schema:
                 type: object
-                additionalProperties:
-                  type: array
-                  items:
-                    type: object
-                    properties:
-                      id:
-                        type: integer
-                        example: 1910
-                      created_at:
-                        type: string
-                        format: date-time
-                        example: '2024-06-27T16:00:47.837Z'
-                      updated_at:
-                        type: string
-                        format: date-time
-                        example: '2024-06-27T16:00:47.837Z'
-                      ts:
-                        type: string
-                        format: date-time
-                        example: '2024-06-27T15:00:00.000Z'
-                      chain:
-                        type: string
-                        example: base
-                      pool_id:
-                        type: integer
-                        example: 1
-                      collateral_type:
-                        type: string
-                        example: '0xC74eA762cF06c9151cE074E6a569a5945b6302E7'
-                      amount_delegated:
-                        type: number
-                        format: double
-                        example: 26161135.01363557
-                      block_ts:
-                        type: string
-                        format: date-time
-                        example: '2024-06-27T15:37:37.000Z'
-        400:
-          description: Bad request (invalid chain parameter)
+                properties:
+                  error:
+                    type: string
+                    example: "collateralType is required"
         404:
-          description: Core delegations data not found
-        500:
-          description: Server error
-
+          description: Daily TVL data not found
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  error:
+                    type: string
+                    example: "Daily TVL data not found for the specified chain"
+  
   /core-delegations/cumulative:
     get:
       summary: Get cumulative core delegations data
@@ -728,7 +480,13 @@ paths:
           schema:
             type: string
           required: false
-          description: The chain to get the core delegations data for
+          description: The chain to get the core delegations data for (optional)
+        - in: query
+          name: collateralType
+          schema:
+            type: string
+          required: true
+          description: The collateral type to get the core delegations data for
       responses:
         200:
           description: Cumulative core delegations data
@@ -741,24 +499,13 @@ paths:
                   items:
                     type: object
                     properties:
-                      id:
-                        type: integer
-                        example: 1912
-                      created_at:
-                        type: string
-                        format: date-time
-                        example: '2024-06-27T16:00:47.950Z'
-                      updated_at:
-                        type: string
-                        format: date-time
-                        example: '2024-06-27T16:00:47.950Z'
                       ts:
                         type: string
                         format: date-time
                         example: '2024-06-27T15:00:00.000Z'
                       chain:
                         type: string
-                        example: arbitrum
+                        example: 'arbitrum'
                       pool_id:
                         type: integer
                         example: 1
@@ -774,11 +521,25 @@ paths:
                         format: date-time
                         example: '2024-06-27T15:11:44.000Z'
         400:
-          description: Bad request (invalid chain parameter)
+          description: Bad request (invalid parameters)
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  error:
+                    type: string
+                    example: "collateralType is required"
         404:
           description: Core delegations data not found
-        500:
-          description: Server error
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  error:
+                    type: string
+                    example: "Core delegations data not found"
 
   /core-delegations/summary:
     get:
@@ -791,7 +552,13 @@ paths:
           schema:
             type: string
           required: false
-          description: The chain to get the core delegations summary statistics for
+          description: The chain to get the core delegations summary statistics for (optional)
+        - in: query
+          name: collateralType
+          schema:
+            type: string
+          required: true
+          description: The collateral type to get the core delegations summary statistics for
       responses:
         200:
           description: The core delegations summary statistics
@@ -838,14 +605,26 @@ paths:
                       type: number
                       format: double
                       example: 130.81
-                    standard_deviation:
-                      type: number
-                      format: double
-                      example: 1500000.25
         400:
-          description: Bad request (invalid chain parameter)
-        500:
-          description: Server error
+          description: Bad request (invalid parameters)
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  error:
+                    type: string
+                    example: "collateralType is required"
+        404:
+          description: Core delegations summary stats not found
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  error:
+                    type: string
+                    example: "Core delegations summary stats not found"
 
   /core-delegations/daily:
     get:
@@ -858,7 +637,13 @@ paths:
           schema:
             type: string
           required: false
-          description: The chain to get the daily core delegations data for
+          description: The chain to get the daily core delegations data for (optional)
+        - in: query
+          name: collateralType
+          schema:
+            type: string
+          required: true
+          description: The collateral type to get the daily core delegations data for
       responses:
         200:
           description: Daily core delegations data
@@ -880,12 +665,26 @@ paths:
                         format: double
                         example: 1000000.5
         400:
-          description: Bad request (invalid chain parameter)
+          description: Bad request (invalid parameters)
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  error:
+                    type: string
+                    example: "collateralType is required"
         404:
           description: Daily core delegations data not found
-        500:
-          description: Server error
-            
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  error:
+                    type: string
+                    example: "Daily core delegations data not found"
+  
   /core-account-delegations/stakers:
     get:
       summary: Get the unique staker count
@@ -897,7 +696,7 @@ paths:
           schema:
             type: string
           required: false
-          description: The chain to get the staker count for
+          description: The chain to get the staker count for (optional)
         - in: query
           name: collateralType
           schema:
@@ -916,10 +715,24 @@ paths:
                   example: 305
         400:
           description: Bad request (invalid parameters)
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  error:
+                    type: string
+                    example: "collateralType is required"
         404:
           description: No staker count data found
-        500:
-          description: Server error
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  error:
+                    type: string
+                    example: "No staker count data found"
 
   /core-account-delegations/stakers/cumulative:
     get:
@@ -932,7 +745,7 @@ paths:
           schema:
             type: string
           required: false
-          description: The chain to get the cumulative unique staker data for
+          description: The chain to get the cumulative unique staker data for (optional)
         - in: query
           name: collateralType
           schema:
@@ -966,70 +779,24 @@ paths:
                         example: '0xC74eA762cF06c9151cE074E6a569a5945b6302E7'
         400:
           description: Bad request (invalid parameters)
-        404:
-          description: No cumulative unique stakers data found
-        500:
-          description: Server error
-
-  /core-account-delegations/account/{accountId}:
-    get:
-      summary: Get core account delegations data by account ID
-      tags:
-        - Core Account Delegations
-      parameters:
-        - in: path
-          name: accountId
-          schema:
-            type: string
-          required: true
-          description: The account ID to get the data for
-      responses:
-        200:
-          description: Core account delegations data for the given account ID
           content:
             application/json:
               schema:
-                type: array
-                items:
-                  type: object
-                  properties:
-                    id:
-                      type: integer
-                      example: 879
-                    created_at:
-                      type: string
-                      format: date-time
-                      example: '2024-06-25T15:45:11.350Z'
-                    updated_at:
-                      type: string
-                      format: date-time
-                      example: '2024-06-25T15:45:11.350Z'
-                    ts:
-                      type: string
-                      format: date-time
-                      example: '2023-12-15T08:04:45.000Z'
-                    chain:
-                      type: string
-                      example: base
-                    account_id:
-                      type: string
-                      example: '1'
-                    pool_id:
-                      type: integer
-                      example: 1
-                    collateral_type:
-                      type: string
-                      example: '0xC74eA762cF06c9151cE074E6a569a5945b6302E7'
-                    amount_delegated:
-                      type: number
-                      format: double
-                      example: 200
-        400:
-          description: Bad request
+                type: object
+                properties:
+                  error:
+                    type: string
+                    example: "collateralType is required"
         404:
-          description: Core account delegations data not found for this account ID
-        500:
-          description: Server error
+          description: No cumulative unique stakers data found
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  error:
+                    type: string
+                    example: "No cumulative unique stakers data found"
 
   /core-account-delegations/stakers/summary:
     get:
@@ -1042,7 +809,7 @@ paths:
           schema:
             type: string
           required: false
-          description: The chain to get the unique stakers summary statistics for
+          description: The chain to get the unique stakers summary statistics for (optional)
         - in: query
           name: collateralType
           schema:
@@ -1095,16 +862,26 @@ paths:
                       type: number
                       format: double
                       example: 152.50
-                    standard_deviation:
-                      type: number
-                      format: double
-                      example: 15.5
         400:
           description: Bad request (invalid parameters)
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  error:
+                    type: string
+                    example: "collateralType is required"
         404:
           description: No summary stats found
-        500:
-          description: Server error
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  error:
+                    type: string
+                    example: "No summary stats found"
 
   /core-account-delegations/stakers/daily:
     get:
@@ -1117,7 +894,7 @@ paths:
           schema:
             type: string
           required: false
-          description: The chain to get the daily new unique stakers data for
+          description: The chain to get the daily new unique stakers data for (optional)
         - in: query
           name: collateralType
           schema:
@@ -1140,75 +917,30 @@ paths:
                         type: string
                         format: date-time
                         example: "2023-05-01T00:00:00Z"
-                      daily_new_unique_stakers:
+                      daily_unique_stakers:
                         type: integer
                         example: 42
         400:
           description: Bad request (invalid parameters)
-        404:
-          description: Daily new unique stakers data not found
-        500:
-          description: Server error
-
-  /pool-rewards/latest:
-    get:
-      summary: Get the latest pool rewards data
-      tags:
-        - Pool Rewards
-      parameters:
-        - in: query
-          name: chain
-          schema:
-            type: string
-          required: false
-          description: The chain to get the pool rewards data for
-      responses:
-        200:
-          description: The latest pool rewards data
           content:
             application/json:
               schema:
                 type: object
-                additionalProperties:
-                  type: array
-                  items:
-                    type: object
-                    properties:
-                      id:
-                        type: integer
-                        example: 2780
-                      created_at:
-                        type: string
-                        format: date-time
-                        example: '2024-06-27T14:01:04.001Z'
-                      updated_at:
-                        type: string
-                        format: date-time
-                        example: '2024-06-27T14:01:04.001Z'
-                      ts:
-                        type: string
-                        format: date-time
-                        example: '2024-06-27T13:00:00.000Z'
-                      chain:
-                        type: string
-                        example: base
-                      pool_id:
-                        type: integer
-                        example: 1
-                      collateral_type:
-                        type: string
-                        example: '0xc74ea762cf06c9151ce074e6a569a5945b6302e7'
-                      rewards_usd:
-                        type: number
-                        format: double
-                        example: 139.08178975083112
-        400:
-          description: Bad request (invalid chain parameter)
+                properties:
+                  error:
+                    type: string
+                    example: "collateralType is required"
         404:
-          description: Pool rewards data not found
-        500:
-          description: Server error
-
+          description: Daily new unique stakers data not found
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  error:
+                    type: string
+                    example: "Daily new unique stakers data not found for the specified chain"
+ 
   /pool-rewards/cumulative:
     get:
       summary: Get cumulative pool rewards data
@@ -1220,7 +952,13 @@ paths:
           schema:
             type: string
           required: false
-          description: The chain to get the pool rewards data for
+          description: The chain to get the pool rewards data for (optional)
+        - in: query
+          name: collateralType
+          schema:
+            type: string
+          required: true
+          description: The collateral type to get the pool rewards data for
       responses:
         200:
           description: Cumulative pool rewards data
@@ -1237,9 +975,6 @@ paths:
                         type: string
                         format: date-time
                         example: '2024-06-27T13:00:00.000Z'
-                      chain:
-                        type: string
-                        example: base
                       pool_id:
                         type: integer
                         example: 1
@@ -1255,11 +990,25 @@ paths:
                         format: double
                         example: 1000000.50
         400:
-          description: Bad request (invalid chain parameter)
+          description: Bad request (invalid parameters)
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  error:
+                    type: string
+                    example: "collateralType is required"
         404:
           description: Pool rewards data not found
-        500:
-          description: Server error
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  error:
+                    type: string
+                    example: "Pool rewards data not found"
 
   /pool-rewards/summary:
     get:
@@ -1272,7 +1021,13 @@ paths:
           schema:
             type: string
           required: false
-          description: The chain to get the pool rewards summary statistics for
+          description: The chain to get the pool rewards summary statistics for (optional)
+        - in: query
+          name: collateralType
+          schema:
+            type: string
+          required: true
+          description: The collateral type to get the pool rewards summary statistics for
       responses:
         200:
           description: The pool rewards summary statistics
@@ -1319,14 +1074,26 @@ paths:
                       type: number
                       format: double
                       example: 200.00
-                    standard_deviation:
-                      type: number
-                      format: double
-                      example: 50000.0
         400:
-          description: Bad request (invalid chain parameter)
-        500:
-          description: Server error
+          description: Bad request (invalid parameters)
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  error:
+                    type: string
+                    example: "collateralType is required"
+        404:
+          description: Pool rewards summary stats not found
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  error:
+                    type: string
+                    example: "Pool rewards summary stats not found"
 
   /pool-rewards/daily:
     get:
@@ -1339,7 +1106,13 @@ paths:
           schema:
             type: string
           required: false
-          description: The chain to get the daily pool rewards data for
+          description: The chain to get the daily pool rewards data for (optional)
+        - in: query
+          name: collateralType
+          schema:
+            type: string
+          required: true
+          description: The collateral type to get the daily pool rewards data for
       responses:
         200:
           description: Daily pool rewards data
@@ -1361,12 +1134,26 @@ paths:
                         format: double
                         example: 5000.75
         400:
-          description: Bad request (invalid chain parameter)
+          description: Bad request (invalid parameters)
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  error:
+                    type: string
+                    example: "collateralType is required"
         404:
           description: Daily pool rewards data not found
-        500:
-          description: Server error
-
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  error:
+                    type: string
+                    example: "Daily pool rewards data not found"
+                      
   /perp-account-stats/traders/cumulative:
     get:
       summary: Get cumulative unique traders data
@@ -1400,8 +1187,14 @@ paths:
                         example: 150
         400:
           description: Bad request (invalid chain parameter)
-        500:
-          description: Server error
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  error:
+                    type: string
+                    example: "Invalid chain parameter"
 
   /perp-account-stats/traders/summary:
     get:
@@ -1461,14 +1254,16 @@ paths:
                       type: number
                       format: double
                       example: 1000.00
-                    standard_deviation:
-                      type: number
-                      format: double
-                      example: 150.25
         400:
           description: Bad request (invalid chain parameter)
-        500:
-          description: Server error
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  error:
+                    type: string
+                    example: "Invalid chain parameter"
 
   /perp-account-stats/traders/daily:
     get:
@@ -1498,53 +1293,26 @@ paths:
                         type: string
                         format: date-time
                         example: "2023-05-01T00:00:00Z"
-                      daily_new_unique_traders:
+                      daily_unique_traders:
                         type: integer
                         example: 42
         400:
-          description: Bad request - Invalid chain parameter
-        404:
-          description: Daily new unique traders data not found
-        500:
-          description: Server error
-
-  /perp-stats/latest:
-    get:
-      summary: Get latest perp stats data
-      tags:
-        - Perp Stats
-      parameters:
-        - in: query
-          name: chain
-          schema:
-            type: string
-          required: false
-          description: The chain to get the latest perp stats data for (optional)
-      responses:
-        200:
-          description: The latest perp stats data
+          description: Bad request (invalid chain parameter)
           content:
             application/json:
               schema:
                 type: object
-                additionalProperties:
-                  type: array
-                  items:
-                    type: object
-                    properties:
-                      ts:
-                        type: string
-                        format: date-time
-                      cumulative_volume:
-                        type: number
-                      cumulative_exchange_fees:
-                        type: number
-        400:
-          description: Bad request (invalid chain parameter)
+                properties:
+                  error:
+                    type: string
+                    example: "Invalid chain parameter"
         404:
-          description: Perp stats data not found
-        500:
-          description: Server error
+          description: Daily new unique traders data not found
+          content:
+            application/json:
+              schema:
+                type: string
+                example: "Daily new unique traders data not found for the specified chain"
 
   /perp-stats/volume/cumulative:
     get:
@@ -1577,8 +1345,14 @@ paths:
                         type: number
         400:
           description: Bad request (invalid chain parameter)
-        500:
-          description: Server error
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  error:
+                    type: string
+                    example: "Invalid chain parameter"
 
   /perp-stats/volume/summary:
     get:
@@ -1620,12 +1394,16 @@ paths:
                       type: number
                     atl_percentage:
                       type: number
-                    standard_deviation:
-                      type: number
         400:
           description: Bad request (invalid chain parameter)
-        500:
-          description: Server error
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  error:
+                    type: string
+                    example: "Invalid chain parameter"
 
   /perp-stats/volume/daily:
     get:
@@ -1658,8 +1436,14 @@ paths:
                         type: number
         400:
           description: Bad request (invalid chain parameter)
-        500:
-          description: Server error
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  error:
+                    type: string
+                    example: "Invalid chain parameter"
 
   /perp-stats/exchange-fees/cumulative:
     get:
@@ -1692,8 +1476,14 @@ paths:
                         type: number
         400:
           description: Bad request (invalid chain parameter)
-        500:
-          description: Server error
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  error:
+                    type: string
+                    example: "Invalid chain parameter"
 
   /perp-stats/exchange-fees/summary:
     get:
@@ -1735,12 +1525,16 @@ paths:
                       type: number
                     atl_percentage:
                       type: number
-                    standard_deviation:
-                      type: number
         400:
           description: Bad request (invalid chain parameter)
-        500:
-          description: Server error
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  error:
+                    type: string
+                    example: "Invalid chain parameter"
 
   /perp-stats/exchange-fees/daily:
     get:
@@ -1773,9 +1567,15 @@ paths:
                         type: number
         400:
           description: Bad request (invalid chain parameter)
-        500:
-          description: Server error
-          
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  error:
+                    type: string
+                    example: "Invalid chain parameter"
+                      
   /perp-market-history/open-interest/daily:
     get:
       summary: Get daily open interest data
@@ -1807,8 +1607,14 @@ paths:
                         type: number
         400:
           description: Bad request (invalid chain parameter)
-        500:
-          description: Server error
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  error:
+                    type: string
+                    example: "Invalid chain parameter"
 
   /perp-market-history/open-interest/daily-change:
     get:
@@ -1841,8 +1647,14 @@ paths:
                         type: number
         400:
           description: Bad request (invalid chain parameter)
-        500:
-          description: Server error
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  error:
+                    type: string
+                    example: "Invalid chain parameter"
 
   /perp-market-history/open-interest/daily/summary:
     get:
@@ -1884,9 +1696,13 @@ paths:
                       type: number
                     atl_percentage:
                       type: number
-                    standard_deviation:
-                      type: number
         400:
           description: Bad request (invalid chain parameter)
-        500:
-          description: Server error
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  error:
+                    type: string
+                    example: "Invalid chain parameter"

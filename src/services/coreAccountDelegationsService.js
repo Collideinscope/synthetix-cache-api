@@ -4,6 +4,7 @@ const { CHAINS } = require('../helpers');
 const { calculateDelta, calculatePercentage, smoothData } = require('../helpers');
 
 const CACHE_TTL = 60 * 60 * 24 * 365; // 1 year in seconds
+const SERVICE_CHAINS = CHAINS['core_account_delegations'];
 
 const getStakerCount = async (chain, collateralType, isRefresh = false, trx = troyDBKnex) => {
   try {
@@ -73,7 +74,7 @@ const getStakerCount = async (chain, collateralType, isRefresh = false, trx = tr
     if (chain) {
       return await fetchCount(chain);
     } else {
-      const results = await Promise.all(CHAINS.map(fetchCount));
+      const results = await Promise.all(SERVICE_CHAINS.map(fetchCount));
       return Object.assign({}, ...results);
     }
   } catch (error) {
@@ -208,7 +209,7 @@ const getCumulativeUniqueStakers = async (chain, collateralType, isRefresh = fal
     if (chain) {
       return await fetchCumulativeData(chain);
     } else {
-      const results = await Promise.all(CHAINS.map(fetchCumulativeData));
+      const results = await Promise.all(SERVICE_CHAINS.map(fetchCumulativeData));
       return Object.assign({}, ...results);
     }
   } catch (error) {
@@ -302,8 +303,8 @@ const getUniqueStakersSummaryStats = async (chain, collateralType, isRefresh = f
       const result = await processChainData(chain);
       return result ? { [chain]: result } : {};
     } else {
-      const results = await Promise.all(CHAINS.map(processChainData));
-      return Object.fromEntries(CHAINS.map((chain, index) => [chain, results[index] || {}]));
+      const results = await Promise.all(SERVICE_CHAINS.map(processChainData));
+      return Object.fromEntries(SERVICE_CHAINS.map((chain, index) => [chain, results[index] || {}]));
     }
   } catch (error) {
     console.error('Error in getUniqueStakersSummaryStats:', error);
@@ -413,7 +414,7 @@ const getDailyNewUniqueStakers = async (chain, collateralType, isRefresh = false
     if (chain) {
       return await fetchDailyData(chain);
     } else {
-      const results = await Promise.all(CHAINS.map(chainToFetch => fetchDailyData(chainToFetch)));
+      const results = await Promise.all(SERVICE_CHAINS.map(chainToFetch => fetchDailyData(chainToFetch)));
       return Object.assign({}, ...results);
     }
   } catch (error) {
@@ -425,7 +426,7 @@ const getDailyNewUniqueStakers = async (chain, collateralType, isRefresh = false
 const refreshAllCoreAccountDelegationsData = async (collateralType) => {
   console.log('Starting to refresh Core Account Delegations data for all chains');
 
-  for (const chain of CHAINS['core_account_delegations']) {
+  for (const chain of SERVICE_CHAINS) {
     console.log(`Refreshing core account delegations data for chain: ${chain}`);
     console.time(`${chain} total refresh time`);
 

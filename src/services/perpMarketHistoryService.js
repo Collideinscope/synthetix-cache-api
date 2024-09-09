@@ -4,6 +4,7 @@ const { CHAINS } = require('../helpers');
 const { calculateDelta, calculatePercentage, smoothData } = require('../helpers');
 
 const CACHE_TTL = 60 * 60 * 24 * 365; // 1 year in seconds
+const SERVICE_CHAINS = CHAINS['perp_market_history'];
 
 const getOpenInterestData = async (chain, isRefresh = false, trx = troyDBKnex) => {
   console.log(`getOpenInterestData called with chain: ${chain}, isRefresh: ${isRefresh}`);
@@ -111,7 +112,7 @@ const getOpenInterestData = async (chain, isRefresh = false, trx = troyDBKnex) =
     if (chain) {
       return await fetchDataForChain(chain);
     } else {
-      const results = await Promise.all(CHAINS.map(fetchDataForChain));
+      const results = await Promise.all(SERVICE_CHAINS.map(fetchDataForChain));
       return Object.assign({}, ...results);
     }
   } catch (error) {
@@ -237,7 +238,7 @@ const getDailyOpenInterestChangeData = async (chain, isRefresh = false, trx = tr
     if (chain) {
       return await fetchDataForChain(chain);
     } else {
-      const results = await Promise.all(CHAINS.map(fetchDataForChain));
+      const results = await Promise.all(SERVICE_CHAINS.map(fetchDataForChain));
       return Object.assign({}, ...results);
     }
   } catch (error) {
@@ -325,8 +326,8 @@ const getOpenInterestSummaryStats = async (chain, isRefresh = false, trx = troyD
       const result = await processChainData(chain);
       return result ? { [chain]: result } : {};
     } else {
-      const results = await Promise.all(CHAINS.map(processChainData));
-      return Object.fromEntries(CHAINS.map((chain, index) => [chain, results[index] || {}]));
+      const results = await Promise.all(SERVICE_CHAINS.map(processChainData));
+      return Object.fromEntries(SERVICE_CHAINS.map((chain, index) => [chain, results[index] || {}]));
     }
   } catch (error) {
     console.error('Error in getOpenInterestSummaryStats:', error);
@@ -337,7 +338,7 @@ const getOpenInterestSummaryStats = async (chain, isRefresh = false, trx = troyD
 const refreshAllPerpMarketHistoryData = async () => {
   console.log('Starting to refresh Perp Market History data for all chains');
   
-  for (const chain of CHAINS['perp_market_history']) {
+  for (const chain of SERVICE_CHAINS) {
     console.log(`Refreshing Perp Market History data for chain: ${chain}`);
     console.time(`${chain} total refresh time`);
 
