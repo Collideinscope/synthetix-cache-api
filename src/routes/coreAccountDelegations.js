@@ -8,11 +8,13 @@ const {
 } = require('../services/coreAccountDelegationsService');
 const { CHAINS } = require('../helpers');
 
+const SERVICE_CHAINS = CHAINS['core_account_delegations'];
+
 const validateParameters = (chain, collateralType) => {
   if (!collateralType) {
     throw new Error("collateralType is required");
   }
-  if (chain && !CHAINS.includes(chain)) {
+  if (chain && !SERVICE_CHAINS.includes(chain)) {
     throw new Error("Invalid chain parameter");
   }
 };

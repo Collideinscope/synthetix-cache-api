@@ -7,11 +7,13 @@ const {
 } = require('../services/poolRewardsService');
 const { CHAINS } = require('../helpers');
 
+const SERVICE_CHAINS = CHAINS['pool_rewards'];
+
 const validateParameters = (chain, collateralType) => {
   if (!collateralType) {
     throw new Error("collateralType is required");
   }
-  if (chain && !CHAINS.includes(chain)) {
+  if (chain && !SERVICE_CHAINS.includes(chain)) {
     throw new Error("Invalid chain parameter");
   }
 };

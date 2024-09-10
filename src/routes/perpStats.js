@@ -10,8 +10,10 @@ const {
 } = require('../services/perpStatsService');
 const { CHAINS } = require('../helpers');
 
+const SERVICE_CHAINS = CHAINS['perp_stats'];
+
 const validateOptionalChain = (chain) => {
-  if (chain && !CHAINS.includes(chain)) {
+  if (chain && !SERVICE_CHAINS.includes(chain)) {
     throw new Error("Invalid chain parameter");
   }
 };
