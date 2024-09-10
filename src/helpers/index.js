@@ -26,6 +26,10 @@ const CHAINS = {
     'base',
     'arbitrum',
   ],
+  'perp_stats': [
+    'base',
+    'arbitrum',
+  ],
   'perp_market_history': [
     'base',
     'arbitrum',
