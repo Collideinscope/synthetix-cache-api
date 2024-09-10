@@ -384,10 +384,6 @@ const refreshAllCoreDelegationsData = async (collateralType) => {
     await troyDBKnex.transaction(async (trx) => {
       try {
         // Fetch new data
-        console.time(`${chain} getLatestCoreDelegationsData`);
-        await getLatestCoreDelegationsData(chain, collateralType, true, trx);
-        console.timeEnd(`${chain} getLatestCoreDelegationsData`);
-
         console.time(`${chain} getCoreDelegationsData`);
         await getCoreDelegationsData(chain, collateralType, true, trx);
         console.timeEnd(`${chain} getCoreDelegationsData`);
