@@ -118,6 +118,11 @@ const getCumulativeUniqueStakers = async (chain, collateralType, isRefresh = fal
             const startDate = cachedTimestamp ? new Date(cachedTimestamp) : new Date('2023-01-01');
             console.log(`Fetching data from ${startDate.toISOString()} to ${latestDbTimestamp.latest_ts}`);
 
+            let lastCumulativeCount = 0;
+            if (result && result.length > 0) {
+              lastCumulativeCount = Math.max(...result.map(r => r.cumulative_staker_count));
+            }
+
             const queryResult = await trx.raw(`
               WITH daily_stakers AS (
                 SELECT DISTINCT
@@ -146,7 +151,7 @@ const getCumulativeUniqueStakers = async (chain, collateralType, isRefresh = fal
                   day,
                   pool_id,
                   collateral_type,
-                  SUM(daily_unique_stakers) OVER (PARTITION BY pool_id, collateral_type ORDER BY day) AS cumulative_staker_count
+                  SUM(daily_unique_stakers) OVER (PARTITION BY pool_id, collateral_type ORDER BY day) + ? AS cumulative_staker_count
                 FROM
                   daily_counts
               )
@@ -159,7 +164,7 @@ const getCumulativeUniqueStakers = async (chain, collateralType, isRefresh = fal
                 cumulative_counts
               ORDER BY
                 ts, pool_id, collateral_type;
-            `, [collateralType, startDate]);
+            `, [collateralType, startDate, lastCumulativeCount]);
 
             const newResult = queryResult.rows.map(row => ({
               ts: row.ts,
@@ -171,8 +176,19 @@ const getCumulativeUniqueStakers = async (chain, collateralType, isRefresh = fal
             console.log(`Fetched ${newResult.length} new records from database`);
 
             if (result) {
-              console.log('Parsing and concatenating existing result with new data');
-              result = result.concat(newResult);
+              console.log('Merging existing result with new data');
+              const mergedResult = [...result];
+              newResult.forEach(newRow => {
+                const existingIndex = mergedResult.findIndex(r => 
+                  r.ts === newRow.ts && r.pool_id === newRow.pool_id && r.collateral_type === newRow.collateral_type
+                );
+                if (existingIndex !== -1) {
+                  mergedResult[existingIndex] = newRow;
+                } else {
+                  mergedResult.push(newRow);
+                }
+              });
+              result = mergedResult.sort((a, b) => new Date(a.ts) - new Date(b.ts));
             } else {
               console.log('Setting result to new data');
               result = newResult;

@@ -35,6 +35,11 @@ const getCumulativeUniqueTraders = async (chain, isRefresh = false, trx = troyDB
           const startDate = cachedTimestamp ? new Date(cachedTimestamp) : new Date('2023-01-01');
           console.log(`Fetching data from ${startDate.toISOString()} to ${latestDbTimestamp.latest_ts}`);
 
+          let lastCumulativeCount = 0;
+          if (result && result.length > 0) {
+            lastCumulativeCount = Math.max(...result.map(r => r.cumulative_trader_count));
+          }
+
           const queryResult = await trx.raw(`
             WITH daily_unique_traders AS (
               SELECT
@@ -49,7 +54,7 @@ const getCumulativeUniqueTraders = async (chain, isRefresh = false, trx = troyDB
             cumulative_counts AS (
               SELECT
                 ts,
-                SUM(unique_traders) OVER (ORDER BY ts) AS cumulative_trader_count
+                SUM(unique_traders) OVER (ORDER BY ts) + ? AS cumulative_trader_count
               FROM
                 daily_unique_traders
             )
@@ -60,7 +65,7 @@ const getCumulativeUniqueTraders = async (chain, isRefresh = false, trx = troyDB
               cumulative_counts
             ORDER BY
               ts;
-          `, [startDate]);
+          `, [startDate, lastCumulativeCount]);
 
           const newResult = queryResult.rows.map(row => ({
             ts: row.ts,
@@ -70,8 +75,17 @@ const getCumulativeUniqueTraders = async (chain, isRefresh = false, trx = troyDB
           console.log(`Fetched ${newResult.length} new records from database`);
 
           if (result) {
-            console.log('Parsing and concatenating existing result with new data');
-            result = result.concat(newResult);
+            console.log('Merging existing result with new data');
+            const mergedResult = [...result];
+            newResult.forEach(newRow => {
+              const existingIndex = mergedResult.findIndex(r => r.ts === newRow.ts);
+              if (existingIndex !== -1) {
+                mergedResult[existingIndex] = newRow;
+              } else {
+                mergedResult.push(newRow);
+              }
+            });
+            result = mergedResult.sort((a, b) => new Date(a.ts) - new Date(b.ts));
           } else {
             console.log('Setting result to new data');
             result = newResult;

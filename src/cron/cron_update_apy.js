@@ -36,3 +36,5 @@ cronRefreshAPY().catch(error => {
   console.error('Unhandled error in cronRefreshAPY:', error);
   process.exit(1);
 });
+
+module.exports = cronRefreshAPY;
