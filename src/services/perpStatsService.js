@@ -250,28 +250,50 @@ const fetchDailyData = async (chain, dataType, isRefresh = false, trx = troyDBKn
         const startDate = cachedTimestamp ? new Date(cachedTimestamp) : new Date('2023-01-01');
         console.log(`Fetching data from ${startDate.toISOString()} to ${latestDbTimestamp.latest_ts}`);
 
-        const queryResult = await trx.raw(`
-          WITH daily_data AS (
-            SELECT 
+        let queryResult; 
+
+        if (!result || !cachedTimestamp) {
+          // Initial fetch query
+          queryResult = await trx.raw(`
+            SELECT
               ts AS date,
               ${dataType},
-              LAG(${dataType}) OVER (ORDER BY ts) AS prev_${dataType}
-            FROM 
+              ${dataType} - LAG(${dataType}) OVER (ORDER BY ts) AS daily_${dataType}
+            FROM
               ${tableName}
-            WHERE ts > ?
-            ORDER BY 
+            ORDER BY
               ts
-          )
-          SELECT 
-            date,
-            COALESCE(${dataType} - prev_${dataType}, ${dataType}) AS daily_${dataType}
-          FROM 
-            daily_data
-          WHERE
-            prev_${dataType} IS NOT NULL OR date = (SELECT MIN(date) FROM daily_data)
-          ORDER BY 
-            date;
-        `, [startDate]);
+          `);
+        } else {
+          // Update query
+          queryResult = await trx.raw(`
+            WITH updated_data AS (
+              SELECT
+                ts AS date,
+                ${dataType},
+                LAG(${dataType}) OVER (ORDER BY ts) AS prev_${dataType}
+              FROM
+                ${tableName}
+              WHERE ts >= ?
+              UNION ALL
+              SELECT
+                ts AS date,
+                ${dataType},
+                NULL AS prev_${dataType}
+              FROM
+                ${tableName}
+              WHERE ts = (SELECT MAX(ts) FROM ${tableName} WHERE ts < ?)
+            )
+            SELECT
+              date,
+              COALESCE(${dataType} - prev_${dataType}, ${dataType}) AS daily_${dataType}
+            FROM
+              updated_data
+            ORDER BY
+              date
+          `, [startDate, startDate]);
+        }
+
 
         const newResult = queryResult.rows.map(row => ({
           ts: row.date,
