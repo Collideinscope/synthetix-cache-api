@@ -346,81 +346,97 @@ const getDailyNewUniqueStakers = async (chain, collateralType, isRefresh = false
 
       console.log(`Redis result: ${result ? 'Data found' : 'No data'}, Timestamp: ${cachedTimestamp}`);
 
-      if (isRefresh || !result) {
-        const tableName = `prod_${chainToFetch}_mainnet.fct_core_account_delegation_${chainToFetch}_mainnet`;
-        console.log(`Querying database table: ${tableName}`);
+      const tableName = `prod_${chainToFetch}_mainnet.fct_core_account_delegation_${chainToFetch}_mainnet`;
 
-        try {
-          const latestDbTimestamp = await trx(tableName)
-            .where('collateral_type', collateralType)
-            .max('ts as latest_ts')
-            .first();
+      try {
+        const latestDbTimestamp = await trx(tableName)
+          .where('collateral_type', collateralType)
+          .max('ts as latest_ts')
+          .first();
 
-          console.log(`Latest DB timestamp: ${JSON.stringify(latestDbTimestamp)}`);
+        console.log(`Latest DB timestamp: ${JSON.stringify(latestDbTimestamp)}`);
 
-          if (!result || !cachedTimestamp || new Date(latestDbTimestamp.latest_ts) > new Date(cachedTimestamp)) {
-            console.log('Fetching new daily unique stakers data from database');
-            const startDate = cachedTimestamp ? new Date(cachedTimestamp) : new Date('2023-01-01');
-            console.log(`Fetching data from ${startDate.toISOString()} to ${latestDbTimestamp.latest_ts}`);
+        if (!result || !cachedTimestamp || new Date(latestDbTimestamp.latest_ts) > new Date(cachedTimestamp)) {
+          console.log('Fetching new daily unique stakers data from database');
 
-            const queryResult = await trx.raw(`
-              WITH daily_stakers AS (
-                SELECT DISTINCT
-                  DATE_TRUNC('day', ts) AS date,
-                  account_id
-                FROM
-                  ${tableName}
-                WHERE
-                  collateral_type = ? AND ts > ?
-              )
-              SELECT
-                date,
-                COUNT(DISTINCT account_id) AS daily_unique_stakers
+          // If it's a refresh, recalculate from the beginning of the last cached day
+          const startDate = cachedTimestamp ? new Date(cachedTimestamp) : new Date('2023-01-01');
+
+          console.log(`Fetching data from ${startDate} to ${latestDbTimestamp.latest_ts}`);
+
+          const queryResult = await trx.raw(`
+            WITH daily_stakers AS (
+              SELECT DISTINCT
+                DATE_TRUNC('day', ts) AS date,
+                account_id
               FROM
-                daily_stakers
-              GROUP BY
-                date
-              ORDER BY
-                date;
-            `, [collateralType, startDate]);
+                ${tableName}
+              WHERE
+                collateral_type = ? AND ts > ?
+            )
+            SELECT
+              date,
+              COUNT(DISTINCT account_id) AS daily_unique_stakers
+            FROM
+              daily_stakers
+            GROUP BY
+              date
+            ORDER BY
+              date;
+          `, [collateralType, startDate]);
 
-            const newResult = queryResult.rows.map(row => ({
-              ts: row.date,
-              daily_unique_stakers: parseInt(row.daily_unique_stakers),
-            }));
+          const newResult = queryResult.rows.map(row => ({
+            ts: row.date,
+            daily_unique_stakers: parseInt(row.daily_unique_stakers),
+          }));
 
-            console.log(`Fetched ${newResult.length} new records from database`);
+          console.log(`Fetched ${newResult.length} new records from database`);
 
-            if (result) {
-              console.log('Parsing and concatenating existing result with new data');
-              result = result.concat(newResult);
-            } else {
-              console.log('Setting result to new data');
-              result = newResult;
-            }
+          // Update the result, replacing the overlapping days
+          if (result) {
+            console.log('Merging existing result with new data');
+            const mergedResult = [...result];
 
-            if (result.length > 0) {
-              console.log(`Attempting to cache ${result.length} records in Redis`);
-              try {
-                await redisService.set(cacheKey, result, CACHE_TTL);
-                await redisService.set(tsKey, latestDbTimestamp.latest_ts, CACHE_TTL);
-                console.log('Data successfully cached in Redis');
-              } catch (redisError) {
-                console.error('Error caching data in Redis:', redisError);
+            newResult.forEach(newRow => {
+              // Check if the day already exists in the cached result
+              const existingIndex = mergedResult.findIndex(r =>
+                new Date(r.ts).toISOString().split('T')[0] === new Date(newRow.ts).toISOString().split('T')[0]
+              );
+
+              if (existingIndex !== -1) {
+                // If the day exists, replace the old data with the new data for that day
+                mergedResult[existingIndex] = newRow;
+              } else {
+                // Otherwise, add the new entry
+                mergedResult.push(newRow);
               }
-            } else {
-              console.log('No data to cache in Redis');
+            });
+
+            // Sort the result by timestamp
+            result = mergedResult.sort((a, b) => new Date(a.ts) - new Date(b.ts));
+          } else {
+            console.log('Setting result to new data');
+            result = newResult;
+          }
+
+          if (result.length > 0) {
+            console.log(`Attempting to cache ${result.length} records in Redis`);
+            try {
+              await redisService.set(cacheKey, result, CACHE_TTL);
+              await redisService.set(tsKey, latestDbTimestamp.latest_ts, CACHE_TTL);
+              console.log('Data successfully cached in Redis');
+            } catch (redisError) {
+              console.error('Error caching data in Redis:', redisError);
             }
           } else {
-            console.log('Using cached data, no need to fetch from database');
+            console.log('No data to cache in Redis');
           }
-        } catch (dbError) {
-          console.error('Error querying database:', dbError);
-          result = [];
+        } else {
+          console.log('Using cached data, no need to fetch from database');
         }
-      } else {
-        console.log('Not refreshing, parsing cached result');
-        result = result;
+      } catch (dbError) {
+        console.error('Error querying database:', dbError);
+        result = [];
       }
 
       console.log(`Returning result for ${chainToFetch}: ${result ? result.length + ' records' : 'No data'}`);

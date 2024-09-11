@@ -12,7 +12,7 @@ const getCumulativeUniqueTraders = async (chain, isRefresh = false, trx = troyDB
   const fetchCumulativeData = async (chainToFetch) => {
     const cacheKey = `cumulativeUniqueTraders:${chainToFetch}`;
     const tsKey = `${cacheKey}:timestamp`;
-    
+
     console.log(`Attempting to get data from Redis for key: ${cacheKey}`);
     let result = await redisService.get(cacheKey);
     let cachedTimestamp = await redisService.get(tsKey);
@@ -41,25 +41,32 @@ const getCumulativeUniqueTraders = async (chain, isRefresh = false, trx = troyDB
           }
 
           const queryResult = await trx.raw(`
-            WITH daily_unique_traders AS (
-              SELECT
-                ts,
-                COUNT(DISTINCT account_id) AS unique_traders
+            WITH daily_traders AS (
+              SELECT DISTINCT
+                DATE_TRUNC('day', ts) AS day,
+                account_id
               FROM
                 ${tableName}
               WHERE ts > ?
+            ),
+            daily_counts AS (
+              SELECT
+                day,
+                COUNT(DISTINCT account_id) AS daily_unique_traders
+              FROM
+                daily_traders
               GROUP BY
-                ts
+                day
             ),
             cumulative_counts AS (
               SELECT
-                ts,
-                SUM(unique_traders) OVER (ORDER BY ts) + ? AS cumulative_trader_count
+                day,
+                SUM(daily_unique_traders) OVER (ORDER BY day) + ? AS cumulative_trader_count
               FROM
-                daily_unique_traders
+                daily_counts
             )
             SELECT
-              ts,
+              day AS ts,
               cumulative_trader_count
             FROM
               cumulative_counts
@@ -225,7 +232,7 @@ const getDailyNewUniqueTraders = async (chain, isRefresh = false, trx = troyDBKn
   const fetchDailyData = async (chainToFetch) => {
     const cacheKey = `dailyNewUniqueTraders:${chainToFetch}`;
     const tsKey = `${cacheKey}:timestamp`;
-    
+
     console.log(`Attempting to get data from Redis for key: ${cacheKey}`);
     let result = await redisService.get(cacheKey);
     let cachedTimestamp = await redisService.get(tsKey);
@@ -244,33 +251,53 @@ const getDailyNewUniqueTraders = async (chain, isRefresh = false, trx = troyDBKn
         console.log(`Latest DB timestamp: ${JSON.stringify(latestDbTimestamp)}`);
 
         if (!result || !cachedTimestamp || new Date(latestDbTimestamp.latest_ts) > new Date(cachedTimestamp)) {
-          console.log('Fetching new daily new unique traders data from database');
+          console.log('Fetching new daily unique traders data from database');
+
+          // If it's a refresh, recalculate from the beginning of the last cached day
           const startDate = cachedTimestamp ? new Date(cachedTimestamp) : new Date('2023-01-01');
           console.log(`Fetching data from ${startDate.toISOString()} to ${latestDbTimestamp.latest_ts}`);
 
           const queryResult = await trx.raw(`
             SELECT
-              ts,
+              DATE_TRUNC('day', ts) AS date,
               COUNT(DISTINCT account_id) AS daily_unique_traders
             FROM
               ${tableName}
             WHERE ts > ?
             GROUP BY
-              ts
+              date
             ORDER BY
-              ts;
+              date;
           `, [startDate]);
 
           const newResult = queryResult.rows.map(row => ({
-            ts: row.ts,
+            ts: row.date,
             daily_unique_traders: parseInt(row.daily_unique_traders),
           }));
 
           console.log(`Fetched ${newResult.length} new records from database`);
 
           if (result) {
-            console.log('Parsing and concatenating existing result with new data');
-            result = result.concat(newResult);
+            console.log('Merging existing result with new data');
+            const mergedResult = [...result];
+
+            newResult.forEach(newRow => {
+              // Check if the day already exists in the cached result
+              const existingIndex = mergedResult.findIndex(r =>
+                new Date(r.ts).toISOString().split('T')[0] === new Date(newRow.ts).toISOString().split('T')[0]
+              );
+
+              if (existingIndex !== -1) {
+                // If the day exists, replace the old data with the new data for that day
+                mergedResult[existingIndex] = newRow;
+              } else {
+                // Otherwise, add the new entry
+                mergedResult.push(newRow);
+              }
+            });
+
+            // Sort the result by timestamp
+            result = mergedResult.sort((a, b) => new Date(a.ts) - new Date(b.ts));
           } else {
             console.log('Setting result to new data');
             result = newResult;
