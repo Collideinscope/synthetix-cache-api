@@ -51,8 +51,19 @@ const getCumulativeTVLData = async (chain, collateralType, isRefresh = false, tr
           console.log(`Fetched ${newData.length} new records from database`);
 
           if (result) {
-            console.log('Parsing and concatenating existing result with new data');
-            result = result.concat(newData);
+            console.log('Merging existing result with new data');
+            const mergedResult = [...result];
+            newData.forEach(newRow => {
+              const existingIndex = mergedResult.findIndex(r => r.ts === newRow.ts);
+              if (existingIndex !== -1) {
+                // Update existing entry
+                mergedResult[existingIndex] = newRow;
+              } else {
+                // Add new entry
+                mergedResult.push(newRow);
+              }
+            });
+            result = mergedResult.sort((a, b) => new Date(a.ts) - new Date(b.ts));
           } else {
             console.log('Setting result to new data');
             result = newData;
@@ -251,8 +262,19 @@ const getDailyTVLData = async (chain, collateralType, isRefresh = false, trx = t
           console.log(`Fetched ${newResult.length} new records from database`);
 
           if (result) {
-            console.log('Parsing and concatenating existing result with new data');
-            result = result.concat(newResult);
+            console.log('Merging existing result with new data');
+            const mergedResult = [...result];
+            newResult.forEach(newRow => {
+              const existingIndex = mergedResult.findIndex(r => r.ts === newRow.ts);
+              if (existingIndex !== -1) {
+                // Update existing entry
+                mergedResult[existingIndex] = newRow;
+              } else {
+                // Add new entry
+                mergedResult.push(newRow);
+              }
+            });
+            result = mergedResult.sort((a, b) => new Date(a.ts) - new Date(b.ts));
           } else {
             console.log('Setting result to new data');
             result = newResult;
