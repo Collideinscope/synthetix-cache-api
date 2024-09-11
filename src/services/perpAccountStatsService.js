@@ -41,7 +41,7 @@ const getCumulativeUniqueTraders = async (chain, isRefresh = false, trx = troyDB
           }
 
           const queryResult = await trx.raw(`
-            WITH daily_traders AS (
+            WITH distinct_daily_traders AS (
               SELECT DISTINCT
                 DATE_TRUNC('day', ts) AS day,
                 account_id
@@ -49,21 +49,26 @@ const getCumulativeUniqueTraders = async (chain, isRefresh = false, trx = troyDB
                 ${tableName}
               WHERE ts > ?
             ),
-            daily_counts AS (
+            daily_new_traders AS (
               SELECT
                 day,
-                COUNT(DISTINCT account_id) AS daily_unique_traders
-              FROM
-                daily_traders
-              GROUP BY
-                day
+                COUNT(*) AS new_traders
+              FROM (
+                SELECT
+                  day,
+                  account_id,
+                  ROW_NUMBER() OVER (PARTITION BY account_id ORDER BY day) AS rn
+                FROM distinct_daily_traders
+              ) subquery
+              WHERE rn = 1
+              GROUP BY day
             ),
             cumulative_counts AS (
               SELECT
                 day,
-                SUM(daily_unique_traders) OVER (ORDER BY day) + ? AS cumulative_trader_count
+                SUM(new_traders) OVER (ORDER BY day) + ? AS cumulative_trader_count
               FROM
-                daily_counts
+                daily_new_traders
             )
             SELECT
               day AS ts,
