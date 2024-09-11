@@ -76,21 +76,32 @@ const getOpenInterestData = async (chain, isRefresh = false, trx = troyDBKnex) =
           if (result) {
             console.log('Merging existing result with new data');
             const mergedResult = [...result];
+          
             newResult.forEach(newRow => {
-              const existingIndex = mergedResult.findIndex(r => r.ts === newRow.ts);
+              // Find existing entry based on date day
+              const existingIndex = mergedResult.findIndex(r => 
+                new Date(r.ts).toISOString().split('T')[0] === new Date(newRow.ts).toISOString().split('T')[0]
+              );
+          
               if (existingIndex !== -1) {
-                // Update existing entry
-                mergedResult[existingIndex] = newRow;
+                // If the day exists, recalculate the average
+                const existingRow = mergedResult[existingIndex];
+                mergedResult[existingIndex] = {
+                  ts: existingRow.ts, 
+                  daily_oi: newRow.daily_oi
+                };
               } else {
-                // Add new entry
+                // If it's a new day, add the new entry
                 mergedResult.push(newRow);
               }
             });
+          
+            // Ensure the data is sorted by date after merging
             result = mergedResult.sort((a, b) => new Date(a.ts) - new Date(b.ts));
           } else {
             console.log('Setting result to new data');
             result = newResult;
-          }          
+          }      
 
           if (result.length > 0) {
             console.log(`Attempting to cache ${result.length} records in Redis`);
@@ -211,12 +222,35 @@ const getDailyOpenInterestChangeData = async (chain, isRefresh = false, trx = tr
           console.log(`Fetched ${newResult.length} new records from database`);
 
           if (result) {
-            console.log('Parsing and concatenating existing result with new data');
-            result = result.concat(newResult);
+            console.log('Merging existing result with new data');
+            const mergedResult = [...result];
+          
+            newResult.forEach(newRow => {
+              // Find existing entry based on date day
+              const existingIndex = mergedResult.findIndex(r => 
+                new Date(r.ts).toISOString().split('T')[0] === new Date(newRow.ts).toISOString().split('T')[0]
+              );
+          
+              if (existingIndex !== -1) {
+                // If the day exists, recalculate the average
+                const existingRow = mergedResult[existingIndex];
+                mergedResult[existingIndex] = {
+                  ts: existingRow.ts, 
+                  daily_oi: newRow.daily_oi
+                };
+              } else {
+                // If it's a new day, add the new entry
+                mergedResult.push(newRow);
+              }
+            });
+          
+            // Ensure the data is sorted by date after merging
+            result = mergedResult.sort((a, b) => new Date(a.ts) - new Date(b.ts));
           } else {
             console.log('Setting result to new data');
             result = newResult;
-          }
+          }      
+
 
           if (result.length > 0) {
             console.log(`Attempting to cache ${result.length} records in Redis`);

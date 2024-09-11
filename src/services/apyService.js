@@ -56,7 +56,7 @@ const getAllAPYData = async (chain, collateralType, isRefresh = false, trx = tro
           }));
 
           if (result) {
-            console.log('Parsing and concatenating existing result with new data');
+            console.log('Concatenating existing result with new data');
             result = result.concat(newResult);
           } else {
             console.log('Setting result to new data');
@@ -244,6 +244,7 @@ const getDailyAggregatedAPYData = async (chain, collateralType, isRefresh = fals
           }));
 
           if (result) {
+            console.log('Concatenating existing result with new data');
             result = result.concat(newResult);
           } else {
             result = newResult;
@@ -255,10 +256,12 @@ const getDailyAggregatedAPYData = async (chain, collateralType, isRefresh = fals
           }
         }
       } else if (result) {
-        // If not refreshing but result exists, parse it
+        console.log('Not refreshing, parsing cached result');
         result = result;
       }
   
+      console.log(`Returning result for ${chainToFetch}: ${result ? result.length + ' records' : 'No data'}`);
+
       return { [chainToFetch]: result || [] };
     };
 

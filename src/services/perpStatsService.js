@@ -150,7 +150,7 @@ const fetchCumulativeData = async (chain, dataType, isRefresh = false, trx = tro
         console.log(`Fetched ${newResult.length} new records from database`);
 
         if (result) {
-          console.log('Parsing and concatenating existing result with new data');
+          console.log('Concatenating existing result with new data');
           result = result.concat(newResult);
         } else {
           console.log('Setting result to new data');
@@ -249,55 +249,21 @@ const fetchDailyData = async (chain, dataType, isRefresh = false, trx = troyDBKn
         console.log('Fetching new daily data from database');
         const startDate = cachedTimestamp ? new Date(cachedTimestamp) : new Date('2023-01-01');
         console.log(`Fetching data from ${startDate.toISOString()} to ${latestDbTimestamp.latest_ts}`);
-
-        let queryResult; 
-
-        if (!result || !cachedTimestamp) {
-          // Initial fetch query
-          queryResult = await trx.raw(`
-            SELECT
-              ts AS date,
-              ${dataType},
-              ${dataType} - LAG(${dataType}) OVER (ORDER BY ts) AS daily_${dataType}
-            FROM
-              ${tableName}
-            ORDER BY
-              ts
-          `);
-        } else {
-          // Update query
-          queryResult = await trx.raw(`
-            WITH updated_data AS (
-              SELECT
-                ts AS date,
-                ${dataType},
-                LAG(${dataType}) OVER (ORDER BY ts) AS prev_${dataType}
-              FROM
-                ${tableName}
-              WHERE ts >= ?
-              UNION ALL
-              SELECT
-                ts AS date,
-                ${dataType},
-                NULL AS prev_${dataType}
-              FROM
-                ${tableName}
-              WHERE ts = (SELECT MAX(ts) FROM ${tableName} WHERE ts < ?)
-            )
-            SELECT
-              date,
-              COALESCE(${dataType} - prev_${dataType}, ${dataType}) AS daily_${dataType}
-            FROM
-              updated_data
-            ORDER BY
-              date
-          `, [startDate, startDate]);
-        }
-
+        
+        const queryResult = await trx.raw(`
+          SELECT
+            ts,
+            ${dataType}
+          FROM
+            ${tableName}
+          WHERE ts > ?
+          ORDER BY
+            ts
+        `, [startDate]);
 
         const newResult = queryResult.rows.map(row => ({
-          ts: row.date,
-          [`daily_${dataType}`]: parseFloat(row[`daily_${dataType}`]),
+          ts: row.ts,
+          [`daily_${dataType}`]: parseFloat(row[dataType]),
         }));
 
         console.log(`Fetched ${newResult.length} new records from database`);
@@ -341,11 +307,11 @@ const getDailyVolumeData = async (chain, isRefresh = false, trx = troyDBKnex) =>
   console.log(`getDailyVolumeData called with chain: ${chain}, isRefresh: ${isRefresh}`);
   try {
     if (chain) {
-      const data = await fetchDailyData(chain, 'cumulative_volume', isRefresh, trx);
+      const data = await fetchDailyData(chain, 'volume', isRefresh, trx);
       return { [chain]: data };
     } else {
       const results = await Promise.all(SERVICE_CHAINS.map(async (chain) => {
-        const data = await fetchDailyData(chain, 'cumulative_volume', isRefresh, trx);
+        const data = await fetchDailyData(chain, 'volume', isRefresh, trx);
         return { [chain]: data };
       }));
       return results.reduce((acc, curr) => ({ ...acc, ...curr }), {});
@@ -360,11 +326,11 @@ const getDailyExchangeFeesData = async (chain, isRefresh = false, trx = troyDBKn
   console.log(`getDailyExchangeFeesData called with chain: ${chain}, isRefresh: ${isRefresh}`);
   try {
     if (chain) {
-      const data = await fetchDailyData(chain, 'cumulative_exchange_fees', isRefresh, trx);
+      const data = await fetchDailyData(chain, 'exchange_fees', isRefresh, trx);
       return { [chain]: data };
     } else {
       const results = await Promise.all(SERVICE_CHAINS.map(async (chain) => {
-        const data = await fetchDailyData(chain, 'cumulative_exchange_fees', isRefresh, trx);
+        const data = await fetchDailyData(chain, 'exchange_fees', isRefresh, trx);
         return { [chain]: data };
       }));
       return results.reduce((acc, curr) => ({ ...acc, ...curr }), {});
