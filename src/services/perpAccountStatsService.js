@@ -47,7 +47,7 @@ const getCumulativeUniqueTraders = async (chain, isRefresh = false, trx = troyDB
                 account_id
               FROM
                 ${tableName}
-              WHERE ts > ?
+              WHERE DATE(ts) > DATE(?)
             ),
             daily_new_traders AS (
               SELECT
@@ -268,7 +268,7 @@ const getDailyNewUniqueTraders = async (chain, isRefresh = false, trx = troyDBKn
               COUNT(DISTINCT account_id) AS daily_unique_traders
             FROM
               ${tableName}
-            WHERE ts > ?
+            WHERE DATE(ts) > DATE(?)
             GROUP BY
               date
             ORDER BY

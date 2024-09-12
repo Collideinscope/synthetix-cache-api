@@ -134,7 +134,7 @@ const getCumulativeUniqueStakers = async (chain, collateralType, isRefresh = fal
                 FROM
                   ${tableName}
                 WHERE
-                  collateral_type = ? AND ts > ?
+                  collateral_type = ? AND DATE(ts) >= DATE(?)
                 GROUP BY
                   account_id, pool_id, collateral_type
               ),
@@ -264,21 +264,20 @@ const getUniqueStakersSummaryStats = async (chain, collateralType, isRefresh = f
             return null;
           }
 
-          const smoothedData = smoothData(data, 'cumulative_staker_count');
-          const latestData = smoothedData[smoothedData.length - 1];
+          const latestData = data[data.length - 1];
           const latestTs = new Date(latestData.ts);
 
           const findValueAtDate = (days) => {
             const targetDate = new Date(latestTs.getTime() - days * 24 * 60 * 60 * 1000);
-            return smoothedData.findLast(item => new Date(item.ts) <= targetDate);
+            return data.findLast(item => new Date(item.ts) <= targetDate);
           };
 
           const value24h = findValueAtDate(1);
           const value7d = findValueAtDate(7);
           const value28d = findValueAtDate(28);
-          const valueYtd = smoothedData.find(item => new Date(item.ts) >= new Date(latestTs.getFullYear(), 0, 1)) || smoothedData[0];
+          const valueYtd = data.find(item => new Date(item.ts) >= new Date(latestTs.getFullYear(), 0, 1)) || data[0];
 
-          const stakerValues = smoothedData.map(item => parseFloat(item.cumulative_staker_count));
+          const stakerValues = data.map(item => parseFloat(item.cumulative_staker_count));
           const current = parseFloat(latestData.cumulative_staker_count);
           const ath = Math.max(...stakerValues);
           const atl = Math.min(...stakerValues);
@@ -367,7 +366,7 @@ const getDailyNewUniqueStakers = async (chain, collateralType, isRefresh = false
               FROM
                 ${tableName}
               WHERE
-                collateral_type = ? AND ts > ?
+                collateral_type = ? AND DATE(ts) >= DATE(?)
             )
             SELECT
               date,

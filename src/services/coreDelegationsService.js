@@ -309,7 +309,7 @@ const getDailyCoreDelegationsData = async (chain, collateralType, isRefresh = fa
                   FIRST_VALUE(SUM(amount_delegated)) OVER (PARTITION BY DATE_TRUNC('day', ts) ORDER BY ts ASC) AS start_of_day_delegations,
                   LAST_VALUE(SUM(amount_delegated)) OVER (PARTITION BY DATE_TRUNC('day', ts) ORDER BY ts ASC ROWS BETWEEN UNBOUNDED PRECEDING AND UNBOUNDED FOLLOWING) AS end_of_day_delegations
                 FROM ${tableName}
-                WHERE collateral_type = ? AND ts > ?
+                WHERE collateral_type = ? AND DATE(ts) >= DATE(?)
                 GROUP BY DATE_TRUNC('day', ts), ts
               )
               SELECT DISTINCT
@@ -327,8 +327,19 @@ const getDailyCoreDelegationsData = async (chain, collateralType, isRefresh = fa
             console.log(`Fetched ${newResult.length} new records from database`);
 
             if (result) {
-              console.log('Parsing and concatenating existing result with new data');
-              result = result.concat(newResult);
+              console.log('Merging existing result with new data');
+              const mergedResult = [...result];
+              newResult.forEach(newRow => {
+                const existingIndex = mergedResult.findIndex(r => 
+                  r.ts === newRow.ts && r.pool_id === newRow.pool_id && r.collateral_type === newRow.collateral_type
+                );
+                if (existingIndex !== -1) {
+                  mergedResult[existingIndex] = newRow;
+                } else {
+                  mergedResult.push(newRow);
+                }
+              });
+              result = mergedResult.sort((a, b) => new Date(a.ts) - new Date(b.ts));
             } else {
               console.log('Setting result to new data');
               result = newResult;

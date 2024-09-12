@@ -180,7 +180,7 @@ const getDailyOpenInterestChangeData = async (chain, isRefresh = false, trx = tr
                 AVG(size_usd) AS daily_market_oi
               FROM
                 ${tableName}
-              WHERE ts > ?
+              WHERE DATE(ts) >= DATE(?)
               GROUP BY
                 DATE_TRUNC('day', ts),
                 market_symbol
