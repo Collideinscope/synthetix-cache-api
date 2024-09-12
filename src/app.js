@@ -7,15 +7,6 @@ const path = require('path');
 
 const app = express();
 
-// Load the combined Swagger documentation file
-let swaggerDocument;
-try {
-  swaggerDocument = YAML.load('./src/docs/combined-swagger.yaml');
-  console.log('Swagger documentation loaded successfully.');
-} catch (error) {
-  console.error('Error loading Swagger documentation:', error);
-}
-
 const apiRouter = express.Router();
 
 const apyRoutes = require('./routes/apy');
@@ -42,13 +33,20 @@ apiRouter.use('/perp-market-history', perpMarketHistoryRoutes);
 
 const customCss = fs.readFileSync(path.join(__dirname, 'swagger-custom.css'), 'utf8');
 
+// Load the combined Swagger documenttion file
+let swaggerDocument;
+try {
+  swaggerDocument = YAML.load('./src/docs/combined-swagger.yaml');
+  console.log('Swagger documentation loaded successfully.');
+} catch (error) {
+  console.error('Error loading Swagger documentation:', error);
+}
+
 // Setup Swagger UI with the combined document and custom options
 if (swaggerDocument) {
   const options = {
     customCss,
     customSiteTitle: "Synthetix Stats API Documentation",
-    customfavIcon: "/path/to/favicon.ico", // Update this path
-    customLogo: "/path/to/synthetix-logo.png", // Update this path
   };
   
   app.use('/api-docs', swaggerUi.serve, swaggerUi.setup(swaggerDocument, options));

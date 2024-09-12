@@ -8,6 +8,11 @@ info:
     **Base URL**: `https://synthetix-cache-api-f7db01015ec1.herokuapp.com`
 
     **Base Path**: `/api/v1`
+
+servers:
+- url: https://synthetix-cache-api-f7db01015ec1.herokuapp.com/api/v1
+  description: Production server
+
 paths:
   /apy/all:
     get:
