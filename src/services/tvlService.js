@@ -238,43 +238,50 @@ const getDailyTVLData = async (chain, collateralType, isRefresh = false, trx = t
           const queryResult = await trx.raw(`
             WITH daily_data AS (
               SELECT
-                DATE_TRUNC('day', ts) AS date,
-                FIRST_VALUE(SUM(collateral_value)) OVER (PARTITION BY DATE_TRUNC('day', ts) ORDER BY ts ASC) AS start_of_day_tvl,
-                LAST_VALUE(SUM(collateral_value)) OVER (PARTITION BY DATE_TRUNC('day', ts) ORDER BY ts ASC ROWS BETWEEN UNBOUNDED PRECEDING AND UNBOUNDED FOLLOWING) AS end_of_day_tvl
+                DATE_TRUNC('day', ts AT TIME ZONE 'UTC') AS date,
+                FIRST_VALUE(SUM(collateral_value)) OVER (PARTITION BY DATE_TRUNC('day', ts AT TIME ZONE 'UTC') ORDER BY ts ASC) AS start_of_day_tvl,
+                LAST_VALUE(SUM(collateral_value)) OVER (PARTITION BY DATE_TRUNC('day', ts AT TIME ZONE 'UTC') ORDER BY ts ASC ROWS BETWEEN UNBOUNDED PRECEDING AND UNBOUNDED FOLLOWING) AS end_of_day_tvl,
+                LAST_VALUE(ts) OVER (PARTITION BY DATE_TRUNC('day', ts AT TIME ZONE 'UTC') ORDER BY ts ASC ROWS BETWEEN UNBOUNDED PRECEDING AND UNBOUNDED FOLLOWING) AS latest_ts
               FROM ${tableName}
               WHERE pool_id = 1
                 AND collateral_type = ?
-                AND DATE(ts) >= DATE(?)
-              GROUP BY DATE_TRUNC('day', ts), ts
+                AND DATE(ts AT TIME ZONE 'UTC') >= DATE(?)
+              GROUP BY DATE_TRUNC('day', ts AT TIME ZONE 'UTC'), ts
             )
             SELECT DISTINCT
-              date,
+              latest_ts AS ts,
               end_of_day_tvl - start_of_day_tvl AS daily_tvl_change
             FROM daily_data
-            ORDER BY date;
+            ORDER BY ts;
           `, [collateralType, startDate]);
 
           const newResult = queryResult.rows.map(row => ({
-            ts: row.date,
+            ts: new Date(row.ts),
             daily_tvl_change: parseFloat(row.daily_tvl_change)
           }));
 
           console.log(`Fetched ${newResult.length} new records from database`);
 
-          if (result) {
+          const isSameUTCDay = (date1, date2) => {
+            const d1 = new Date(date1);
+            const d2 = new Date(date2);
+            return d1.getUTCFullYear() === d2.getUTCFullYear() &&
+                   d1.getUTCMonth() === d2.getUTCMonth() &&
+                   d1.getUTCDate() === d2.getUTCDate();
+          };
+
+          if (result && Array.isArray(result)) {
             console.log('Merging existing result with new data');
             const mergedResult = [...result];
             newResult.forEach(newRow => {
-              const existingIndex = mergedResult.findIndex(r => 
-                r.ts === newRow.ts && r.pool_id === newRow.pool_id && r.collateral_type === newRow.collateral_type
-              );
+              const existingIndex = mergedResult.findIndex(r => isSameUTCDay(r.ts, newRow.ts));
               if (existingIndex !== -1) {
                 mergedResult[existingIndex] = newRow;
               } else {
                 mergedResult.push(newRow);
               }
             });
-            result = mergedResult.sort((a, b) => new Date(a.ts) - new Date(b.ts));
+            result = mergedResult.sort((a, b) => a.ts - b.ts);
           } else {
             console.log('Setting result to new data');
             result = newResult;

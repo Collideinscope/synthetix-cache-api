@@ -38,70 +38,73 @@ const getOpenInterestData = async (chain, isRefresh = false, trx = troyDBKnex) =
           const queryResult = await trx.raw(`
             WITH daily_market_oi AS (
               SELECT
-                DATE(ts) AS day,
+                DATE(ts AT TIME ZONE 'UTC') AS day,
                 market_symbol,
-                AVG(size_usd) AS daily_market_oi
+                AVG(size_usd) AS daily_market_oi,
+                MAX(ts) AS latest_ts
               FROM
                 ${tableName}
-              WHERE DATE(ts) >= DATE(?)
+              WHERE DATE(ts AT TIME ZONE 'UTC') >= DATE(?)
               GROUP BY
-                DATE(ts),
+                DATE(ts AT TIME ZONE 'UTC'),
                 market_symbol
             ),
             daily_oi AS (
               SELECT
                 day,
-                SUM(daily_market_oi) AS daily_oi
+                SUM(daily_market_oi) AS daily_oi,
+                MAX(latest_ts) AS latest_ts
               FROM
                 daily_market_oi
               GROUP BY
                 day
             )
             SELECT
-              day AS ts,
+              latest_ts AS ts,
               daily_oi
             FROM
               daily_oi
             ORDER BY
-              ts ASC;
+              ts ASC;  
           `, [startDate]);
 
+          if (!queryResult || !queryResult.rows) {
+            throw new Error('Query result is undefined or has no rows');
+          }
           const newResult = queryResult.rows.map(row => ({
-            ts: row.ts,
+            ts: new Date(row.ts),
             daily_oi: parseFloat(row.daily_oi),
           }));
-
+          
           console.log(`Fetched ${newResult.length} new records from database`);
-
-          if (result) {
+          
+          const isSameUTCDay = (date1, date2) => {
+            const d1 = new Date(date1);
+            const d2 = new Date(date2);
+            return d1.getUTCFullYear() === d2.getUTCFullYear() &&
+                   d1.getUTCMonth() === d2.getUTCMonth() &&
+                   d1.getUTCDate() === d2.getUTCDate();
+          };
+          
+          if (result && Array.isArray(result)) {
             console.log('Merging existing result with new data');
             const mergedResult = [...result];
-          
             newResult.forEach(newRow => {
-              // Find existing entry based on date day
-              const existingIndex = mergedResult.findIndex(r => 
-                new Date(r.ts).toISOString().split('T')[0] === new Date(newRow.ts).toISOString().split('T')[0]
-              );
-          
+              console.log(`Processing new row for date: ${newRow.ts.toUTCString()}`);
+              const existingIndex = mergedResult.findIndex(r => isSameUTCDay(r.ts, newRow.ts));
               if (existingIndex !== -1) {
-                // If the day exists, recalculate the average
-                const existingRow = mergedResult[existingIndex];
-                mergedResult[existingIndex] = {
-                  ts: existingRow.ts, 
-                  daily_oi: newRow.daily_oi
-                };
+                console.log(`Updating existing entry for ${new Date(mergedResult[existingIndex].ts).toUTCString()} with new value ${newRow.daily_oi}`);
+                mergedResult[existingIndex] = newRow;
               } else {
-                // If it's a new day, add the new entry
+                console.log(`Adding new entry for ${newRow.ts.toUTCString()}`);
                 mergedResult.push(newRow);
               }
             });
-          
-            // Ensure the data is sorted by date after merging
-            result = mergedResult.sort((a, b) => new Date(a.ts) - new Date(b.ts));
+            result = mergedResult.sort((a, b) => a.ts - b.ts);
           } else {
             console.log('Setting result to new data');
             result = newResult;
-          }      
+          }
 
           if (result.length > 0) {
             console.log(`Attempting to cache ${result.length} records in Redis`);
@@ -175,82 +178,70 @@ const getDailyOpenInterestChangeData = async (chain, isRefresh = false, trx = tr
           const queryResult = await trx.raw(`
             WITH daily_market_oi AS (
               SELECT
-                DATE_TRUNC('day', ts) AS day,
+                DATE(ts AT TIME ZONE 'UTC') AS day,
                 market_symbol,
-                AVG(size_usd) AS daily_market_oi
+                FIRST_VALUE(size_usd) OVER (PARTITION BY DATE(ts AT TIME ZONE 'UTC'), market_symbol ORDER BY ts) AS start_oi,
+                LAST_VALUE(size_usd) OVER (PARTITION BY DATE(ts AT TIME ZONE 'UTC'), market_symbol ORDER BY ts ROWS BETWEEN UNBOUNDED PRECEDING AND UNBOUNDED FOLLOWING) AS end_oi,
+                LAST_VALUE(ts) OVER (PARTITION BY DATE(ts AT TIME ZONE 'UTC'), market_symbol ORDER BY ts ROWS BETWEEN UNBOUNDED PRECEDING AND UNBOUNDED FOLLOWING) AS latest_ts
               FROM
                 ${tableName}
-              WHERE DATE(ts) >= DATE(?)
-              GROUP BY
-                DATE_TRUNC('day', ts),
-                market_symbol
+              WHERE DATE(ts AT TIME ZONE 'UTC') >= DATE(?)
             ),
-            daily_oi AS (
+            daily_oi_change AS (
               SELECT
                 day,
-                SUM(daily_market_oi) AS daily_oi
+                MAX(latest_ts) AS ts,
+                SUM(end_oi - start_oi) AS daily_oi_change
               FROM
                 daily_market_oi
               GROUP BY
                 day
-            ),
-            daily_oi_change AS (
-              SELECT
-                day AS ts,
-                daily_oi,
-                daily_oi - LAG(daily_oi) OVER (ORDER BY day) AS daily_oi_change
-              FROM
-                daily_oi
             )
             SELECT
               ts,
-              daily_oi,
               daily_oi_change
             FROM
               daily_oi_change
-            WHERE
-              daily_oi_change IS NOT NULL
             ORDER BY
               ts ASC;
           `, [startDate]);
 
           const newResult = queryResult.rows.map(row => ({
-            ts: row.ts,
+            ts: new Date(row.ts),
             daily_oi_change: parseFloat(row.daily_oi_change)
           }));
 
           console.log(`Fetched ${newResult.length} new records from database`);
 
-          if (result) {
+          const isSameUTCDay = (date1, date2) => {
+            const d1 = new Date(date1);
+            const d2 = new Date(date2);
+            return d1.getUTCFullYear() === d2.getUTCFullYear() &&
+                   d1.getUTCMonth() === d2.getUTCMonth() &&
+                   d1.getUTCDate() === d2.getUTCDate();
+          };
+
+          if (result && Array.isArray(result)) {
             console.log('Merging existing result with new data');
             const mergedResult = [...result];
           
             newResult.forEach(newRow => {
-              // Find existing entry based on date day
-              const existingIndex = mergedResult.findIndex(r => 
-                new Date(r.ts).toISOString().split('T')[0] === new Date(newRow.ts).toISOString().split('T')[0]
-              );
+              const existingIndex = mergedResult.findIndex(r => isSameUTCDay(r.ts, newRow.ts));
           
               if (existingIndex !== -1) {
-                // If the day exists, recalculate the average
-                const existingRow = mergedResult[existingIndex];
-                mergedResult[existingIndex] = {
-                  ts: existingRow.ts, 
-                  daily_oi: newRow.daily_oi
-                };
+                console.log(`Updating existing entry for ${mergedResult[existingIndex].ts.toUTCString()} with new value ${newRow.daily_oi_change}`);
+                mergedResult[existingIndex] = newRow;
               } else {
-                // If it's a new day, add the new entry
+                console.log(`Adding new entry for ${newRow.ts.toUTCString()}`);
                 mergedResult.push(newRow);
               }
             });
           
-            // Ensure the data is sorted by date after merging
-            result = mergedResult.sort((a, b) => new Date(a.ts) - new Date(b.ts));
+            result = mergedResult.sort((a, b) => a.ts - b.ts);
           } else {
             console.log('Setting result to new data');
             result = newResult;
           }      
-
 
           if (result.length > 0) {
             console.log(`Attempting to cache ${result.length} records in Redis`);

@@ -56,8 +56,19 @@ const getAllAPYData = async (chain, collateralType, isRefresh = false, trx = tro
           }));
 
           if (result) {
-            console.log('Concatenating existing result with new data');
-            result = result.concat(newResult);
+            console.log('Merging existing result with new data');
+            const mergedResult = [...result];
+            newResult.forEach(newRow => {
+              const existingIndex = mergedResult.findIndex(r => 
+                r.ts === newRow.ts
+              );
+              if (existingIndex !== -1) {
+                mergedResult[existingIndex] = newRow;
+              } else {
+                mergedResult.push(newRow);
+              }
+            });
+            result = mergedResult.sort((a, b) => new Date(a.ts) - new Date(b.ts));
           } else {
             console.log('Setting result to new data');
             result = newResult;
@@ -206,7 +217,7 @@ const getDailyAggregatedAPYData = async (chain, collateralType, isRefresh = fals
       let result = await redisService.get(cacheKey);
       let cachedTimestamp = await redisService.get(tsKey);
 
-      if (isRefresh) {
+      if (isRefresh || !result) {
         const tableName = `prod_${chainToFetch}_mainnet.fct_core_apr_${chainToFetch}_mainnet`;
         const latestDbTimestamp = await trx(tableName)
           .where('collateral_type', collateralType)
@@ -226,7 +237,7 @@ const getDailyAggregatedAPYData = async (chain, collateralType, isRefresh = fals
                 LAST_VALUE(apy_28d) OVER (PARTITION BY DATE_TRUNC('day', ts) ORDER BY ts
                   RANGE BETWEEN UNBOUNDED PRECEDING AND UNBOUNDED FOLLOWING) AS day_end_apy
               FROM ${tableName}
-              WHERE collateral_type = ? AND ts > ?
+              WHERE collateral_type = ? AND DATE(ts) >= DATE(?)
             )
             SELECT DISTINCT
               date as ts,
@@ -244,9 +255,21 @@ const getDailyAggregatedAPYData = async (chain, collateralType, isRefresh = fals
           }));
 
           if (result) {
-            console.log('Concatenating existing result with new data');
-            result = result.concat(newResult);
+            console.log('Merging existing result with new data');
+            const mergedResult = [...result];
+            newResult.forEach(newRow => {
+              const existingIndex = mergedResult.findIndex(r => 
+                r.ts === newRow.ts
+              );
+              if (existingIndex !== -1) {
+                mergedResult[existingIndex] = newRow;
+              } else {
+                mergedResult.push(newRow);
+              }
+            });
+            result = mergedResult.sort((a, b) => new Date(a.ts) - new Date(b.ts));
           } else {
+            console.log('Setting result to new data');
             result = newResult;
           }
 
