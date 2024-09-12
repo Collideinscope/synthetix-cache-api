@@ -41,6 +41,7 @@ const getStakerCount = async (chain, collateralType, isRefresh = false, trx = tr
             
             const queryResult = await trx(tableName)
               .where('collateral_type', collateralType)
+              .where('pool_id', 1)
               .countDistinct('account_id as staker_count')
               .first();
             
@@ -124,44 +125,38 @@ const getCumulativeUniqueStakers = async (chain, collateralType, isRefresh = fal
             }
 
             const queryResult = await trx.raw(`
-              WITH daily_stakers AS (
-                SELECT DISTINCT
-                  DATE_TRUNC('day', ts) AS day,
+              WITH daily_first_stake AS (
+                SELECT
                   account_id,
                   pool_id,
-                  collateral_type
+                  collateral_type,
+                  MIN(DATE_TRUNC('day', ts)) AS first_stake_day
                 FROM
                   ${tableName}
                 WHERE
                   collateral_type = ? AND ts > ?
-              ),
-              daily_counts AS (
-                SELECT
-                  day,
-                  pool_id,
-                  collateral_type,
-                  COUNT(DISTINCT account_id) AS daily_unique_stakers
-                FROM
-                  daily_stakers
                 GROUP BY
-                  day, pool_id, collateral_type
+                  account_id, pool_id, collateral_type
               ),
-              cumulative_counts AS (
+              daily_cumulative_counts AS (
                 SELECT
-                  day,
-                  pool_id,
-                  collateral_type,
-                  SUM(daily_unique_stakers) OVER (PARTITION BY pool_id, collateral_type ORDER BY day) + ? AS cumulative_staker_count
+                  d.first_stake_day AS day,
+                  d.pool_id,
+                  d.collateral_type,
+                  COUNT(*) AS new_stakers,
+                  SUM(COUNT(*)) OVER (PARTITION BY d.pool_id, d.collateral_type ORDER BY d.first_stake_day) AS cumulative_staker_count
                 FROM
-                  daily_counts
+                  daily_first_stake d
+                GROUP BY
+                  d.first_stake_day, d.pool_id, d.collateral_type
               )
               SELECT
                 day AS ts,
                 pool_id,
                 collateral_type,
-                cumulative_staker_count
+                cumulative_staker_count + ? AS cumulative_staker_count
               FROM
-                cumulative_counts
+                daily_cumulative_counts
               ORDER BY
                 ts, pool_id, collateral_type;
             `, [collateralType, startDate, lastCumulativeCount]);

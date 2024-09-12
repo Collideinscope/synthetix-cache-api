@@ -38,14 +38,14 @@ const getOpenInterestData = async (chain, isRefresh = false, trx = troyDBKnex) =
           const queryResult = await trx.raw(`
             WITH daily_market_oi AS (
               SELECT
-                DATE_TRUNC('day', ts) AS day,
+                DATE(ts) AS day,
                 market_symbol,
                 AVG(size_usd) AS daily_market_oi
               FROM
                 ${tableName}
-              WHERE ts > ?
+              WHERE DATE(ts) >= DATE(?)
               GROUP BY
-                DATE_TRUNC('day', ts),
+                DATE(ts),
                 market_symbol
             ),
             daily_oi AS (
@@ -322,22 +322,21 @@ const getOpenInterestSummaryStats = async (chain, isRefresh = false, trx = troyD
           return null;
         }
 
-        const smoothedData = smoothData(chainData, 'daily_oi');
-        const latestData = smoothedData[smoothedData.length - 1];
+        const latestData = chainData[chainData.length - 1];
         const latestTs = new Date(latestData.ts);
         
         const findValueAtDate = (days) => {
           const targetDate = new Date(latestTs.getTime() - days * 24 * 60 * 60 * 1000);
-          return smoothedData.findLast(item => new Date(item.ts) <= targetDate);
+          return chainData.findLast(item => new Date(item.ts) <= targetDate);
         };
         
         const value24h = findValueAtDate(1);
         const value7d = findValueAtDate(7);
         const value28d = findValueAtDate(28);
-        const valueYtd = smoothedData.find(item => new Date(item.ts) >= new Date(latestTs.getFullYear(), 0, 1)) || smoothedData[0];
+        const valueYtd = chainData.find(item => new Date(item.ts) >= new Date(latestTs.getFullYear(), 0, 1)) || chainData[0];
         
         const current = parseFloat(latestData.daily_oi);
-        const oiValues = smoothedData.map(item => parseFloat(item.daily_oi));
+        const oiValues = chainData.map(item => parseFloat(item.daily_oi));
         
         summaryResult = {
           current,
