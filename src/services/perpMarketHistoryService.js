@@ -176,35 +176,48 @@ const getDailyOpenInterestChangeData = async (chain, isRefresh = false, trx = tr
           console.log(`Fetching data from ${startDate.toISOString()} to ${latestDbTimestamp.latest_ts}`);
 
           const queryResult = await trx.raw(`
-            WITH daily_market_oi AS (
+            WITH daily_market_avg AS (
               SELECT
                 DATE(ts AT TIME ZONE 'UTC') AS day,
                 market_symbol,
-                FIRST_VALUE(size_usd) OVER (PARTITION BY DATE(ts AT TIME ZONE 'UTC'), market_symbol ORDER BY ts) AS start_oi,
-                LAST_VALUE(size_usd) OVER (PARTITION BY DATE(ts AT TIME ZONE 'UTC'), market_symbol ORDER BY ts ROWS BETWEEN UNBOUNDED PRECEDING AND UNBOUNDED FOLLOWING) AS end_oi,
-                LAST_VALUE(ts) OVER (PARTITION BY DATE(ts AT TIME ZONE 'UTC'), market_symbol ORDER BY ts ROWS BETWEEN UNBOUNDED PRECEDING AND UNBOUNDED FOLLOWING) AS latest_ts
+                AVG(size_usd) AS avg_oi,
+                MAX(ts) AS latest_ts
               FROM
                 ${tableName}
-              WHERE DATE(ts AT TIME ZONE 'UTC') >= DATE(?)
+              WHERE DATE(ts AT TIME ZONE 'UTC') >= DATE(?) - INTERVAL '1 day'
+              GROUP BY
+                DATE(ts AT TIME ZONE 'UTC'), market_symbol
             ),
-            daily_oi_change AS (
+            daily_total_avg AS (
               SELECT
                 day,
-                MAX(latest_ts) AS ts,
-                SUM(end_oi - start_oi) AS daily_oi_change
+                SUM(avg_oi) AS total_avg_oi,
+                MAX(latest_ts) AS ts
               FROM
-                daily_market_oi
+                daily_market_avg
               GROUP BY
                 day
+            ),
+            daily_change AS (
+              SELECT
+                day,
+                ts,
+                total_avg_oi,
+                total_avg_oi - LAG(total_avg_oi) OVER (ORDER BY day) AS daily_oi_change
+              FROM
+                daily_total_avg
             )
             SELECT
               ts,
-              daily_oi_change
+              total_avg_oi AS current_oi,
+              COALESCE(daily_oi_change, 0) AS daily_oi_change
             FROM
-              daily_oi_change
+              daily_change
+            WHERE
+              day >= DATE(?) 
             ORDER BY
-              ts ASC;
-          `, [startDate]);
+              day ASC;
+          `, [startDate, startDate]);
 
           const newResult = queryResult.rows.map(row => ({
             ts: new Date(row.ts),
@@ -229,10 +242,8 @@ const getDailyOpenInterestChangeData = async (chain, isRefresh = false, trx = tr
               const existingIndex = mergedResult.findIndex(r => isSameUTCDay(r.ts, newRow.ts));
           
               if (existingIndex !== -1) {
-                console.log(`Updating existing entry for ${mergedResult[existingIndex].ts.toUTCString()} with new value ${newRow.daily_oi_change}`);
                 mergedResult[existingIndex] = newRow;
               } else {
-                console.log(`Adding new entry for ${newRow.ts.toUTCString()}`);
                 mergedResult.push(newRow);
               }
             });
