@@ -119,50 +119,52 @@ const getCumulativeUniqueStakers = async (chain, collateralType, isRefresh = fal
             const startDate = cachedTimestamp ? new Date(cachedTimestamp) : new Date('2023-01-01');
             console.log(`Fetching data from ${startDate.toISOString()} to ${latestDbTimestamp.latest_ts}`);
 
-            let lastCumulativeCount = 0;
-            if (result && result.length > 0) {
-              lastCumulativeCount = Math.max(...result.map(r => r.cumulative_staker_count));
-            }
-
             const queryResult = await trx.raw(`
-              WITH daily_first_stake AS (
+              WITH staker_data AS (
                 SELECT
                   account_id,
                   pool_id,
                   collateral_type,
-                  MIN(DATE_TRUNC('day', ts)) AS first_stake_day
+                  ts
                 FROM
                   ${tableName}
                 WHERE
-                  collateral_type = ? AND DATE(ts) >= DATE(?)
-                GROUP BY
-                  account_id, pool_id, collateral_type
+                  collateral_type = ? AND ts > ?
               ),
-              daily_cumulative_counts AS (
-                SELECT
-                  d.first_stake_day AS day,
-                  d.pool_id,
-                  d.collateral_type,
-                  COUNT(*) AS new_stakers,
-                  SUM(COUNT(*)) OVER (PARTITION BY d.pool_id, d.collateral_type ORDER BY d.first_stake_day) AS cumulative_staker_count
+              unique_stakers AS (
+                SELECT DISTINCT
+                  account_id,
+                  MIN(ts) OVER (PARTITION BY account_id) AS first_stake_ts
                 FROM
-                  daily_first_stake d
-                GROUP BY
-                  d.first_stake_day, d.pool_id, d.collateral_type
+                  staker_data
+              ),
+              cumulative_counts AS (
+                SELECT
+                  us.first_stake_ts AS ts,
+                  sd.pool_id,
+                  sd.collateral_type,
+                  COUNT(*) OVER (ORDER BY us.first_stake_ts) AS cumulative_staker_count,
+                  ROW_NUMBER() OVER (PARTITION BY us.first_stake_ts ORDER BY us.first_stake_ts) AS rn
+                FROM
+                  unique_stakers us
+                JOIN
+                  staker_data sd ON us.account_id = sd.account_id AND us.first_stake_ts = sd.ts
               )
               SELECT
-                day AS ts,
+                ts,
                 pool_id,
                 collateral_type,
-                cumulative_staker_count + ? AS cumulative_staker_count
+                cumulative_staker_count
               FROM
-                daily_cumulative_counts
+                cumulative_counts
+              WHERE
+                rn = 1
               ORDER BY
-                ts, pool_id, collateral_type;
-            `, [collateralType, startDate, lastCumulativeCount]);
+                ts;
+            `, [collateralType, startDate]);
 
             const newResult = queryResult.rows.map(row => ({
-              ts: row.ts,
+              ts: new Date(row.ts),
               cumulative_staker_count: parseInt(row.cumulative_staker_count),
               pool_id: row.pool_id,
               collateral_type: row.collateral_type,
@@ -170,12 +172,12 @@ const getCumulativeUniqueStakers = async (chain, collateralType, isRefresh = fal
 
             console.log(`Fetched ${newResult.length} new records from database`);
 
-            if (result) {
+            if (result && Array.isArray(result)) {
               console.log('Merging existing result with new data');
               const mergedResult = [...result];
               newResult.forEach(newRow => {
                 const existingIndex = mergedResult.findIndex(r => 
-                  r.ts === newRow.ts && r.pool_id === newRow.pool_id && r.collateral_type === newRow.collateral_type
+                  r.ts.getTime() === newRow.ts.getTime() && r.pool_id === newRow.pool_id && r.collateral_type === newRow.collateral_type
                 );
                 if (existingIndex !== -1) {
                   mergedResult[existingIndex] = newRow;
@@ -183,7 +185,7 @@ const getCumulativeUniqueStakers = async (chain, collateralType, isRefresh = fal
                   mergedResult.push(newRow);
                 }
               });
-              result = mergedResult.sort((a, b) => new Date(a.ts) - new Date(b.ts));
+              result = mergedResult.sort((a, b) => a.ts - b.ts);
             } else {
               console.log('Setting result to new data');
               result = newResult;
@@ -209,8 +211,7 @@ const getCumulativeUniqueStakers = async (chain, collateralType, isRefresh = fal
           result = [];
         }
       } else {
-        console.log('Not refreshing, parsing cached result');
-        result = result;
+        console.log('Not refreshing, using cached result');
       }
 
       console.log(`Returning result for ${chainToFetch}: ${result ? result.length + ' records' : 'No data'}`);
@@ -353,23 +354,23 @@ const getDailyNewUniqueStakers = async (chain, collateralType, isRefresh = false
         if (!result || !cachedTimestamp || new Date(latestDbTimestamp.latest_ts) > new Date(cachedTimestamp)) {
           console.log('Fetching new daily unique stakers data from database');
 
-          // If it's a refresh, recalculate from the beginning of the last cached day
           const startDate = cachedTimestamp ? new Date(cachedTimestamp) : new Date('2023-01-01');
 
-          console.log(`Fetching data from ${startDate} to ${latestDbTimestamp.latest_ts}`);
+          console.log(`Fetching data from ${startDate.toISOString()} to ${latestDbTimestamp.latest_ts}`);
 
           const queryResult = await trx.raw(`
             WITH daily_stakers AS (
               SELECT DISTINCT
-                DATE_TRUNC('day', ts) AS date,
-                account_id
+                DATE_TRUNC('day', ts AT TIME ZONE 'UTC') AS date,
+                account_id,
+                ts
               FROM
                 ${tableName}
               WHERE
-                collateral_type = ? AND DATE(ts) >= DATE(?)
+                collateral_type = ? AND DATE(ts AT TIME ZONE 'UTC') >= DATE(?)
             )
             SELECT
-              date,
+              MAX(ts) AS ts,
               COUNT(DISTINCT account_id) AS daily_unique_stakers
             FROM
               daily_stakers
@@ -380,34 +381,35 @@ const getDailyNewUniqueStakers = async (chain, collateralType, isRefresh = false
           `, [collateralType, startDate]);
 
           const newResult = queryResult.rows.map(row => ({
-            ts: row.date,
+            ts: new Date(row.ts),
             daily_unique_stakers: parseInt(row.daily_unique_stakers),
           }));
 
           console.log(`Fetched ${newResult.length} new records from database`);
 
-          // Update the result, replacing the overlapping days
-          if (result) {
+          const isSameUTCDay = (date1, date2) => {
+            const d1 = new Date(date1);
+            const d2 = new Date(date2);
+            return d1.getUTCFullYear() === d2.getUTCFullYear() &&
+                   d1.getUTCMonth() === d2.getUTCMonth() &&
+                   d1.getUTCDate() === d2.getUTCDate();
+          };
+
+          if (result && Array.isArray(result)) {
             console.log('Merging existing result with new data');
             const mergedResult = [...result];
 
             newResult.forEach(newRow => {
-              // Check if the day already exists in the cached result
-              const existingIndex = mergedResult.findIndex(r =>
-                new Date(r.ts).toISOString().split('T')[0] === new Date(newRow.ts).toISOString().split('T')[0]
-              );
+              const existingIndex = mergedResult.findIndex(r => isSameUTCDay(r.ts, newRow.ts));
 
               if (existingIndex !== -1) {
-                // If the day exists, replace the old data with the new data for that day
                 mergedResult[existingIndex] = newRow;
               } else {
-                // Otherwise, add the new entry
                 mergedResult.push(newRow);
               }
             });
 
-            // Sort the result by timestamp
-            result = mergedResult.sort((a, b) => new Date(a.ts) - new Date(b.ts));
+            result = mergedResult.sort((a, b) => a.ts - b.ts);
           } else {
             console.log('Setting result to new data');
             result = newResult;

@@ -20,7 +20,7 @@ const getCumulativeUniqueTraders = async (chain, isRefresh = false, trx = troyDB
     console.log(`Redis result: ${result ? 'Data found' : 'No data'}, Timestamp: ${cachedTimestamp}`);
 
     if (isRefresh || !result) {
-      const tableName = `prod_${chainToFetch}_mainnet.fct_perp_account_stats_daily_${chainToFetch}_mainnet`;
+      const tableName = `prod_${chainToFetch}_mainnet.fct_perp_account_stats_hourly_${chainToFetch}_mainnet`;
       console.log(`Querying database table: ${tableName}`);
 
       try {
@@ -35,69 +35,61 @@ const getCumulativeUniqueTraders = async (chain, isRefresh = false, trx = troyDB
           const startDate = cachedTimestamp ? new Date(cachedTimestamp) : new Date('2023-01-01');
           console.log(`Fetching data from ${startDate.toISOString()} to ${latestDbTimestamp.latest_ts}`);
 
-          let lastCumulativeCount = 0;
-          if (result && result.length > 0) {
-            lastCumulativeCount = Math.max(...result.map(r => r.cumulative_trader_count));
-          }
-
           const queryResult = await trx.raw(`
-            WITH distinct_daily_traders AS (
+            WITH trader_data AS (
               SELECT DISTINCT
-                DATE_TRUNC('day', ts) AS day,
-                account_id
+                account_id,
+                ts
               FROM
                 ${tableName}
-              WHERE DATE(ts) > DATE(?)
+              WHERE
+                ts > ?
             ),
-            daily_new_traders AS (
-              SELECT
-                day,
-                COUNT(*) AS new_traders
-              FROM (
-                SELECT
-                  day,
-                  account_id,
-                  ROW_NUMBER() OVER (PARTITION BY account_id ORDER BY day) AS rn
-                FROM distinct_daily_traders
-              ) subquery
-              WHERE rn = 1
-              GROUP BY day
+            unique_traders AS (
+              SELECT DISTINCT
+                account_id,
+                MIN(ts) OVER (PARTITION BY account_id) AS first_trade_ts
+              FROM
+                trader_data
             ),
             cumulative_counts AS (
               SELECT
-                day,
-                SUM(new_traders) OVER (ORDER BY day) + ? AS cumulative_trader_count
+                first_trade_ts AS ts,
+                COUNT(*) OVER (ORDER BY first_trade_ts) AS cumulative_trader_count,
+                ROW_NUMBER() OVER (PARTITION BY first_trade_ts ORDER BY first_trade_ts) AS rn
               FROM
-                daily_new_traders
+                unique_traders
             )
             SELECT
-              day AS ts,
+              ts,
               cumulative_trader_count
             FROM
               cumulative_counts
+            WHERE
+              rn = 1
             ORDER BY
               ts;
-          `, [startDate, lastCumulativeCount]);
+          `, [startDate]);
 
           const newResult = queryResult.rows.map(row => ({
-            ts: row.ts,
+            ts: new Date(row.ts),
             cumulative_trader_count: parseInt(row.cumulative_trader_count),
           }));
 
           console.log(`Fetched ${newResult.length} new records from database`);
 
-          if (result) {
+          if (result && Array.isArray(result)) {
             console.log('Merging existing result with new data');
             const mergedResult = [...result];
             newResult.forEach(newRow => {
-              const existingIndex = mergedResult.findIndex(r => r.ts === newRow.ts);
+              const existingIndex = mergedResult.findIndex(r => r.ts.getTime() === newRow.ts.getTime());
               if (existingIndex !== -1) {
                 mergedResult[existingIndex] = newRow;
               } else {
                 mergedResult.push(newRow);
               }
             });
-            result = mergedResult.sort((a, b) => new Date(a.ts) - new Date(b.ts));
+            result = mergedResult.sort((a, b) => a.ts - b.ts);
           } else {
             console.log('Setting result to new data');
             result = newResult;
@@ -245,7 +237,7 @@ const getDailyNewUniqueTraders = async (chain, isRefresh = false, trx = troyDBKn
     console.log(`Redis result: ${result ? 'Data found' : 'No data'}, Timestamp: ${cachedTimestamp}`);
 
     if (isRefresh || !result) {
-      const tableName = `prod_${chainToFetch}_mainnet.fct_perp_account_stats_daily_${chainToFetch}_mainnet`;
+      const tableName = `prod_${chainToFetch}_mainnet.fct_perp_account_stats_hourly_${chainToFetch}_mainnet`;
       console.log(`Querying database table: ${tableName}`);
 
       try {
@@ -257,18 +249,25 @@ const getDailyNewUniqueTraders = async (chain, isRefresh = false, trx = troyDBKn
 
         if (!result || !cachedTimestamp || new Date(latestDbTimestamp.latest_ts) > new Date(cachedTimestamp)) {
           console.log('Fetching new daily unique traders data from database');
-
-          // If it's a refresh, recalculate from the beginning of the last cached day
           const startDate = cachedTimestamp ? new Date(cachedTimestamp) : new Date('2023-01-01');
           console.log(`Fetching data from ${startDate.toISOString()} to ${latestDbTimestamp.latest_ts}`);
 
           const queryResult = await trx.raw(`
+            WITH daily_traders AS (
+              SELECT DISTINCT
+                DATE_TRUNC('day', ts AT TIME ZONE 'UTC') AS date,
+                account_id,
+                ts
+              FROM
+                ${tableName}
+              WHERE
+                DATE(ts AT TIME ZONE 'UTC') >= DATE(?)
+            )
             SELECT
-              DATE_TRUNC('day', ts) AS date,
+              MAX(ts) AS ts,
               COUNT(DISTINCT account_id) AS daily_unique_traders
             FROM
-              ${tableName}
-            WHERE DATE(ts) > DATE(?)
+              daily_traders
             GROUP BY
               date
             ORDER BY
@@ -276,33 +275,35 @@ const getDailyNewUniqueTraders = async (chain, isRefresh = false, trx = troyDBKn
           `, [startDate]);
 
           const newResult = queryResult.rows.map(row => ({
-            ts: row.date,
+            ts: new Date(row.ts),
             daily_unique_traders: parseInt(row.daily_unique_traders),
           }));
 
           console.log(`Fetched ${newResult.length} new records from database`);
 
-          if (result) {
+          const isSameUTCDay = (date1, date2) => {
+            const d1 = new Date(date1);
+            const d2 = new Date(date2);
+            return d1.getUTCFullYear() === d2.getUTCFullYear() &&
+                   d1.getUTCMonth() === d2.getUTCMonth() &&
+                   d1.getUTCDate() === d2.getUTCDate();
+          };
+
+          if (result && Array.isArray(result)) {
             console.log('Merging existing result with new data');
             const mergedResult = [...result];
 
             newResult.forEach(newRow => {
-              // Check if the day already exists in the cached result
-              const existingIndex = mergedResult.findIndex(r =>
-                new Date(r.ts).toISOString().split('T')[0] === new Date(newRow.ts).toISOString().split('T')[0]
-              );
+              const existingIndex = mergedResult.findIndex(r => isSameUTCDay(r.ts, newRow.ts));
 
               if (existingIndex !== -1) {
-                // If the day exists, replace the old data with the new data for that day
                 mergedResult[existingIndex] = newRow;
               } else {
-                // Otherwise, add the new entry
                 mergedResult.push(newRow);
               }
             });
 
-            // Sort the result by timestamp
-            result = mergedResult.sort((a, b) => new Date(a.ts) - new Date(b.ts));
+            result = mergedResult.sort((a, b) => a.ts - b.ts);
           } else {
             console.log('Setting result to new data');
             result = newResult;

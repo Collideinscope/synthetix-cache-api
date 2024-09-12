@@ -56,19 +56,7 @@ const getAllAPYData = async (chain, collateralType, isRefresh = false, trx = tro
           }));
 
           if (result) {
-            console.log('Merging existing result with new data');
-            const mergedResult = [...result];
-            newResult.forEach(newRow => {
-              const existingIndex = mergedResult.findIndex(r => 
-                r.ts === newRow.ts
-              );
-              if (existingIndex !== -1) {
-                mergedResult[existingIndex] = newRow;
-              } else {
-                mergedResult.push(newRow);
-              }
-            });
-            result = mergedResult.sort((a, b) => new Date(a.ts) - new Date(b.ts));
+            result = result.concat(newResult);
           } else {
             console.log('Setting result to new data');
             result = newResult;
@@ -213,7 +201,6 @@ const getDailyAggregatedAPYData = async (chain, collateralType, isRefresh = fals
     const fetchDaily = async (chainToFetch) => {
       const cacheKey = `dailyAPY:${chainToFetch}:${collateralType}`;
       const tsKey = `${cacheKey}:timestamp`;
-      
       let result = await redisService.get(cacheKey);
       let cachedTimestamp = await redisService.get(tsKey);
 
@@ -232,42 +219,50 @@ const getDailyAggregatedAPYData = async (chain, collateralType, isRefresh = fals
           const newData = await trx.raw(`
             WITH daily_data AS (
               SELECT
-                DATE_TRUNC('day', ts) AS date,
-                FIRST_VALUE(apy_28d) OVER (PARTITION BY DATE_TRUNC('day', ts) ORDER BY ts) AS day_start_apy,
-                LAST_VALUE(apy_28d) OVER (PARTITION BY DATE_TRUNC('day', ts) ORDER BY ts
-                  RANGE BETWEEN UNBOUNDED PRECEDING AND UNBOUNDED FOLLOWING) AS day_end_apy
+                DATE_TRUNC('day', ts AT TIME ZONE 'UTC') AS date,
+                FIRST_VALUE(apy_28d) OVER (PARTITION BY DATE_TRUNC('day', ts AT TIME ZONE 'UTC') ORDER BY ts) AS day_start_apy,
+                LAST_VALUE(apy_28d) OVER (PARTITION BY DATE_TRUNC('day', ts AT TIME ZONE 'UTC') ORDER BY ts
+                  ROWS BETWEEN UNBOUNDED PRECEDING AND UNBOUNDED FOLLOWING) AS day_end_apy,
+                LAST_VALUE(ts) OVER (PARTITION BY DATE_TRUNC('day', ts AT TIME ZONE 'UTC') ORDER BY ts
+                  ROWS BETWEEN UNBOUNDED PRECEDING AND UNBOUNDED FOLLOWING) AS latest_ts
               FROM ${tableName}
-              WHERE collateral_type = ? AND DATE(ts) >= DATE(?)
+              WHERE collateral_type = ? AND DATE(ts AT TIME ZONE 'UTC') >= DATE(?)
             )
             SELECT DISTINCT
-              date as ts,
-              CASE 
+              latest_ts as ts,
+              CASE
                 WHEN day_start_apy = 0 OR day_end_apy = 0 THEN NULL
                 ELSE (day_end_apy - day_start_apy) / day_start_apy
               END as daily_apy_percentage_delta
             FROM daily_data
-            ORDER BY date;
+            ORDER BY ts;
           `, [collateralType, startDate]);
 
           const newResult = newData.rows.map(row => ({
-            ts: row.ts,
+            ts: new Date(row.ts),
             daily_apy_percentage_delta: row.daily_apy_percentage_delta !== null ? parseFloat(row.daily_apy_percentage_delta) : null
           }));
 
-          if (result) {
+          const isSameUTCDay = (date1, date2) => {
+            const d1 = new Date(date1);
+            const d2 = new Date(date2);
+            return d1.getUTCFullYear() === d2.getUTCFullYear() &&
+                   d1.getUTCMonth() === d2.getUTCMonth() &&
+                   d1.getUTCDate() === d2.getUTCDate();
+          };
+
+          if (result && Array.isArray(result)) {
             console.log('Merging existing result with new data');
             const mergedResult = [...result];
             newResult.forEach(newRow => {
-              const existingIndex = mergedResult.findIndex(r => 
-                r.ts === newRow.ts
-              );
+              const existingIndex = mergedResult.findIndex(r => isSameUTCDay(r.ts, newRow.ts));
               if (existingIndex !== -1) {
                 mergedResult[existingIndex] = newRow;
               } else {
                 mergedResult.push(newRow);
               }
             });
-            result = mergedResult.sort((a, b) => new Date(a.ts) - new Date(b.ts));
+            result = mergedResult.sort((a, b) => a.ts - b.ts);
           } else {
             console.log('Setting result to new data');
             result = newResult;
@@ -278,13 +273,11 @@ const getDailyAggregatedAPYData = async (chain, collateralType, isRefresh = fals
             await redisService.set(tsKey, latestDbTimestamp.latest_ts, CACHE_TTL);
           }
         }
-      } else if (result) {
-        console.log('Not refreshing, parsing cached result');
-        result = result;
+      } else {
+        console.log('Not refreshing, using cached result');
       }
-  
-      console.log(`Returning result for ${chainToFetch}: ${result ? result.length + ' records' : 'No data'}`);
 
+      console.log(`Returning result for ${chainToFetch}: ${result ? result.length + ' records' : 'No data'}`);
       return { [chainToFetch]: result || [] };
     };
 

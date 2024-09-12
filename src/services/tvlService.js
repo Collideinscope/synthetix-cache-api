@@ -41,7 +41,7 @@ const getCumulativeTVLData = async (chain, collateralType, isRefresh = false, tr
           console.log(`Fetching data from ${startDate.toISOString()} to ${latestDbTimestamp.latest_ts}`);
 
           const newData = await trx(tableName)
-            .where('ts', '>=', startDate)
+            .where('ts', '>', startDate)
             .where({
               pool_id: 1,
               collateral_type: collateralType
@@ -51,19 +51,7 @@ const getCumulativeTVLData = async (chain, collateralType, isRefresh = false, tr
           console.log(`Fetched ${newData.length} new records from database`);
 
           if (result) {
-            console.log('Merging existing result with new data');
-            const mergedResult = [...result];
-            newData.forEach(newRow => {
-              const existingIndex = mergedResult.findIndex(r => 
-                r.ts === newRow.ts && r.pool_id === newRow.pool_id && r.collateral_type === newRow.collateral_type
-              );
-              if (existingIndex !== -1) {
-                mergedResult[existingIndex] = newRow;
-              } else {
-                mergedResult.push(newRow);
-              }
-            });
-            result = mergedResult.sort((a, b) => new Date(a.ts) - new Date(b.ts));
+            result = result.concat(newData);
           } else {
             console.log('Setting result to new data');
             result = newData;
