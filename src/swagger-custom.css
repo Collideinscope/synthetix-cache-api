@@ -193,3 +193,7 @@ body {
 .swagger-ui .opblock .opblock-summary-path-description-wrapper {
   background: var(--synthetix-navy-800);
 }
+
+.scheme-container {
+  display: none;
+}
