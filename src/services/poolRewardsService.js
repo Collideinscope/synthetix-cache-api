@@ -41,9 +41,11 @@ const getCumulativePoolRewardsData = async (chain, collateralType, isRefresh = f
           console.log(`Fetching data from ${startDate.toISOString()} to ${latestDbTimestamp.latest_ts}`);
 
           const newData = await trx(tableName)
-            .select('ts', 'pool_id', 'collateral_type', 'rewards_usd')
+            .select(trx.raw('DATE_TRUNC(\'hour\', ts) AS ts'))
+            .sum('rewards_usd as rewards_usd')
             .where({ collateral_type: collateralType })
             .where('ts', '>', startDate)
+            .groupBy(trx.raw('DATE_TRUNC(\'hour\', ts)'))
             .orderBy('ts', 'asc');
 
           console.log(`Fetched ${newData.length} new records from database`);
@@ -52,14 +54,14 @@ const getCumulativePoolRewardsData = async (chain, collateralType, isRefresh = f
           const processedNewData = newData.map(row => {
             cumulativeRewards += parseFloat(row.rewards_usd);
             return {
-              ...row,
+              ts: row.ts,
               cumulative_rewards_usd: parseFloat(cumulativeRewards.toFixed(2))
             };
           });
 
           if (result) {
-            console.log('Parsing and concatenating existing result with new data');
-            result = result.concat(processedNewData);
+            console.log('Merging existing result with new data');
+            result = [...result, ...processedNewData];
           } else {
             console.log('Setting result to new data');
             result = processedNewData;
@@ -234,30 +236,48 @@ const getDailyPoolRewardsData = async (chain, collateralType, isRefresh = false,
           const queryResult = await trx.raw(`
             WITH daily_data AS (
               SELECT
-                DATE_TRUNC('day', ts) AS date,
-                SUM(rewards_usd) AS daily_rewards
+                DATE_TRUNC('day', ts AT TIME ZONE 'UTC') AS date,
+                SUM(rewards_usd) AS daily_rewards,
+                MAX(ts) AS latest_ts
               FROM ${tableName}
-              WHERE collateral_type = ? AND ts > ?
-              GROUP BY DATE_TRUNC('day', ts)
-              ORDER BY DATE_TRUNC('day', ts)
+              WHERE collateral_type = ?
+                AND DATE(ts AT TIME ZONE 'UTC') >= DATE(?)
+              GROUP BY DATE_TRUNC('day', ts AT TIME ZONE 'UTC')
             )
             SELECT
-              date,
+              latest_ts AS ts,
               daily_rewards
             FROM daily_data
-            ORDER BY date;
+            ORDER BY ts;
           `, [collateralType, startDate]);
 
           const newResult = queryResult.rows.map(row => ({
-            ts: row.date,
+            ts: new Date(row.ts),
             daily_rewards: parseFloat(row.daily_rewards)
           }));
 
           console.log(`Fetched ${newResult.length} new records from database`);
 
-          if (result) {
-            console.log('Parsing and concatenating existing result with new data');
-            result = result.concat(newResult);
+          const isSameUTCDay = (date1, date2) => {
+            const d1 = new Date(date1);
+            const d2 = new Date(date2);
+            return d1.getUTCFullYear() === d2.getUTCFullYear() &&
+                   d1.getUTCMonth() === d2.getUTCMonth() &&
+                   d1.getUTCDate() === d2.getUTCDate();
+          };
+
+          if (result && Array.isArray(result)) {
+            console.log('Merging existing result with new data');
+            const mergedResult = [...result];
+            newResult.forEach(newRow => {
+              const existingIndex = mergedResult.findIndex(r => isSameUTCDay(r.ts, newRow.ts));
+              if (existingIndex !== -1) {
+                mergedResult[existingIndex] = newRow;
+              } else {
+                mergedResult.push(newRow);
+              }
+            });
+            result = mergedResult.sort((a, b) => a.ts - b.ts);
           } else {
             console.log('Setting result to new data');
             result = newResult;

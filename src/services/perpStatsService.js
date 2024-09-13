@@ -137,7 +137,7 @@ const fetchCumulativeData = async (chain, dataType, isRefresh = false, trx = tro
             ${dataType}
           FROM 
             ${tableName}
-          WHERE DATE(ts) >= DATE(?)
+          WHERE ts > ?
           ORDER BY 
             ts;
         `, [startDate]);
@@ -148,21 +148,19 @@ const fetchCumulativeData = async (chain, dataType, isRefresh = false, trx = tro
         }));
 
         console.log(`Fetched ${newResult.length} new records from database`);
-        
-        if (result) {
+
+        if (result && Array.isArray(result)) {
           console.log('Merging existing result with new data');
           const mergedResult = [...result];
           newResult.forEach(newRow => {
-            const existingIndex = mergedResult.findIndex(r => 
-              r.ts === newRow.ts && r.pool_id === newRow.pool_id && r.collateral_type === newRow.collateral_type
-            );
+            const existingIndex = mergedResult.findIndex(r => r.ts.getTime() === newRow.ts.getTime());
             if (existingIndex !== -1) {
               mergedResult[existingIndex] = newRow;
             } else {
               mergedResult.push(newRow);
             }
           });
-          result = mergedResult.sort((a, b) => new Date(a.ts) - new Date(b.ts));
+          result = mergedResult.sort((a, b) => a.ts - b.ts);
         } else {
           console.log('Setting result to new data');
           result = newResult;
@@ -284,7 +282,7 @@ const fetchDailyData = async (chain, dataType, isRefresh = false, trx = troyDBKn
           const mergedResult = [...result];
           newResult.forEach(newRow => {
             const existingIndex = mergedResult.findIndex(r => 
-              r.ts === newRow.ts && r.pool_id === newRow.pool_id && r.collateral_type === newRow.collateral_type
+              r.ts === newRow.ts
             );
             if (existingIndex !== -1) {
               mergedResult[existingIndex] = newRow;
