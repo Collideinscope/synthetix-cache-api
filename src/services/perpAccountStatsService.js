@@ -12,12 +12,16 @@ const getCumulativeUniqueTraders = async (chain, isRefresh = false, trx = troyDB
   const fetchCumulativeData = async (chainToFetch) => {
     const cacheKey = `cumulativeUniqueTraders:${chainToFetch}`;
     const tsKey = `${cacheKey}:timestamp`;
+    const accountIdsKey = `${cacheKey}:accountIds`;
 
     console.log(`Attempting to get data from Redis for key: ${cacheKey}`);
     let result = await redisService.get(cacheKey);
     let cachedTimestamp = await redisService.get(tsKey);
+    let cachedAccountIds = await redisService.get(accountIdsKey);
 
     console.log(`Redis result: ${result ? 'Data found' : 'No data'}, Timestamp: ${cachedTimestamp}`);
+
+    let seenAccountIds = new Set(cachedAccountIds ? JSON.parse(cachedAccountIds) : []);
 
     if (isRefresh || !result) {
       const tableName = `prod_${chainToFetch}_mainnet.fct_perp_account_stats_hourly_${chainToFetch}_mainnet`;
@@ -36,49 +40,29 @@ const getCumulativeUniqueTraders = async (chain, isRefresh = false, trx = troyDB
           console.log(`Fetching data from ${startDate.toISOString()} to ${latestDbTimestamp.latest_ts}`);
 
           const queryResult = await trx.raw(`
-            WITH trader_data AS (
-              SELECT DISTINCT
-                account_id,
-                ts
-              FROM
-                ${tableName}
-              WHERE
-                ts > ?
-            ),
-            unique_traders AS (
-              SELECT DISTINCT
-                account_id,
-                MIN(ts) OVER (PARTITION BY account_id) AS first_trade_ts
-              FROM
-                trader_data
-            ),
-            cumulative_counts AS (
-              SELECT
-                first_trade_ts AS ts,
-                COUNT(*) OVER (ORDER BY first_trade_ts) AS cumulative_trader_count,
-                ROW_NUMBER() OVER (PARTITION BY first_trade_ts ORDER BY first_trade_ts) AS rn
-              FROM
-                unique_traders
-            )
-            SELECT
-              ts,
-              cumulative_trader_count
+            SELECT DISTINCT
+              account_id,
+              ts
             FROM
-              cumulative_counts
+              ${tableName}
             WHERE
-              rn = 1
+              ts > ?
             ORDER BY
-              ts;
+              ts
           `, [startDate]);
 
-          const lastCumulativeCount = result && Array.isArray(result) && result.length > 0
-            ? result[result.length - 1].cumulative_trader_count
-            : 0;
-
-          const newResult = queryResult.rows.map(row => ({
-            ts: new Date(row.ts),
-            cumulative_trader_count: parseInt(row.cumulative_trader_count) + lastCumulativeCount,
-          }));
+          let cumulativeCount = seenAccountIds.size;
+          const newResult = queryResult.rows.map(row => {
+            if (!seenAccountIds.has(row.account_id)) {
+              seenAccountIds.add(row.account_id);
+              cumulativeCount++;
+            }
+            return {
+              ts: new Date(row.ts),
+              cumulative_trader_count: cumulativeCount,
+              account_id: row.account_id
+            };
+          });
 
           console.log(`Fetched ${newResult.length} new records from database`);
           
@@ -86,16 +70,14 @@ const getCumulativeUniqueTraders = async (chain, isRefresh = false, trx = troyDB
             console.log('Merging existing result with new data');
             const mergedResult = [...result];
             newResult.forEach(newRow => {
-              const existingIndex = mergedResult.findIndex(r => {
-                return new Date(r.ts).getTime() === newRow.ts.getTime();
-              });
+              const existingIndex = mergedResult.findIndex(r => new Date(r.ts).getTime() === newRow.ts.getTime());
               if (existingIndex !== -1) {
                 mergedResult[existingIndex] = newRow;
               } else {
                 mergedResult.push(newRow);
               }
             });
-            result = mergedResult.sort((a, b) => a.ts - b.ts);
+            result = mergedResult.sort((a, b) => new Date(a.ts) - new Date(b.ts));
           } else {
             console.log('Setting result to new data');
             result = newResult;
@@ -106,6 +88,7 @@ const getCumulativeUniqueTraders = async (chain, isRefresh = false, trx = troyDB
             try {
               await redisService.set(cacheKey, result, CACHE_TTL);
               await redisService.set(tsKey, latestDbTimestamp.latest_ts, CACHE_TTL);
+              await redisService.set(accountIdsKey, JSON.stringify(Array.from(seenAccountIds)), CACHE_TTL);
               console.log('Data successfully cached in Redis');
             } catch (redisError) {
               console.error('Error caching data in Redis:', redisError);
@@ -118,7 +101,7 @@ const getCumulativeUniqueTraders = async (chain, isRefresh = false, trx = troyDB
         }
       } catch (dbError) {
         console.error('Error querying database:', dbError);
-        result = [];
+        result = result || []; // Keep existing result if there's an error
       }
     } else {
       console.log('Not refreshing, using cached result');

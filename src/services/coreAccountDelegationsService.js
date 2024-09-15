@@ -95,12 +95,16 @@ const getCumulativeUniqueStakers = async (chain, collateralType, isRefresh = fal
     const fetchCumulativeData = async (chainToFetch) => {
       const cacheKey = `cumulativeUniqueStakers:${chainToFetch}:${collateralType}`;
       const tsKey = `${cacheKey}:timestamp`;
+      const accountIdsKey = `${cacheKey}:accountIds`;
       
       console.log(`Attempting to get data from Redis for key: ${cacheKey}`);
       let result = await redisService.get(cacheKey);
       let cachedTimestamp = await redisService.get(tsKey);
+      let cachedAccountIds = await redisService.get(accountIdsKey);
 
       console.log(`Redis result: ${result ? 'Data found' : 'No data'}, Timestamp: ${cachedTimestamp}`);
+
+      let seenAccountIds = new Set(cachedAccountIds ? JSON.parse(cachedAccountIds) : []);
 
       if (isRefresh || !result) {
         const tableName = `prod_${chainToFetch}_mainnet.fct_core_account_delegation_${chainToFetch}_mainnet`;
@@ -120,59 +124,33 @@ const getCumulativeUniqueStakers = async (chain, collateralType, isRefresh = fal
             console.log(`Fetching data from ${startDate.toISOString()} to ${latestDbTimestamp.latest_ts}`);
 
             const queryResult = await trx.raw(`
-              WITH staker_data AS (
-                SELECT
-                  account_id,
-                  pool_id,
-                  collateral_type,
-                  ts
-                FROM
-                  ${tableName}
-                WHERE
-                  collateral_type = ? AND ts > ?
-              ),
-              unique_stakers AS (
-                SELECT DISTINCT
-                  account_id,
-                  MIN(ts) OVER (PARTITION BY account_id) AS first_stake_ts
-                FROM
-                  staker_data
-              ),
-              cumulative_counts AS (
-                SELECT
-                  us.first_stake_ts AS ts,
-                  sd.pool_id,
-                  sd.collateral_type,
-                  COUNT(*) OVER (ORDER BY us.first_stake_ts) AS cumulative_staker_count,
-                  ROW_NUMBER() OVER (PARTITION BY us.first_stake_ts ORDER BY us.first_stake_ts) AS rn
-                FROM
-                  unique_stakers us
-                JOIN
-                  staker_data sd ON us.account_id = sd.account_id AND us.first_stake_ts = sd.ts
-              )
               SELECT
-                ts,
+                account_id,
                 pool_id,
                 collateral_type,
-                cumulative_staker_count
+                ts
               FROM
-                cumulative_counts
+                ${tableName}
               WHERE
-                rn = 1
+                collateral_type = ? AND ts > ?
               ORDER BY
-                ts;
+                ts
             `, [collateralType, startDate]);
 
-            const lastCumulativeCount = result && Array.isArray(result && result.length > 0)
-              ? result[result.length - 1].cumulative_staker_count
-              : 0;
-
-            const newResult = queryResult.rows.map(row => ({
-              ts: new Date(row.ts),
-              cumulative_staker_count: parseInt(row.cumulative_staker_count) + lastCumulativeCount,
-              pool_id: row.pool_id,
-              collateral_type: row.collateral_type,
-            }));
+            let currentCumulativeCount = seenAccountIds.size;
+            const newResult = queryResult.rows.map(row => {
+              if (!seenAccountIds.has(row.account_id)) {
+                seenAccountIds.add(row.account_id);
+                currentCumulativeCount++;
+              }
+              return {
+                ts: new Date(row.ts),
+                cumulative_staker_count: currentCumulativeCount,
+                pool_id: row.pool_id,
+                collateral_type: row.collateral_type,
+                account_id: row.account_id
+              };
+            });
 
             console.log(`Fetched ${newResult.length} new records from database`);
 
@@ -180,16 +158,19 @@ const getCumulativeUniqueStakers = async (chain, collateralType, isRefresh = fal
               console.log('Merging existing result with new data');
               const mergedResult = [...result];
               newResult.forEach(newRow => {
-                const existingIndex = mergedResult.findIndex(r => {
-                  return new Date(r.ts).getTime() === newRow.ts.getTime() && r.pool_id === newRow.pool_id && r.collateral_type === newRow.collateral_type;
-                });   
+                const existingIndex = mergedResult.findIndex(r => 
+                  new Date(r.ts).getTime() === newRow.ts.getTime() && 
+                  r.pool_id === newRow.pool_id && 
+                  r.collateral_type === newRow.collateral_type
+                );
+                
                 if (existingIndex !== -1) {
                   mergedResult[existingIndex] = newRow;
                 } else {
                   mergedResult.push(newRow);
                 }
               });
-              result = mergedResult.sort((a, b) => a.ts - b.ts);
+              result = mergedResult.sort((a, b) => new Date(a.ts) - new Date(b.ts));
             } else {
               console.log('Setting result to new data');
               result = newResult;
@@ -200,6 +181,7 @@ const getCumulativeUniqueStakers = async (chain, collateralType, isRefresh = fal
               try {
                 await redisService.set(cacheKey, result, CACHE_TTL);
                 await redisService.set(tsKey, latestDbTimestamp.latest_ts, CACHE_TTL);
+                await redisService.set(accountIdsKey, JSON.stringify(Array.from(seenAccountIds)), CACHE_TTL);
                 console.log('Data successfully cached in Redis');
               } catch (redisError) {
                 console.error('Error caching data in Redis:', redisError);
@@ -212,7 +194,7 @@ const getCumulativeUniqueStakers = async (chain, collateralType, isRefresh = fal
           }
         } catch (dbError) {
           console.error('Error querying database:', dbError);
-          result = [];
+          result = result || []; // Keep existing result if there's an error
         }
       } else {
         console.log('Not refreshing, using cached result');
