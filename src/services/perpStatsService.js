@@ -153,7 +153,9 @@ const fetchCumulativeData = async (chain, dataType, isRefresh = false, trx = tro
           console.log('Merging existing result with new data');
           const mergedResult = [...result];
           newResult.forEach(newRow => {
-            const existingIndex = mergedResult.findIndex(r => r.ts.getTime() === newRow.ts.getTime());
+            const existingIndex = mergedResult.findIndex(r => {
+              return new Date(r.ts).getTime() === newRow.ts.getTime();
+            });            
             if (existingIndex !== -1) {
               mergedResult[existingIndex] = newRow;
             } else {
@@ -281,9 +283,9 @@ const fetchDailyData = async (chain, dataType, isRefresh = false, trx = troyDBKn
           console.log('Merging existing result with new data');
           const mergedResult = [...result];
           newResult.forEach(newRow => {
-            const existingIndex = mergedResult.findIndex(r => 
-              r.ts === newRow.ts
-            );
+            const existingIndex = mergedResult.findIndex(r => {
+              return r.ts === newRow.ts
+          });
             if (existingIndex !== -1) {
               mergedResult[existingIndex] = newRow;
             } else {

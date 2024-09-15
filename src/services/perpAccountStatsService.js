@@ -71,18 +71,24 @@ const getCumulativeUniqueTraders = async (chain, isRefresh = false, trx = troyDB
               ts;
           `, [startDate]);
 
+          const lastCumulativeCount = result && Array.isArray(result) && result.length > 0
+            ? result[result.length - 1].cumulative_trader_count
+            : 0;
+
           const newResult = queryResult.rows.map(row => ({
             ts: new Date(row.ts),
-            cumulative_trader_count: parseInt(row.cumulative_trader_count),
+            cumulative_trader_count: parseInt(row.cumulative_trader_count) + lastCumulativeCount,
           }));
 
           console.log(`Fetched ${newResult.length} new records from database`);
-
+          
           if (result && Array.isArray(result)) {
             console.log('Merging existing result with new data');
             const mergedResult = [...result];
             newResult.forEach(newRow => {
-              const existingIndex = mergedResult.findIndex(r => r.ts.getTime() === newRow.ts.getTime());
+              const existingIndex = mergedResult.findIndex(r => {
+                return new Date(r.ts).getTime() === newRow.ts.getTime();
+              });
               if (existingIndex !== -1) {
                 mergedResult[existingIndex] = newRow;
               } else {

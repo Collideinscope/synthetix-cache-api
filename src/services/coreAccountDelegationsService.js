@@ -163,9 +163,13 @@ const getCumulativeUniqueStakers = async (chain, collateralType, isRefresh = fal
                 ts;
             `, [collateralType, startDate]);
 
+            const lastCumulativeCount = result && Array.isArray(result && result.length > 0)
+              ? result[result.length - 1].cumulative_staker_count
+              : 0;
+
             const newResult = queryResult.rows.map(row => ({
               ts: new Date(row.ts),
-              cumulative_staker_count: parseInt(row.cumulative_staker_count),
+              cumulative_staker_count: parseInt(row.cumulative_staker_count) + lastCumulativeCount,
               pool_id: row.pool_id,
               collateral_type: row.collateral_type,
             }));
@@ -176,9 +180,9 @@ const getCumulativeUniqueStakers = async (chain, collateralType, isRefresh = fal
               console.log('Merging existing result with new data');
               const mergedResult = [...result];
               newResult.forEach(newRow => {
-                const existingIndex = mergedResult.findIndex(r => 
-                  r.ts.getTime() === newRow.ts.getTime() && r.pool_id === newRow.pool_id && r.collateral_type === newRow.collateral_type
-                );
+                const existingIndex = mergedResult.findIndex(r => {
+                  return new Date(r.ts).getTime() === newRow.ts.getTime() && r.pool_id === newRow.pool_id && r.collateral_type === newRow.collateral_type;
+                });   
                 if (existingIndex !== -1) {
                   mergedResult[existingIndex] = newRow;
                 } else {
