@@ -230,17 +230,14 @@ const getDailyAggregatedAPYData = async (chain, collateralType, isRefresh = fals
             )
             SELECT DISTINCT
               latest_ts as ts,
-              CASE
-                WHEN day_start_apy = 0 OR day_end_apy = 0 THEN NULL
-                ELSE (day_end_apy - day_start_apy) / day_start_apy
-              END as daily_apy_percentage_delta
+              day_end_apy - day_start_apy as daily_apy_value_delta
             FROM daily_data
             ORDER BY ts;
           `, [collateralType, startDate]);
 
           const newResult = newData.rows.map(row => ({
             ts: new Date(row.ts),
-            daily_apy_percentage_delta: row.daily_apy_percentage_delta !== null ? parseFloat(row.daily_apy_percentage_delta) : null
+            daily_apy_value_delta: parseFloat(row.daily_apy_value_delta)
           }));
 
           const isSameUTCDay = (date1, date2) => {
