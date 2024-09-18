@@ -24,7 +24,7 @@ const getSummaryStats = async (chain, column, isRefresh = false, trx = troyDBKne
     console.log(`Cumulative data cache timestamp: ${cumulativeDataTimestamp}`);
 
     if (isRefresh || !summaryResult || !summaryTimestamp || 
-        (cumulativeDataTimestamp && new Date(cumulativeDataTimestamp) > new Date(summaryTimestamp))) {
+        (cumulativeDataTimestamp && new Date(cumulativeDataTimestamp) >= new Date(summaryTimestamp))) {
       console.log('Processing perp stats summary for', chainToProcess);
 
       const data = await fetchCumulativeData(chainToProcess, column, false, trx);
@@ -34,22 +34,21 @@ const getSummaryStats = async (chain, column, isRefresh = false, trx = troyDBKne
         return null;
       }
 
-      const smoothedData = smoothData(data, column);
-      const latestData = smoothedData[smoothedData.length - 1];
+      const latestData = data[data.length - 1];
       const latestTs = new Date(latestData.ts);
       
       const findValueAtDate = (days) => {
         const targetDate = new Date(latestTs.getTime() - days * 24 * 60 * 60 * 1000);
-        return smoothedData.findLast(item => new Date(item.ts) <= targetDate);
+        return data.findLast(item => new Date(item.ts) <= targetDate);
       };
       
       const value24h = findValueAtDate(1);
       const value7d = findValueAtDate(7);
       const value28d = findValueAtDate(28);
-      const valueYtd = smoothedData.find(item => new Date(item.ts) >= new Date(latestTs.getFullYear(), 0, 1)) || smoothedData[0];
+      const valueYtd = data.find(item => new Date(item.ts) >= new Date(latestTs.getFullYear(), 0, 1)) || data[0];
       
       const current = parseFloat(latestData[column]);
-      const columnValues = smoothedData.map(item => parseFloat(item[column]));
+      const columnValues = data.map(item => parseFloat(item[column]));
       
       summaryResult = {
         current,
