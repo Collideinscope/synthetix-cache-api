@@ -126,7 +126,7 @@ const fetchCumulativeData = async (chain, dataType, isRefresh = false, trx = tro
 
       console.log(`Latest DB timestamp: ${JSON.stringify(latestDbTimestamp)}`);
 
-      if (!result || !cachedTimestamp || new Date(latestDbTimestamp.latest_ts) > new Date(cachedTimestamp)) {
+      if (!result || !cachedTimestamp || new Date(latestDbTimestamp.latest_ts) >= new Date(cachedTimestamp)) {
         console.log('Fetching new cumulative data from database');
         const startDate = cachedTimestamp ? new Date(cachedTimestamp) : new Date('2023-01-01');
         console.log(`Fetching data from ${startDate.toISOString()} to ${latestDbTimestamp.latest_ts}`);
@@ -137,7 +137,7 @@ const fetchCumulativeData = async (chain, dataType, isRefresh = false, trx = tro
             ${dataType}
           FROM 
             ${tableName}
-          WHERE ts > ?
+          WHERE DATE(ts) >= DATE(?)
           ORDER BY 
             ts;
         `, [startDate]);
@@ -149,20 +149,20 @@ const fetchCumulativeData = async (chain, dataType, isRefresh = false, trx = tro
 
         console.log(`Fetched ${newResult.length} new records from database`);
 
-        if (result && Array.isArray(result)) {
+        if (result) {
           console.log('Merging existing result with new data');
           const mergedResult = [...result];
           newResult.forEach(newRow => {
             const existingIndex = mergedResult.findIndex(r => {
-              return new Date(r.ts).getTime() === newRow.ts.getTime();
-            });            
+              return new Date(r.ts).toDateString() === new Date(newRow.ts).toDateString();
+            });
             if (existingIndex !== -1) {
               mergedResult[existingIndex] = newRow;
             } else {
               mergedResult.push(newRow);
             }
           });
-          result = mergedResult.sort((a, b) => a.ts - b.ts);
+          result = mergedResult.sort((a, b) => new Date(a.ts) - new Date(b.ts));
         } else {
           console.log('Setting result to new data');
           result = newResult;
@@ -256,7 +256,7 @@ const fetchDailyData = async (chain, dataType, isRefresh = false, trx = troyDBKn
 
       console.log(`Latest DB timestamp: ${JSON.stringify(latestDbTimestamp)}`);
 
-      if (!result || !cachedTimestamp || new Date(latestDbTimestamp.latest_ts) > new Date(cachedTimestamp)) {
+      if (!result || !cachedTimestamp || new Date(latestDbTimestamp.latest_ts) >= new Date(cachedTimestamp)) {
         console.log('Fetching new daily data from database');
         const startDate = cachedTimestamp ? new Date(cachedTimestamp) : new Date('2023-01-01');
         console.log(`Fetching data from ${startDate.toISOString()} to ${latestDbTimestamp.latest_ts}`);
@@ -284,7 +284,7 @@ const fetchDailyData = async (chain, dataType, isRefresh = false, trx = troyDBKn
           const mergedResult = [...result];
           newResult.forEach(newRow => {
             const existingIndex = mergedResult.findIndex(r => {
-              // Compare the day of timestamp
+              // Compare only the date part of the timestamp
               return new Date(r.ts).toDateString() === new Date(newRow.ts).toDateString();
             });
             if (existingIndex !== -1) {
