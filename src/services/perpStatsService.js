@@ -284,7 +284,7 @@ const fetchDailyData = async (chain, dataType, isRefresh = false, trx = troyDBKn
           const mergedResult = [...result];
           newResult.forEach(newRow => {
             const existingIndex = mergedResult.findIndex(r => {
-              // Compare the day the timestamp
+              // Compare the day of timestamp
               return new Date(r.ts).toDateString() === new Date(newRow.ts).toDateString();
             });
             if (existingIndex !== -1) {
